@@ -26,6 +26,19 @@ void mainWindow::openImages() {
 
 }
 
+void mainWindow::openJSON() {
+    auto selection = ShowFileOpenDialog(false);
+
+    if (selection.size() > 0) {
+        if (validRoll()) {
+            if(activeRolls[selRoll].importRollMetaJSON(selection[0])) {
+                rollRender();
+            }
+
+        }
+    }
+}
+
 void mainWindow::openRolls() {
     auto selection = ShowFolderSelectionDialog();
     // Do something with selection

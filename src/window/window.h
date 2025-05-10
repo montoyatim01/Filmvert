@@ -155,6 +155,7 @@ class mainWindow
         int impRoll = 0;
         bool newRollPopup = false;
         char rollNameBuf[64];
+        char rollPath[512];
 
 
         // Export
@@ -198,6 +199,7 @@ class mainWindow
         void CalculateDisplaySize(int imageWidth, int imageHeight, ImVec2 maxAvailable, ImVec2& outDisplaySize, int rotation);
         void calculateVisible();
         void openImages();
+        void openJSON();
         void openRolls();
         void saveImage();
         void openDirectory();
@@ -211,6 +213,7 @@ class mainWindow
         void initRender(int start, int end);
         void imgRender();
         void imgRender(image *img);
+        void rollRenderCheck();
         void rollRender();
 
         void analyzeImage();

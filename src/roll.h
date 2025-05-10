@@ -21,7 +21,8 @@ class filmRoll {
     void loadBuffers();
 
     void saveAll();
-    bool exportRollMetaJSON(const std::string& outDirectory);
+    bool exportRollMetaJSON();
+    bool importRollMetaJSON(const std::string& jsonFile);
 
     bool imagesLoading = false;
     bool rollLoaded = false;
@@ -32,6 +33,7 @@ class filmRoll {
     bool sdlUpdating();
 
     std::string rollName;
+    std::string rollPath;
 
     std::deque<image> images;
     int selIm = -1;

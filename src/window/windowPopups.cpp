@@ -1,4 +1,6 @@
 #include "window.h"
+#include <cstring>
+#include <imgui.h>
 
 
 
@@ -23,8 +25,18 @@ void mainWindow::importImagePopup() {
         if (ImGui::BeginPopupModal("New Roll", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
             ImGui::Text("Roll Name: ");
             ImGui::InputTextWithHint("###rName", "Roll Name", rollNameBuf, IM_ARRAYSIZE(rollNameBuf));
+            ImGui::Text("Roll Directory (for metadata saving:");
+            ImGui::InputText("###rPath", rollPath, IM_ARRAYSIZE(rollPath));
+            ImGui::SameLine();
+            if (ImGui::Button("Browse")) {
+                auto result = ShowFolderSelectionDialog(false);
+                if (!result.empty())
+                    strcpy(rollPath, result[0].c_str());
+            }
             if (ImGui::Button("Cancel")) {
                 newRollPopup = false;
+                std::memset(rollNameBuf, 0, sizeof(rollNameBuf));
+                std::memset(rollPath, 0, sizeof(rollPath));
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
@@ -33,8 +45,11 @@ void mainWindow::importImagePopup() {
                 rollNames.resize(rollNames.size() + 1);
                 rollNames[rollNames.size() - 1] = new char[activeRolls.back().rollName.length() + 1];
                 std::strcpy(rollNames[rollNames.size() - 1], activeRolls.back().rollName.c_str());
+                activeRolls.back().rollPath = rollPath;
+                std::memset(rollPath, 0, sizeof(rollPath));
                 std::memset(rollNameBuf, 0, sizeof(rollNameBuf));
                 impRoll = activeRolls.size() - 1;
+
                 newRollPopup = false;
                 ImGui::CloseCurrentPopup();
             }

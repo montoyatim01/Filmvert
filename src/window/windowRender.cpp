@@ -48,8 +48,15 @@ void mainWindow::imgRender(image *img) {
         //renderCall = false;
 	}
 }
-
 void mainWindow::rollRender() {
+    if (validRoll()) {
+        for (int i = 0; i < activeRolls[selRoll].images.size(); i++) {
+            imgRender(getImage(selRoll, i));
+        }
+    }
+}
+
+void mainWindow::rollRenderCheck() {
 
     // Scan through all images needing SDL updates
     // after being rendered (queued by import)

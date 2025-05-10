@@ -5,26 +5,30 @@
 void mainWindow::menuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Open Image(s) (Cmd + O")) {
+            if (ImGui::MenuItem("Open Image(s) (⌘+O)")) {
                 openImages();
             }
-            if (ImGui::MenuItem("Open Roll(s) (Cmd + Shift + O")) {
+            if (ImGui::MenuItem("Open Roll(s) (⌘+Shift+O)")) {
                 openRolls();
             }
 
             ImGui::Separator();
 
-            if (ImGui::MenuItem("Save Image (Cmd + S)")) {
+            if (ImGui::MenuItem("Save Image (⌘+S)")) {
                 if (validIm())
                     activeImage()->writeXMPFile();
             }
-            if (ImGui::MenuItem("Save Roll (Cmd + Shift + S)")) {
-                if (validRoll())
+            if (ImGui::MenuItem("Save Roll (⌘+Shift+S)")) {
+                if (validRoll()) {
                     activeRolls[selRoll].saveAll();
+                    activeRolls[selRoll].exportRollMetaJSON();
+                }
+
             }
-            if (ImGui::MenuItem("Save All (Opt + Shift + S)")) {
+            if (ImGui::MenuItem("Save All (Opt+Shift+S)")) {
                 for (int r = 0; r < activeRolls.size(); r++) {
                     activeRolls[r].saveAll();
+                    activeRolls[r].exportRollMetaJSON();
                 }
             }
             ImGui::Separator();
@@ -40,6 +44,7 @@ void mainWindow::menuBar() {
                 //settingPopup = true;
             }
 
+            ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {
                 done = true;
             }
@@ -47,7 +52,7 @@ void mainWindow::menuBar() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Edit")) {
-            if (ImGui::MenuItem("Select All (Cmd + A")) {
+            if (ImGui::MenuItem("Select All (⌘+A)")) {
                 // Select All
                 if(validRoll()) {
                     int itemCount = activeRolls[selRoll].images.size();
@@ -73,8 +78,15 @@ void mainWindow::menuBar() {
         if (ImGui::BeginMenu("Metadata")) {
             // Import Roll Metadata
             if (ImGui::MenuItem("Import Roll Metadata")) {
-                //ImportRollJson();
+                openJSON();
             }
+            // Export Metadata
+            if (ImGui::MenuItem("Export Metadata")) {
+                if (validRoll()) {
+                    activeRolls[selRoll].exportRollMetaJSON();
+                }
+            }
+            ImGui::Separator();
 
             // Edit Roll Metadata
             if (ImGui::MenuItem("Edit Roll Metadata")) {
@@ -86,15 +98,16 @@ void mainWindow::menuBar() {
                 //localMetaPopup = true;
             }
 
-            // Export Metadata
-            if (ImGui::MenuItem("Export Metadata")) {
-                //exportMetaPopup = true;
-            }
+
             ImGui::EndMenu();
+        }
+        std::vector<const char*> itemPointers;
+        for (const auto& item : activeRolls) {
+            itemPointers.push_back(item.rollName.c_str());
         }
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetWindowWidth() * 0.14f));
                 ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25f);
-                if (ImGui::Combo("###", &selRoll, rollNames.data(), activeRolls.size())) {
+                if (ImGui::Combo("###", &selRoll, itemPointers.data(), itemPointers.size())) {
                     // This is where we call the function necessary for dumping
                     // the loaded images and loading the selected images
                     for (int i = 0; i < activeRolls.size(); i++) {

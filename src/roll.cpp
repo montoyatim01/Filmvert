@@ -59,7 +59,7 @@ void filmRoll::saveAll() {
 }
 //TODO IMPORT ROLL JSON
 //TODO DEFAULT ROLL SAVE DIRECTORY
-bool filmRoll::exportRollMetaJSON(const std::string& outDirectory) {
+bool filmRoll::exportRollMetaJSON() {
     try {
         nlohmann::json j;
         nlohmann::json jRoll = nlohmann::json::object();
@@ -74,7 +74,7 @@ bool filmRoll::exportRollMetaJSON(const std::string& outDirectory) {
         }
         j[rollName.c_str()] = jRoll;
         std::string jDump = j.dump(4);
-        std::string outPath = outDirectory + "/" + rollName + ".json";
+        std::string outPath = rollPath + "/" + rollName + ".json";
         std::ofstream jsonFile(outPath, std::ios::out | std::ios::trunc);
         if (!jsonFile) {
             LOG_ERROR("Unable to open JSON file for roll metadata export!");
@@ -87,6 +87,31 @@ bool filmRoll::exportRollMetaJSON(const std::string& outDirectory) {
         LOG_WARN("Unable to format roll JSON: {}", e.what());
         return false;
     }
+}
+
+bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
+     try {
+        nlohmann::json jIn;
+        std::ifstream f(jsonFile);
+        if (!f)
+            return false;
+        jIn = nlohmann::json::parse(f);
+        auto first_item = jIn.begin();
+        rollName = first_item.key();
+        nlohmann::json jRoll = first_item.value();
+        for (int i = 0; i < images.size(); i++) {
+            if (jRoll.contains(images[i].srcFilename)) {
+                nlohmann::json obj = jRoll[images[i].srcFilename].get<nlohmann::json>();
+                images[i].loadMetaFromStr(obj.dump(-1));
+            }
+        }
+        return true;
+
+    } catch (const std::exception& e) {
+        LOG_WARN("Unable to import roll from JSON file: {}", e.what());
+        return false;
+    }
+
 }
 
 bool filmRoll::sdlUpdating() {

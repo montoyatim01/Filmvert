@@ -169,7 +169,7 @@ int mainWindow::openWindow()
         checkMeta();
 
         // Routine for updating thumbnails
-        rollRender();
+        rollRenderCheck();
 
         // Popup functions
         importImagePopup();
