@@ -272,7 +272,7 @@ float4 OCIOMain(float4 inPixel)
   {
     float4 res = float4(outColor.rgb.r, outColor.rgb.g, outColor.rgb.b, outColor.a);
     float4 tmp = res;
-    res = float4x4(float4(1.604753433346922, -0.10208245810655031, -0.0032671116532946819, 0.), float4(-0.531080948604018, 1.1081341286221253, -0.072755424133422703, 0.), float4(-0.073672484741910349, -0.0060516705145729488, 1.0760225357877193, 0.), float4(0., 0., 0., 1.)) * tmp;
+    res = float4x4(1.604753433346922, -0.10208245810655031, -0.0032671116532946819, 0., -0.531080948604018, 1.1081341286221253, -0.072755424133422703, 0., -0.073672484741910349, -0.0060516705145729488, 1.0760225357877193, 0., 0., 0., 0., 1.) * tmp;
     outColor.rgb = float3(res.x, res.y, res.z);
     outColor.a = res.w;
   }
@@ -497,21 +497,25 @@ kernel void mainProcess(device float4 *imgIn [[buffer(0)]],
     pixOut = (pixOut - blackPoint) / (whitePoint - blackPoint);
 
     // Temp/Tint
+    float4 tempPix = pixOut;
     float4 warm = {1.0f, 0.5f, 0.0f, 1.0f};
     float4 cool = {0.0f, 0.5f, 1.0f, 1.0f};
     float4 green = {0.0f, 1.0f, 0.0f, 1.0f};
     float4 mag = {1.0f, 0.0f, 1.0f, 1.0f};
     float temp = (0.75f * renderParams->temp);
     float tint = (0.25f * renderParams->tint);
-    float4 ttXYZIn = AP1toXYZ(pixOut);
+    float4 ttXYZIn = AP1toXYZ(tempPix);
     ttXYZIn.b *= temp + 1.0f;
     ttXYZIn.g *= (-1.0f * tint) + 1.0f;
-    pixOut = XYZtoAP1(ttXYZIn);
+    tempPix = XYZtoAP1(ttXYZIn);
 
     // Grade node operation
     float4 aGrade = G_mult * (G_gain - G_lift) / (G_whitepoint - G_blackpoint);
     float4 bGrade = G_offset + G_lift - aGrade * G_blackpoint;
-    pixOut = pow(aGrade * pixOut + bGrade, 1/G_gamma);
-
-    imgOut[index] = OCIOMain(renderParams->bypass == 1 ? pixIn : pixOut);
+    tempPix = pow(aGrade * tempPix + bGrade, 1.0f/G_gamma);
+    tempPix = clamp(tempPix, 0.0f, 100.0f);
+//OCIOMain
+    float4 out = (renderParams->bypass == 1 ? pixIn : renderParams->gradeBypass == 1 ? pixOut : tempPix);
+    imgOut[index] = out;
+    //dispImg[index] = (uchar4)(clamp(out * 255.0f, 0.0f, 255.0f));
 }

@@ -53,6 +53,7 @@ class tGrainConan(ConanFile):
     default_options = {**spdlog_options, **openimageio_options, **minizip_options, **libraw_options}
 
     def requirements(self):
+        self.requires("libpng/1.6.44")
         self.requires("fmt/10.2.1")
         self.requires("imgui/1.91.4")
         self.requires("sdl/2.30.6")
@@ -62,6 +63,7 @@ class tGrainConan(ConanFile):
         self.requires("openimageio/2.5.16.0")
         self.requires("opencolorio/2.4.0")
         self.requires("minizip-ng/4.0.6")
+        self.requires("exiv2/0.28.2")
 
     def generate(self):
         tc = CMakeToolchain(self)

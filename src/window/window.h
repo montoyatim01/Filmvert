@@ -11,6 +11,11 @@
 #include <stdlib.h>
 #include <cstdlib>
 #include <map>
+#include <atomic>
+#include <filesystem>
+#include <deque>
+#include <string>
+#include <thread>
 
 //ImGui
 #include "grainParams.h"
@@ -26,6 +31,14 @@
 #include "imageIO.h"
 #include "metalGPU.h"
 #include "ocioProcessor.h"
+#include "roll.h"
+#include "threadPool.h"
+
+// Declared functions from macOSFile.mm
+std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canChooseDirectories = false);
+std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true);
+
+std::string find_key_by_value(const std::map<std::string, int>& my_map, int value);
 
 struct copyPaste {
 
@@ -65,6 +78,15 @@ struct copyPaste {
     }
 };
 
+// For mult-threadded imports
+using ImageResult = std::variant<image, std::string>;
+struct IndexedResult {
+    size_t index;
+    ImageResult result;
+};
+
+void imguistyle();
+
 class mainWindow
 {
     public:
@@ -77,7 +99,15 @@ class mainWindow
     private:
         SDL_Renderer* renderer;
         metalGPU* mtlGPU;
-        std::vector<image> activeImages;
+        bool renderCall = false;
+
+        // Program state
+        bool done = false;
+
+        std::deque<filmRoll> activeRolls;
+        std::vector<char*>rollNames;
+        int selRoll = 0;
+        //std::vector<image> activeImages;
 
         int winWidth;
         int winHeight;
@@ -86,7 +116,7 @@ class mainWindow
         ImVec2 dispSize;
         ImVec2 scroll;
 
-        int selIm = -1;
+        //int selIm = -1;
         ImGuiSelectionBasicStorage selection;
         grainParams grain;
         unsigned int cpColorspace;
@@ -94,6 +124,7 @@ class mainWindow
         // UI Toggles
         bool cropDisplay = true;
         bool minMaxDisp = false;
+        bool sampleVisible = false;
 
         // Copy/Paste
         imageParams copyParams;
@@ -105,16 +136,26 @@ class mainWindow
         std::map<std::string, int> globalMapping;
         std::vector<char*> items;
 
-        // Render timings
-        bool renderCall = false;
-        bool isRendering = false;
-        std::chrono::time_point<std::chrono::steady_clock> lastRender;
+        // Metadata
+        std::chrono::time_point<std::chrono::steady_clock> lastChange;
+        bool metaRefresh = false;
 
         // Interaction timings
         float interactionTimer = 0.0f;
         const float INTERACTION_TIMEOUT = 0.25f; // seconds to wait after last interaction
         bool isInteracting = false;
         bool interactCall = false;
+
+        // Import
+        std::atomic<size_t> completedTasks = 0;
+        size_t totalTasks = 0;
+        bool dispImportPop = false;
+        bool dispImpRollPop = false;
+        std::vector<std::string> importFiles;
+        int impRoll = 0;
+        bool newRollPopup = false;
+        char rollNameBuf[64];
+
 
         // Export
         std::thread exportThread;
@@ -131,11 +172,33 @@ class mainWindow
         int curIm = 0;
         unsigned int elapsedTime;
 
+        // Views
+        void menuBar();
+        void imageView();
+        void paramView();
+        void thumbView();
+
+        bool validRoll();
+        bool validIm();
+        image* activeImage();
+        image* getImage(int index);
+        image* getImage(int roll, int index);
+        int activeRollSize();
+        void paramUpdate();
+
+        // windowMeta.cpp
+        void checkMeta();
+
+        // windowKeys.cpp
+        void checkHotkeys();
+
+
         void loadMappings();
         void actionA();
-        void CalculateDisplaySize(int imageWidth, int imageHeight, ImVec2 maxAvailable, ImVec2& outDisplaySize);
+        void CalculateDisplaySize(int imageWidth, int imageHeight, ImVec2 maxAvailable, ImVec2& outDisplaySize, int rotation);
         void calculateVisible();
         void openImages();
+        void openRolls();
         void saveImage();
         void openDirectory();
 
@@ -143,17 +206,20 @@ class mainWindow
         void savePreset();
 
         void clearSelection();
-        bool validIm();
+
 
         void initRender(int start, int end);
         void imgRender();
         void imgRender(image *img);
+        void rollRender();
 
         void analyzeImage();
 
         void createSDLTexture(image* actImage);
         void updateSDLTexture(image* actImage);
 
+        void importImagePopup();
+        void importRollPopup();
         void batchRenderPopup();
         void pastePopup();
 

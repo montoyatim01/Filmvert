@@ -1,6 +1,7 @@
 #include "ocioProcessor.h"
 #include "OpenColorIO/OpenColorIO.h"
 #include "OpenColorIO/OpenColorTypes.h"
+#include <cstring>
 
 ocioProcessor ocioProc;
 /*
@@ -70,12 +71,22 @@ bool ocioProcessor::initialize(std::string &configFile) {
     LOG_INFO("Available displays: ");
     for (int i = 0; i < OCIOconfig->getNumDisplays(); i++) {
         std::string displayName = OCIOconfig->getDisplay(i);
-        LOG_INFO("{}", displayName);
 
+        displays.resize(displays.size() + 1);
+        displays[i] = new char[displayName.length() + 1];
+        std::strcpy(displays[i], displayName.c_str());
+
+        LOG_INFO("{}", displayName);
+        std::vector<char*> curView;
         // Get views for this display
         for (int j = 0; j < OCIOconfig->getNumViews(displayName.c_str()); j++) {
+            std::string view = OCIOconfig->getView(displayName.c_str(), j);
+            curView.resize(curView.size() + 1);
+            curView[j] = new char[view.length() + 1];
+            std::strcpy(curView[j], view.c_str());
             LOG_INFO("{}", OCIOconfig->getView(displayName.c_str(), j));
         }
+        views.push_back(curView);
     }
     return true;
 }
@@ -123,6 +134,32 @@ void ocioProcessor::processImage(float *img, unsigned int width, unsigned int he
     for (auto& t : threads) {
         t.join();
     }
+}
+
+std::string ocioProcessor::getMetalKernel() {
+    const char* display = OCIOconfig->getDisplay(displayOp);
+    const char* view = OCIOconfig->getView(display, viewOp);
+
+    OCIO::DisplayViewTransformRcPtr transform = OCIO::DisplayViewTransform::Create();
+    transform->setSrc("ACEScg");
+    transform->setDisplay(display);
+    transform->setView(view);
+
+    OCIO::ConstProcessorRcPtr processor = OCIOconfig->getProcessor(transform);
+    try {
+        // Step 5: Create GPU shader description
+        OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateShaderDesc();
+        shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_MSL_2_0);  // macOS compatible GLSL version
+
+        // Step 6: Get the shader program info
+        processor->getDefaultGPUProcessor()->extractGpuShaderInfo(shaderDesc);
+        //LOG_INFO("GPU Shader: {}", shaderDesc->getShaderText());
+        return shaderDesc->getShaderText();
+    } catch (OCIO::Exception& e) {
+        LOG_ERROR("OCIO processing error: {}", e.what());
+        return "No Shader!";
+    }
+
 }
 
 void ocioProcessor::processImageGPU(float *img, unsigned int width, unsigned int height) {

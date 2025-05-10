@@ -29,6 +29,7 @@ endif()
 find_package(libraw REQUIRED)
 find_package(OpenImageIO REQUIRED)
 find_package(OpenColorIO REQUIRED)
+find_package(exiv2 REQUIRED)
 find_package(fmt REQUIRED)
 target_compile_definitions( fmt::fmt INTERFACE FMT_HEADER_ONLY)
 find_package(spdlog REQUIRED)
@@ -51,8 +52,15 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -DDEBUG_BUILD")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
 include_directories(src)
+include_directories(src/image)
+include_directories(src/window)
 include_directories("${CMAKE_BINARY_DIR}/bindings")
-include_directories("src/gpu/OCIO")
+#INCLUDE_DIRECTORIES("/Users/timothymontoya/Downloads/exiv2-0.28.5-Darwin-arm64/include")
+#add_library(LibRaw STATIC IMPORTED)
+#set_target_properties(LibRaw PROPERTIES
+#    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/LibRaw/lib/libraw_r.dylib"
+#    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/LibRaw"
+#)
 
 if (APPLE)
     include_directories("/usr/local/include/metal-cpp")
@@ -114,7 +122,7 @@ if (APPLE)
     add_custom_target(make-metallib DEPENDS default.metallib)
 
     add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/Filmvert.air"
-        COMMAND xcrun -sdk macosx metal -std=osx-metal1.2 -mmacos-version-min=10.12 -ffast-math -DMETAL=1 -c ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/Filmvert.metal -o "${CMAKE_BINARY_DIR}/Filmvert.air"
+        COMMAND xcrun -sdk macosx metal -std=macos-metal2.4 -mmacos-version-min=12.0 -ffast-math -DMETAL=1 -c ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/Filmvert.metal -o "${CMAKE_BINARY_DIR}/Filmvert.air"
         DEPENDS src/gpu/Filmvert.metal src/renderParams.h
     )
     add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/default.metallib"
@@ -153,24 +161,27 @@ assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio
 )
 set_property(TARGET resources PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-set(OCIO_SRCS
-    src/gpu/OCIO/glsl.cpp
-    src/gpu/OCIO/oglapp.cpp)
+file(GLOB_RECURSE IMAGE_SRCS src/image/*.cpp)
+file(GLOB_RECURSE WINDOW_SRCS src/window/*.cpp)
+
 
 set(TGRAIN_SRCS
-    ${OCIO_SRCS}
     src/main.cpp
-    src/window.cpp
     src/logger.cpp
-    src/imageIO.cpp
+    ${WINDOW_SRCS}
+    ${IMAGE_SRCS}
+    src/roll.cpp
     src/utils.cpp
     src/grainParams.cpp
     src/metalGPU.cpp
     src/ocioProcessor.cpp
+    src/threadPool.cpp
+    src/threadPool.h
+    src/macOSFile.mm
     ${LICENSEWINDOW_SRC}
     ${IMGUI_SRCS}
 )
-
+set(CMAKE_MACOSX_RPATH ON)
 add_executable(tGrain MACOSX_BUNDLE ${TGRAIN_SRCS})
 set_target_properties(tGrain PROPERTIES
     BUNDLE True
@@ -185,7 +196,7 @@ if (APPLE)
     #set_source_files_properties(HaloLab/HaloLabPlugin.cpp
     #                           COMPILE_FLAGS "-x objective-c++")
 
-
+    #target_link_directories(tGrain PUBLIC "/Users/timothymontoya/Downloads/exiv2-0.28.5/build/lib")
     target_link_libraries(tGrain
                   "-framework MetalKit"
                   "-framework IOKit"
@@ -203,7 +214,11 @@ if (APPLE)
                   nlohmann_json::nlohmann_json
                   libraw::libraw
                   OpenImageIO::OpenImageIO
-                  OpenColorIO::OpenColorIO)
+                  OpenColorIO::OpenColorIO
+                  exiv2::exiv2
+                  #LibRaw
+                  #-lomp
+    )
 elseif (WIN32)
 
     target_link_libraries(tGrain wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
@@ -244,4 +259,17 @@ target_compile_definitions(tGrain PRIVATE
 
 if (APPLE)
     add_dependencies(tGrain make-metallib)
+
+    #add_custom_command(TARGET tGrain POST_BUILD
+    #  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    #          "${CMAKE_SOURCE_DIR}/LibRaw/lib/libraw_r.24.dylib"
+    #          "$<TARGET_BUNDLE_DIR:tGrain>/Contents/Frameworks/libraw_r.24.dylib"
+    #  COMMAND install_name_tool -id "@rpath/libraw_r.24.dylib"
+    #          "$<TARGET_BUNDLE_DIR:tGrain>/Contents/Frameworks/libraw_r.24.dylib"
+    #  COMMAND install_name_tool -add_rpath "@executable_path/../Frameworks"
+    #          $<TARGET_FILE:tGrain>
+    #  COMMAND install_name_tool -change "/usr/local/lib/libraw_r.24.dylib"
+    #          "@rpath/libraw_r.24.dylib"
+    #          $<TARGET_FILE:tGrain>)
+
 endif()

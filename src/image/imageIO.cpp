@@ -2,6 +2,7 @@
 #include "OpenColorIO/OpenColorTransforms.h"
 #include "OpenColorIO/OpenColorTypes.h"
 #include "grainParams.h"
+#include "imageMeta.h"
 #include "logger.h"
 #include "renderParams.h"
 #include "utils.h"
@@ -25,6 +26,7 @@ void image::padToRGBA() {
         // We already have an alpha channel
         return;
     }
+    allocProcBuf();
     if (!procImgData || !rawImgData) {
         LOG_ERROR("Either source or destination rgba buffer is null");
     }
@@ -68,6 +70,7 @@ void image::padToRGBA() {
         thread.join();
     }
     memcpy(rawImgData, procImgData, width * height * 4 * sizeof(float));
+    delProcBuf();
 }
 
 void image::trimForSave() {
@@ -274,14 +277,14 @@ bool image::writeImg(const exportParam param) {
 void image::processBaseColor() {
 
     unsigned int x0, x1, y0, y1;
-    x0 = sampleX[0] < sampleX[1] ? sampleX[0] : sampleX[1];
-    x1 = sampleX[0] > sampleX[1] ? sampleX[0] : sampleX[1];
+    x0 = imgParam.sampleX[0] < imgParam.sampleX[1] ? imgParam.sampleX[0] : imgParam.sampleX[1];
+    x1 = imgParam.sampleX[0] > imgParam.sampleX[1] ? imgParam.sampleX[0] : imgParam.sampleX[1];
 
     x0 = std::clamp(x0, 0u, width - 2);
     x1 = std::clamp(x0, 0u, width - 2);
 
-    y0 = sampleY[0] < sampleY[1] ? sampleY[0] : sampleY[1];
-    y1 = sampleY[0] > sampleY[1] ? sampleY[0] : sampleY[1];
+    y0 = imgParam.sampleY[0] < imgParam.sampleY[1] ? imgParam.sampleY[0] : imgParam.sampleY[1];
+    y1 = imgParam.sampleY[0] > imgParam.sampleY[1] ? imgParam.sampleY[0] : imgParam.sampleY[1];
 
     y0 = std::clamp(y0, 0u, height - 2);
     y1 = std::clamp(y0, 0u, height - 2);
@@ -305,10 +308,36 @@ void image::processBaseColor() {
         return;
     }
 
-    baseColor[0] = rTotal / (float)pixCount;
-    baseColor[1] = gTotal / (float)pixCount;
-    baseColor[2] = bTotal / (float)pixCount;
+    imgParam.baseColor[0] = rTotal / (float)pixCount;
+    imgParam.baseColor[1] = gTotal / (float)pixCount;
+    imgParam.baseColor[2] = bTotal / (float)pixCount;
 
+}
+
+void image::rotRight() {
+    switch(imRot) {
+        case 1: // Upright
+            imRot = 6; break;
+        case 6: // Left
+            imRot = 3; break;
+        case 3: // Upside
+            imRot = 8; break;
+        case 8: // Right
+            imRot = 1; break;
+    }
+}
+
+void image::rotLeft() {
+    switch(imRot) {
+        case 1: // Upright
+            imRot = 8; break;
+        case 8: // Right
+            imRot = 3; break;
+        case 3: // Upside
+            imRot = 6; break;
+        case 6: // Left
+            imRot = 1; break;
+    }
 }
 
 void image::allocBlurBuf() {
@@ -317,12 +346,78 @@ void image::allocBlurBuf() {
 }
 
 void image::delBlurBuf() {
+    blurReady = false;
     if (blurImgData)
     {
         delete [] blurImgData;
         blurImgData = nullptr;
     }
 
+}
+
+void image::allocProcBuf() {
+    if (!procImgData)
+        procImgData = new float [width * height * 4];
+}
+void image::delProcBuf() {
+    if (procImgData) {
+        delete [] procImgData;
+        procImgData = nullptr;
+    }
+}
+
+void image::allocDispBuf() {
+    if (!dispImgData)
+        dispImgData = new uint8_t[width * height * 4];
+}
+
+void image::delDispBuf() {
+    if (dispImgData) {
+        delete [] dispImgData;
+        dispImgData = nullptr;
+    }
+}
+
+void image::clearBuffers() {
+    // Delete raw buffer
+    if (rawImgData) {
+        delete [] rawImgData;
+        rawImgData = nullptr;
+    }
+    // Delete proc buffer
+    if (procImgData) {
+        delete [] procImgData;
+        procImgData = nullptr;
+    }
+    // Delete temp buffer
+    if (tmpOutData) {
+        delete [] tmpOutData;
+        tmpOutData = nullptr;
+    }
+    // Delete Blur buff
+    if (blurImgData) {
+        delete [] blurImgData;
+        blurImgData = nullptr;
+    }
+    // Delete disp buffer
+    if (dispImgData) {
+        delete [] dispImgData;
+        dispImgData = nullptr;
+    }
+    imageLoaded = false;
+}
+
+void image::loadBuffers() {
+    if (imageLoaded)
+        return;
+    allocProcBuf();
+    allocDispBuf();
+    if(debayerImage(false, 2)) {
+        imageLoaded = true;
+
+    }
+    else
+        LOG_WARN("Unable to re-debayer image: {}", fullPath);
 }
 
 void image::processMinMax() {
@@ -402,24 +497,24 @@ void image::processMinMax() {
         float minLuma = 100.0f;
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                if (isPointInBox(x, y, cropBoxX, cropBoxY)) {
+                if (isPointInBox(x, y, imgParam.cropBoxX, imgParam.cropBoxY)) {
                     unsigned int index = (y * width) + x;
                     float luma = Luma(buffer[4 * index + 0], buffer[4 * index + 1], buffer[4 * index + 2]);
                     if (luma < minLuma) {
                         minLuma = luma;
-                        minX = x;
-                        minY = y;
-                        blackPoint[0] = buffer[4 * index + 0];
-                        blackPoint[1] = buffer[4 * index + 1];
-                        blackPoint[2] = buffer[4 * index + 2];
+                        imgParam.minX = x;
+                        imgParam.minY = y;
+                        imgParam.blackPoint[0] = buffer[4 * index + 0];
+                        imgParam.blackPoint[1] = buffer[4 * index + 1];
+                        imgParam.blackPoint[2] = buffer[4 * index + 2];
                     }
                     if (luma > maxLuma) {
                         maxLuma = luma;
-                        maxX = x;
-                        maxY = y;
-                        whitePoint[0] = buffer[4 * index + 0];
-                        whitePoint[1] = buffer[4 * index + 1];
-                        whitePoint[2] = buffer[4 * index + 2];
+                        imgParam.maxX = x;
+                        imgParam.maxY = y;
+                        imgParam.whitePoint[0] = buffer[4 * index + 0];
+                        imgParam.whitePoint[1] = buffer[4 * index + 1];
+                        imgParam.whitePoint[2] = buffer[4 * index + 2];
                     }
                 }
             }
@@ -454,10 +549,10 @@ void image::processMinMax() {
             }*/
 
         LOG_INFO("Analysis finished!");
-        LOG_INFO("Min Pixel: {},{}", minX, minY);
-        LOG_INFO("Min Values: {}, {}, {}", blackPoint[0], blackPoint[1], blackPoint[2]);
-        LOG_INFO("Max Pixel: {},{}", maxX, maxY);
-        LOG_INFO("Max Values: {}, {}, {}", whitePoint[0], whitePoint[1], whitePoint[2]);
+        LOG_INFO("Min Pixel: {},{}", imgParam.minX, imgParam.minY);
+        LOG_INFO("Min Values: {}, {}, {}", imgParam.blackPoint[0], imgParam.blackPoint[1], imgParam.blackPoint[2]);
+        LOG_INFO("Max Pixel: {},{}", imgParam.maxX, imgParam.maxY);
+        LOG_INFO("Max Values: {}, {}, {}", imgParam.whitePoint[0], imgParam.whitePoint[1], imgParam.whitePoint[2]);
     //std::raise(SIGINT);
 }
 
@@ -527,9 +622,15 @@ bool image::debayerImage(bool fullRes, int quality) {
                     rawImgData[index + 1] = pOut[1] * 2.0f;
                     rawImgData[index + 2] = pOut[2] * 2.0f;
                     rawImgData[index + 3] = 1.0f;
+                    delete [] pIn;
+                    delete [] pOut;
                 }
             }
         }
+    padToRGBA();
+    // Clean up
+    LibRaw::dcraw_clear_mem(processedImage);
+    rawProcessor->recycle();
     return true;
 }
 
@@ -555,7 +656,7 @@ std::variant<image, std::string> readRawImage(std::string imagePath) {
     rawProcessor->imgdata.params.no_auto_bright = 1;    // Disable auto-brightening
     rawProcessor->imgdata.params.use_camera_wb = 1;     // Use camera white balance
     rawProcessor->imgdata.params.output_color = 6;      // Output color space: 1 = sRGB
-    rawProcessor->imgdata.params.user_qual = 0;
+    rawProcessor->imgdata.params.user_qual = 2;
     rawProcessor->imgdata.params.half_size = 1;
 
     // Open the raw file
@@ -597,8 +698,48 @@ auto c1 = std::chrono::steady_clock::now();
 
     // Convert to float (assuming 16-bit output)
         if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
+            unsigned int numThreads = std::thread::hardware_concurrency();
+            numThreads = numThreads == 0 ? 2 : numThreads;
+            // Create a vector of threads
+            std::vector<std::thread> threads(numThreads);
+            // Divide the workload into equal parts for each thread
+            int rowsPerThread = processedImage->height / numThreads;
+
             uint16_t* raw_data = reinterpret_cast<uint16_t*>(processedImage->data);
-            for (int y = 0; y < processedImage->height; y++) {
+            auto processRows = [&](int startRow, int endRow) {
+                for (int y=startRow; y<endRow; y++)
+                {
+                    for (int x=0; x<processedImage->width; x++)
+                    {
+                        int index = ((y * processedImage->width) + x) * processedImage->colors;
+                        float* pIn = new float[3];
+                        float* pOut = new float[3];
+                        pIn[0] = static_cast<float>(raw_data[index + 0]) / 65535.0f;
+                        pIn[1] = static_cast<float>(raw_data[index + 1]) / 65535.0f;
+                        pIn[2] = static_cast<float>(raw_data[index + 2]) / 65535.0f;
+                        ap0_to_ap1(pIn, pOut);
+                        img.rawImgData[index + 0] = pOut[0] * 2.0f;
+                        img.rawImgData[index + 1] = pOut[1] * 2.0f;
+                        img.rawImgData[index + 2] = pOut[2] * 2.0f;
+                        img.rawImgData[index + 3] = 1.0f;
+                        delete [] pIn;
+                        delete [] pOut;
+                    }
+                }
+            };
+            // Launch the threads
+            for (int i=0; i<numThreads; ++i) {
+                int startRow = i * rowsPerThread;
+                int endRow = (i == numThreads - 1) ? processedImage->height : (i + 1) * rowsPerThread;
+                threads[i] = std::thread(processRows, startRow, endRow);
+            }
+
+                // Wait for all threads to finish
+            for (auto& thread : threads) {
+                thread.join();
+            }
+
+            /*for (int y = 0; y < processedImage->height; y++) {
                 for (int x = 0; x < processedImage->width; x++) {
                     int index = ((y * processedImage->width) + x) * processedImage->colors;
                     float* pIn = new float[3];
@@ -612,32 +753,39 @@ auto c1 = std::chrono::steady_clock::now();
                     img.rawImgData[index + 2] = pOut[2] * 2.0f;
                     img.rawImgData[index + 3] = 1.0f;
                 }
+            }*/
             }
-        }
 auto d1 = std::chrono::steady_clock::now();
 
-    img.procImgData = new float[img.width * img.height * 4];
-    img.dispImgData = new uint8_t[img.width * img.height * 4];
-    img.sampleVisible = false;
-    img.cropBoxX[0] = img.width * 0.1;
-    img.cropBoxY[0] = img.height * 0.1;
+    //img.procImgData = new float[img.width * img.height * 4];
+    //img.dispImgData = new uint8_t[img.width * img.height * 4];
+    //img.sampleVisible = false;
+    img.imgParam.cropBoxX[0] = img.width * 0.1;
+    img.imgParam.cropBoxY[0] = img.height * 0.1;
 
-    img.cropBoxX[1] = img.width * 0.9;
-    img.cropBoxY[1] = img.height * 0.1;
+    img.imgParam.cropBoxX[1] = img.width * 0.9;
+    img.imgParam.cropBoxY[1] = img.height * 0.1;
 
-    img.cropBoxX[2] = img.width * 0.9;
-    img.cropBoxY[2] = img.height * 0.9;
+    img.imgParam.cropBoxX[2] = img.width * 0.9;
+    img.imgParam.cropBoxY[2] = img.height * 0.9;
 
-    img.cropBoxX[3] = img.width * 0.1;
-    img.cropBoxY[3] = img.height * 0.9;
+    img.imgParam.cropBoxX[3] = img.width * 0.1;
+    img.imgParam.cropBoxY[3] = img.height * 0.9;
     img.renderBypass = true;
+    img.imageLoaded = true;
 
     // Pad to RGBA
     img.padToRGBA();
 auto e1 = std::chrono::steady_clock::now();
     // Process Disp Img
-    img.procDispImg();
+    //img.procDispImg();
 auto f1 = std::chrono::steady_clock::now();
+
+    // Read metadata
+    img.readMetaFromFile();
+    //readAllMetadata(imagePath);
+    //writeCustomMetadata(imagePath, "dc", "Filmvertv1");
+    //writeExifMetadata(imagePath, "Exif.Photo.UserComment", "Filmvertv1");
 
     // Clean up
     LibRaw::dcraw_clear_mem(processedImage);
@@ -651,15 +799,16 @@ auto durD = std::chrono::duration_cast<std::chrono::microseconds>(d1 - c1);
 auto durE = std::chrono::duration_cast<std::chrono::microseconds>(e1 - d1);
 auto durF = std::chrono::duration_cast<std::chrono::microseconds>(f1 - e1);
 auto durG = std::chrono::duration_cast<std::chrono::microseconds>(end - f1);
-
+auto durH = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 LOG_INFO("-----------Debayer Time-----------");
-LOG_INFO("A1:  {:*>8}μs | {:*>8}ms", durA.count(), durA.count()/1000);
-LOG_INFO("B1:  {:*>8}μs | {:*>8}ms", durB.count(), durB.count()/1000);
-LOG_INFO("C1:  {:*>8}μs | {:*>8}ms", durC.count(), durC.count()/1000);
-LOG_INFO("D1:  {:*>8}μs | {:*>8}ms", durD.count(), durD.count()/1000);
-LOG_INFO("E1:  {:*>8}μs | {:*>8}ms", durE.count(), durE.count()/1000);
-LOG_INFO("F1:  {:*>8}μs | {:*>8}ms", durF.count(), durF.count()/1000);
-LOG_INFO("G1:  {:*>8}μs | {:*>8}ms", durG.count(), durG.count()/1000);
+LOG_INFO("Open:     {:*>8}μs | {:*>8}ms", durA.count(), durA.count()/1000);
+LOG_INFO("Unpack:   {:*>8}μs | {:*>8}ms", durB.count(), durB.count()/1000);
+LOG_INFO("Process:  {:*>8}μs | {:*>8}ms", durC.count(), durC.count()/1000);
+LOG_INFO("Convert:  {:*>8}μs | {:*>8}ms", durD.count(), durD.count()/1000);
+LOG_INFO("Pad:      {:*>8}μs | {:*>8}ms", durE.count(), durE.count()/1000);
+LOG_INFO("Disp:     {:*>8}μs | {:*>8}ms", durF.count(), durF.count()/1000);
+LOG_INFO("Clear:    {:*>8}μs | {:*>8}ms", durG.count(), durG.count()/1000);
+LOG_INFO("Total:    {:*>8}μs | {:*>8}ms", durH.count(), durH.count()/1000);
 LOG_INFO("----------------------------------");
     return img;
 }
@@ -689,27 +838,27 @@ std::variant<image, std::string> readImage(std::string imagePath) {
     newImg.width = inputSpec.width;
     newImg.height = inputSpec.height;
     newImg.nChannels = inputSpec.nchannels;
-    newImg.imgMeta = inputSpec.to_xml();
-    newImg.sampleVisible = false;
+    //newImg.imgMeta = inputSpec.to_xml();
+    //newImg.sampleVisible = false;
 
-    newImg.cropBoxX[0] = newImg.width * 0.1;
-    newImg.cropBoxY[0] = newImg.height * 0.1;
+    newImg.imgParam.cropBoxX[0] = newImg.width * 0.1;
+    newImg.imgParam.cropBoxY[0] = newImg.height * 0.1;
 
-    newImg.cropBoxX[1] = newImg.width * 0.9;
-    newImg.cropBoxY[1] = newImg.height * 0.1;
+    newImg.imgParam.cropBoxX[1] = newImg.width * 0.9;
+    newImg.imgParam.cropBoxY[1] = newImg.height * 0.1;
 
-    newImg.cropBoxX[2] = newImg.width * 0.9;
-    newImg.cropBoxY[2] = newImg.height * 0.9;
+    newImg.imgParam.cropBoxX[2] = newImg.width * 0.9;
+    newImg.imgParam.cropBoxY[2] = newImg.height * 0.9;
 
-    newImg.cropBoxX[3] = newImg.width * 0.1;
-    newImg.cropBoxY[3] = newImg.height * 0.9;
+    newImg.imgParam.cropBoxX[3] = newImg.width * 0.1;
+    newImg.imgParam.cropBoxY[3] = newImg.height * 0.9;
     newImg.renderBypass = true;
 
     //readMetadata(inputSpec, &newImg, imgP.stem().string(), imgP.extension().string());
     LOG_INFO("Reading in image with size: {}x{}x{}", newImg.width, newImg.height, newImg.nChannels);
 
     newImg.rawImgData = new float[newImg.width * newImg.height * 4];
-    newImg.procImgData = new float[newImg.width * newImg.height * 4];
+    //newImg.procImgData = new float[newImg.width * newImg.height * 4];
     newImg.dispImgData = new uint8_t[newImg.width * newImg.height * 4];
     if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)newImg.rawImgData))
     {
@@ -723,7 +872,7 @@ std::variant<image, std::string> readImage(std::string imagePath) {
     // Pad to RGBA
     newImg.padToRGBA();
     // Process Disp Img
-    newImg.procDispImg();
+    //newImg.procDispImg();
 
     return newImg;
 }
@@ -735,23 +884,24 @@ renderParams img_to_param(image* _img) {
     params.width = _img->width;
     params.height = _img->height;
 
-    params.sigmaFilter = _img->blurAmount;
-    params.temp = _img->temp;
-    params.tint = _img->tint;
+    params.sigmaFilter = _img->imgParam.blurAmount;
+    params.temp = _img->imgParam.temp;
+    params.tint = _img->imgParam.tint;
 
     params.bypass = _img->renderBypass ? 1 : 0;
+    params.gradeBypass = _img->gradeBypass ? 1 : 0;
 
     for (int i = 0; i < 4; i++) {
-        params.baseColor[i] = i == 3 ? 0.0f : _img->baseColor[i];
-        params.blackPoint[i] = i == 3 ? 0.0f : _img->blackPoint[i] + _img->blackPoint[3];
-        params.whitePoint[i] = i == 3 ? 1.0f : _img->whitePoint[i] * _img->whitePoint[3];
-        params.G_blackpoint[i] = i == 3 ? 0.0f : _img->g_blackpoint[i] + _img->g_blackpoint[3];
-        params.G_whitepoint[i] = i == 3 ? 1.0f : _img->g_whitepoint[i] * _img->g_whitepoint[3];
-        params.G_lift[i] = i == 3 ? 0.0f : _img->g_lift[i] + _img->g_lift[3];
-        params.G_gain[i] = i == 3 ? 1.0f : _img->g_gain[i] * _img->g_gain[3];
-        params.G_mult[i] = i == 3 ? 1.0f : _img->g_mult[i] * _img->g_mult[3];
-        params.G_offset[i] = i == 3 ? 0.0f : _img->g_offset[i] + _img->g_offset[3];
-        params.G_gamma[i] = i == 3 ? 1.0f : _img->g_gamma[i] * _img->g_gamma[3];
+        params.baseColor[i] = i == 3 ? 0.0f : _img->imgParam.baseColor[i];
+        params.blackPoint[i] = i == 3 ? 0.0f : _img->imgParam.blackPoint[i] + _img->imgParam.blackPoint[3];
+        params.whitePoint[i] = i == 3 ? 1.0f : _img->imgParam.whitePoint[i] * _img->imgParam.whitePoint[3];
+        params.G_blackpoint[i] = i == 3 ? 0.0f : _img->imgParam.g_blackpoint[i] + _img->imgParam.g_blackpoint[3];
+        params.G_whitepoint[i] = i == 3 ? 1.0f : _img->imgParam.g_whitepoint[i] * _img->imgParam.g_whitepoint[3];
+        params.G_lift[i] = i == 3 ? 0.0f : _img->imgParam.g_lift[i] + _img->imgParam.g_lift[3];
+        params.G_gain[i] = i == 3 ? 1.0f : _img->imgParam.g_gain[i] * _img->imgParam.g_gain[3];
+        params.G_mult[i] = i == 3 ? 1.0f : _img->imgParam.g_mult[i] * _img->imgParam.g_mult[3];
+        params.G_offset[i] = i == 3 ? 0.0f : _img->imgParam.g_offset[i] + _img->imgParam.g_offset[3];
+        params.G_gamma[i] = i == 3 ? 1.0f : _img->imgParam.g_gamma[i] * _img->imgParam.g_gamma[3];
     }
 
     //params.baseColor[0] = 0.01f;

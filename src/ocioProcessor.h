@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 // OCIO
 #include <OpenColorIO/OpenColorIO.h>
@@ -19,7 +20,14 @@ class ocioProcessor {
 
     bool initialize(std::string &configFile);
     void processImage(float* img, unsigned int width, unsigned int height);
+    std::string getMetalKernel();
     void processImageGPU(float *img, unsigned int width, unsigned int height);
+
+    std::vector<char*> displays;
+    std::vector<std::vector<char*>> views;
+
+    int displayOp;
+    int viewOp;
 
     private:
 

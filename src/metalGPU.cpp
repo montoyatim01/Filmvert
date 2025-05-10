@@ -1,6 +1,7 @@
 
 #include <chrono>
 #include <spdlog/details/log_msg_buffer.h>
+#include <thread>
 #define NS_PRIVATE_IMPLEMENTATION
 #define CA_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
@@ -17,6 +18,7 @@
 #include "logger.h"
 #include "metalGPU.h"
 #include "utils.h"
+#include "ocioProcessor.h"
 
 #include <cmrc/cmrc.hpp> //read embedded stuff
 CMRC_DECLARE(assets);
@@ -24,6 +26,9 @@ CMRC_DECLARE(assets);
 
 
 metalGPU::metalGPU() {
+
+  ocioKernelText1 = "#include <metal_math>\n #include <metal_common>\n #include <metal_compute>\n #include <metal_stdlib>\n using namespace metal;\n\n";
+  ocioKernelText2 = "kernel void ocioProcess(device float4 *imgIn [[buffer(0)]], device uchar4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = (uchar4)(clamp(OCIOMain(imgIn[index]) * 255.0f, 0.0f, 255.0f));}";
 
   auto fs = cmrc::assets::get_filesystem();
   auto mtllib = fs.open("assets/default.metallib");
@@ -61,6 +66,13 @@ metalGPU::metalGPU() {
 
   // Read in libraries and create buffers?
   LOG_INFO("Metal Active, GPU Device: {}", m_device->name()->cString(NS::UTF8StringEncoding));
+  enableQueue = true;
+  queueThread = std::thread(&metalGPU::processQueue, this);
+}
+
+metalGPU::~metalGPU() {
+    enableQueue = false;
+    queueThread.join();
 }
 
 void metalGPU::initPipelineState() {
@@ -100,12 +112,52 @@ void metalGPU::initPipelineState() {
 
 }
 
+bool metalGPU::initOCIOKernels() {
+
+    std::string ocioKernel;
+    ocioKernel = ocioKernelText1;
+    ocioKernel += ocioProc.getMetalKernel();
+    ocioKernel += ocioKernelText2;
+    MTL::Library    *metalLibrary;     // Metal library
+    MTL::Function   *kernelFunction;   // Compute kernel
+    NS::Error* err;
+
+    MTL::CompileOptions* options = MTL::CompileOptions::alloc()->init();
+    options->setFastMathEnabled(true);
+    options->setLanguageVersion(MTL::LanguageVersion2_4);
+    auto nsOCIO = NS::String::string(ocioKernel.c_str(), NS::ASCIIStringEncoding);
+    metalLibrary = m_device->newLibrary(nsOCIO, options, &err);
+    if (!metalLibrary) {
+        LOG_ERROR("Error creating OCIO Metal Library: {}", err->description()->cString(NS::ASCIIStringEncoding));
+        return false;
+    }
+    options->release();
+
+    auto ocioName = NS::String::string("ocioProcess", NS::ASCIIStringEncoding);
+    kernelFunction = metalLibrary->newFunction(ocioName);
+
+    if (!kernelFunction) {
+        LOG_ERROR("Error initializing the Metal OCIO pipeline");
+        return false;
+    }
+
+    _ocioProcess = m_device->newComputePipelineState(kernelFunction, &err);
+    if (!_ocioProcess) {
+        LOG_ERROR("Failed to init OCIO Pipeline State");
+        return false;
+    }
+    return true;
+
+
+}
+
 void metalGPU::initBuffers() {
     // Set intial buffer size to something reasonable for image processing
 
     bufferSize = 2000 * 3000 * sizeof(float) * 4;
     m_src = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
     m_dst = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
+    m_disp = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
     workingA = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
     workingB = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
 
@@ -124,11 +176,13 @@ void metalGPU::bufferCheck(unsigned int width, unsigned int height) {
 
         m_src->release();
         m_dst->release();
+        m_disp->release();
         workingA->release();
         workingB->release();
 
         m_src = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
         m_dst = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
+        m_disp = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
         workingA = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
         workingB = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
     }
@@ -158,11 +212,69 @@ void metalGPU::computeKernels(float strength, float* kernels)
   //safetyMutex.unlock();
 }
 
+void metalGPU::addToRender(image *_image, renderType type) {
 
+    renderQueue.push(gpuQueue(_image, type));
+}
+
+bool metalGPU::isInQueue(image* _image) {
+    if (!_image)
+        return false;
+    queueLock.lock();
+    std::queue<gpuQueue> searchQueue = renderQueue;
+    queueLock.unlock();
+    while (!searchQueue.empty()) {
+        if (_image == searchQueue.front()._img)
+            return true;
+        searchQueue.pop();
+    }
+    return false;
+}
+
+void metalGPU::processQueue() {
+
+    while (enableQueue) {
+        // While we've enabled the queue
+        if (renderQueue.size() > 0) {
+            rendering = true;
+            // If there are items in the queue
+            queueLock.lock();
+            image* img = renderQueue.front()._img;
+            renderType _type = renderQueue.front()._type;
+            while (renderQueue.size() > 0 && renderQueue.front()._img == img) {
+                // Removing duplicates to only run a single
+                // instance of this image through the render
+                renderQueue.pop();
+            }
+            queueLock.unlock();
+            switch (_type) {
+                case r_sdt:
+                    renderImage(img);
+                    break;
+                case r_blr:
+                    renderBlurPass(img);
+                    break;
+            }
+
+        }
+        else {
+            rendering = false;
+        }
+
+        // Sleep for a few ms until we have a new image in the queue
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    }
+
+
+}
 
 
 void metalGPU::renderImage(image* _image) {
-
+if (!_image)
+    return;
+if (!_image->imageLoaded)
+    return; //We don't have our buffers yet
 auto start = std::chrono::steady_clock::now();
     // Generate RenderParams struct
     renderParams _renderParams = img_to_param(_image);
@@ -188,9 +300,21 @@ auto start = std::chrono::steady_clock::now();
     // Buffers
     bufferCheck(_renderParams.width, _renderParams.height);
 
+    // OCIO Kernels
+    if (ocioProc.displayOp != prevDisp || ocioProc.viewOp != prevView || !_ocioProcess) {
+        // Compile new kernels
+        if (!initOCIOKernels()) {
+            LOG_ERROR("Failure to build OCIO kernels, exiting render");
+            return;
+        }
+        prevDisp = ocioProc.displayOp;
+        prevView = ocioProc.viewOp;
+    }
+
 
     // Src img
     unsigned int imgSize = _renderParams.width * _renderParams.height * 4 * sizeof(float);
+    unsigned int dispSize = _renderParams.width * _renderParams.height * 4 * sizeof(uint8_t);
     if (prevIm != _image)
     {
         prevIm = _image;
@@ -203,20 +327,31 @@ auto start = std::chrono::steady_clock::now();
     renderParamBuf->didModifyRange(NS::Range(0, sizeof(_renderParams)));
 
 
-        // Transpose
+        // Main process
         computeEncoder->setComputePipelineState(_mainProcess);
         computeEncoder->setBuffer(m_src, 0, 0);
-        computeEncoder->setBuffer(m_dst, 0, 1);
+        computeEncoder->setBuffer(workingA, 0, 1);
+        //computeEncoder->setBuffer(m_disp, 0, 2);
         computeEncoder->setBuffer(renderParamBuf, 0, 2);
         computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
 
+        computeEncoder->setComputePipelineState(_ocioProcess);
+        computeEncoder->setBuffer(workingA, 0, 0);
+        computeEncoder->setBuffer(m_disp, 0, 1);
+        computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
+        computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
 
         computeEncoder->endEncoding();
         commandBuffer->commit();
         commandBuffer->waitUntilCompleted();
 
         // Copy completed image
-        memcpy(_image->procImgData, m_dst->contents(), imgSize);
+        _image->allocDispBuf();
+
+        if (_image->fullIm)
+            memcpy(_image->procImgData, m_dst->contents(), imgSize);
+        memcpy(_image->dispImgData, m_disp->contents(), dispSize);
+        _image->sdlUpdate = true;
 
         auto end = std::chrono::steady_clock::now();
         auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -350,7 +485,7 @@ void metalGPU::renderBlurPass(image* _image) {
 
             // Copy completed image
             memcpy(_image->blurImgData, m_dst->contents(), imgSize);
-
+            _image->blurReady = true;
             auto end = std::chrono::steady_clock::now();
             auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 

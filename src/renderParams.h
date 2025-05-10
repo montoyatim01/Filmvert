@@ -33,6 +33,7 @@ struct renderParams
   unsigned int width;
   unsigned int height;
   unsigned int bypass;
+  unsigned int gradeBypass;
   unsigned int align;
 
   float sigmaFilter;
