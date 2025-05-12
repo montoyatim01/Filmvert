@@ -1,4 +1,5 @@
 #include "window.h"
+#include "ocioProcessor.h"
 #include <SDL_pixels.h>
 #include <SDL_render.h>
 #include <SDL_video.h>
@@ -107,10 +108,22 @@ int mainWindow::openWindow()
     }
 
     // Initialie the OCIO metal kernel
-    mtlGPU->initOCIOKernels();
+    mtlGPU->initOCIOKernels(1, 0, 0);
+
+    // Load in user preferences
+    preferences.loadFromFile();
+
+    if (!preferences.ocioPath.empty()) {
+        if (ocioProc.initAltConfig(preferences.ocioPath) && preferences.ocioExt) {
+            ocioProc.setExtActive();
+        } else {
+            ocioProc.setIntActive();
+        }
+    }
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
+    imguistyle();
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
@@ -176,6 +189,12 @@ int mainWindow::openWindow()
         importRollPopup();
         batchRenderPopup();
         pastePopup();
+        unsavedRollPopup();
+        globalMetaPopup();
+        localMetaPopup();
+        preferencesPopup();
+        shortcutsPopup();
+        ackPopup();
 
         // Rendering
         ImGui::Render();

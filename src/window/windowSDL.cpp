@@ -2,16 +2,22 @@
 
 void mainWindow::createSDLTexture(image* actImage) {
 
+    if (!actImage)
+        return;
     // For rotations 6 and 8 (90 degrees), we need to swap width and height
     int textureWidth = (actImage->imRot == 6 || actImage->imRot == 8) ? actImage->height : actImage->width;
     int textureHeight = (actImage->imRot == 6 || actImage->imRot == 8) ? actImage->width : actImage->height;
 
     SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING,
                                                 textureWidth, textureHeight);
-    if (texture)
+    if (texture) {
         actImage->texture = texture;
-    else
+        actImage->sdlRotation = actImage->imRot;
+    }
+    else {
         LOG_WARN("Unable to create SDL texture for image: {}", actImage->srcFilename);
+    }
+
 }
 
 void mainWindow::updateSDLTexture(image* actImage) {
@@ -21,6 +27,13 @@ void mainWindow::updateSDLTexture(image* actImage) {
 
     if (actImage->texture == nullptr) {
             createSDLTexture(actImage);
+    }
+    if (actImage->sdlRotation != actImage->imRot) {
+        if (actImage->texture) {
+            SDL_DestroyTexture((SDL_Texture*)actImage->texture);
+            actImage->texture = nullptr;
+        }
+        createSDLTexture(actImage);
     }
 
     void* pixelData = nullptr;

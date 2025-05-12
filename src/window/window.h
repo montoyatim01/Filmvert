@@ -19,6 +19,7 @@
 
 //ImGui
 #include "grainParams.h"
+#include "imageMeta.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_impl_sdl2.h"
@@ -31,8 +32,10 @@
 #include "imageIO.h"
 #include "metalGPU.h"
 #include "ocioProcessor.h"
+#include "preferences.h"
 #include "roll.h"
 #include "threadPool.h"
+#include "windowUtils.h"
 
 // Declared functions from macOSFile.mm
 std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canChooseDirectories = false);
@@ -40,43 +43,8 @@ std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true);
 
 std::string find_key_by_value(const std::map<std::string, int>& my_map, int value);
 
-struct copyPaste {
-
-    bool baseColor = false;
-    bool cropPoints = false;
-    bool analysisBlur = false;
-    bool analysis = false;
 
 
-    bool temp = false;
-    bool tint = false;
-    bool bp = false;
-    bool wp = false;
-    bool lift = false;
-    bool gain = false;
-    bool mult = false;
-    bool offset = false;
-    bool gamma = false;
-
-    void analysisGlobal(){
-        baseColor = !(baseColor && true);
-        cropPoints = !(cropPoints && true);
-        analysisBlur = !(analysisBlur && true);
-        analysis = !(analysis && true);
-    }
-
-    void gradeGlobal(){
-        temp = !(temp && true);
-        tint = !(tint && true);
-        bp = !(bp && true);
-        wp = !(wp && true);
-        lift = !(lift && true);
-        gain = !(gain && true);
-        mult = !(mult && true);
-        offset = !(offset && true);
-        gamma = !(gamma && true);
-    }
-};
 
 // For mult-threadded imports
 using ImageResult = std::variant<image, std::string>;
@@ -101,20 +69,26 @@ class mainWindow
         metalGPU* mtlGPU;
         bool renderCall = false;
 
-        // Program state
-        bool done = false;
-
-        std::deque<filmRoll> activeRolls;
-        std::vector<char*>rollNames;
-        int selRoll = 0;
-        //std::vector<image> activeImages;
-
+        // Window Layout
+        ImVec2 imageWinSize;
+        float thumbHeight = 290;
         int winWidth;
         int winHeight;
         ImVec2 cursorPos;
         float dispScale = 1.0f;
         ImVec2 dispSize;
         ImVec2 scroll;
+
+        // Program state
+        bool done = false;
+        userPreferences preferences;
+
+        std::deque<filmRoll> activeRolls;
+        std::vector<char*>rollNames;
+        int selRoll = 0;
+        //std::vector<image> activeImages;
+
+
 
         //int selIm = -1;
         ImGuiSelectionBasicStorage selection;
@@ -128,8 +102,23 @@ class mainWindow
 
         // Copy/Paste
         imageParams copyParams;
+        imageMetadata copyMeta;
         copyPaste pasteOptions;
         bool pasteTrigger = false;
+        metaBuff metaEdit;
+
+
+        bool unsavedPopTrigger = false;
+        bool globalMetaPopTrig = false;
+        bool localMetaPopTrig = false;
+        bool preferencesPopTrig = false;
+        bool ackPopTrig = false;
+        bool shortPopTrig = false;
+        bool badOcioText = false;
+        char ackMsg[512];
+        char ackError[512];
+        char ocioPath[1024];
+        int ocioSel = 0;
 
 
         std::map<std::string, int> localMapping;
@@ -155,22 +144,26 @@ class mainWindow
         int impRoll = 0;
         bool newRollPopup = false;
         char rollNameBuf[64];
-        char rollPath[512];
+        char rollPath[1024];
 
 
         // Export
         std::thread exportThread;
+        exportParam expSetting;
         bool exportPopup = false;
-        bool overwrite = false;
-        int quality = 85;
-        std::string outPath = "";
+        bool expRolls = false;
+        std::chrono::time_point<std::chrono::steady_clock> expStart;
+        //bool overwrite = false;
+        //int quality = 85;
+        //std::string outPath = "";
         std::vector<char*> fileTypes;
         std::vector<char*> bitDepths;
-        int outType = 4;
-        int outDepth = 1;
+        std::vector<char*> colorspaceSet;
+        //int outType = 4;
+        //int outDepth = 1;
         bool isExporting = false;
-        int numIm = 0;
-        int curIm = 0;
+        int exportImgCount = 0;
+        int exportProcCount = 0;
         unsigned int elapsedTime;
 
         // Views
@@ -179,6 +172,7 @@ class mainWindow
         void paramView();
         void thumbView();
 
+        // windowUtls.cpp
         bool validRoll();
         bool validIm();
         image* activeImage();
@@ -186,9 +180,12 @@ class mainWindow
         image* getImage(int roll, int index);
         int activeRollSize();
         void paramUpdate();
+        void removeRoll();
 
         // windowMeta.cpp
         void checkMeta();
+        void imageMetaPreEdit();
+        void imageMetaPostEdit();
 
         // windowKeys.cpp
         void checkHotkeys();
@@ -196,16 +193,16 @@ class mainWindow
 
         void loadMappings();
         void actionA();
-        void CalculateDisplaySize(int imageWidth, int imageHeight, ImVec2 maxAvailable, ImVec2& outDisplaySize, int rotation);
+        void CalculateThumbDisplaySize(int imageWidth, int imageHeight, float maxHeight, ImVec2& outDisplaySize, int rotation);
         void calculateVisible();
-        void openImages();
-        void openJSON();
-        void openRolls();
-        void saveImage();
-        void openDirectory();
 
-        void loadPreset();
-        void savePreset();
+        // windowIO.cpp
+        void openImages();
+        bool openJSON();
+        void openRolls();
+        void exportImages();
+        void exportRolls();
+
 
         void clearSelection();
 
@@ -221,10 +218,17 @@ class mainWindow
         void createSDLTexture(image* actImage);
         void updateSDLTexture(image* actImage);
 
+        // windowPopups.cpp
         void importImagePopup();
         void importRollPopup();
         void batchRenderPopup();
         void pastePopup();
+        void unsavedRollPopup();
+        void globalMetaPopup();
+        void localMetaPopup();
+        void preferencesPopup();
+        void ackPopup();
+        void shortcutsPopup();
 
         void copyIntoParams();
         void pasteIntoParams();

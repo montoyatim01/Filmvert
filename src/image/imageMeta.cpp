@@ -131,6 +131,51 @@ void image::readMetaFromFile() {
     // Any cleanup?
 }
 
+bool image::writeExpMeta(std::string filename) {
+    updateMetaStr();
+    exifData["Exif.Image.ImageDescription"] = jsonMeta;
+    exifData["Exif.Image.Orientation"] = imRot;
+    if (hasSCXMP) {
+        scxmpData["Xmp.dc.description"] = jsonMeta;
+        scxmpData["Xmp.tiff.Orientation"] = imRot;
+    }
+    else {
+        intxmpData["Xmp.dc.description"] = jsonMeta;
+        intxmpData["Xmp.tiff.Orientation"] = imRot;
+    }
+
+    try {
+        // Open the image file
+        Exiv2::Image::UniquePtr image = Exiv2::ImageFactory::open(filename);
+
+        if (image.get() == 0) {
+            throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Failed to open image for metadata writing");
+        }
+
+        // Read existing metadata (this is important to preserve any other metadata)
+        image->readMetadata();
+
+        // Set the new Exif data
+        image->setExifData(exifData);
+
+        // Set the new XMP data
+        if (hasSCXMP) {
+            image->setXmpData(scxmpData);
+        } else {
+            image->setXmpData(intxmpData);
+        }
+
+        // Write the metadata back to the image file
+        image->writeMetadata();
+
+        return true;
+
+    } catch (const Exiv2::Error& e) {
+        LOG_ERROR("Exiv2 exception writing metadata: {}", e.what());
+        return false;
+    }
+}
+
 std::optional<nlohmann::json> image::getJSONMeta() {
     try {
         nlohmann::json j;
@@ -180,6 +225,7 @@ std::optional<nlohmann::json> image::getJSONMeta() {
 
         fvParams["temp"] = imgParam.temp;
         fvParams["tint"] = imgParam.tint;
+        fvParams["rotation"] = imRot;
 
         metaParams["fileName"] = imMeta.fileName;
         metaParams["rollName"] = imMeta.rollName;
@@ -193,7 +239,7 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         metaParams["exposureTime"] = imMeta.exposureTime;
         metaParams["dateTime"] = imMeta.dateTime;
         metaParams["location"] = imMeta.location;
-        metaParams["gpsLocation"] = imMeta.gpsLocation;
+        metaParams["gps"] = imMeta.gps;
         metaParams["notes"] = imMeta.notes;
         metaParams["devProcess"] = imMeta.devProcess;
         metaParams["chemMfg"] = imMeta.chemMfg;
@@ -438,6 +484,12 @@ bool image::loadMetaFromStr(const std::string& j) {
                     goodImgParm = false;
                 }
 
+                if (imgJson.contains("rotation")){
+                    imRot = imgJson["rotation"].get<int>();
+                } else {
+                    //goodImgParm = false;
+                }
+
             } else {
                 LOG_WARN("No parameters found in metadata!");
                 goodImgParm = false;
@@ -483,8 +535,8 @@ bool image::loadMetaFromStr(const std::string& j) {
                 if (metaJson.contains("location")) {
                     imMeta.location = metaJson["location"].get<std::string>();
                 }
-                if (metaJson.contains("gpsLocation")) {
-                    imMeta.gpsLocation = metaJson["gpsLocation"].get<std::string>();
+                if (metaJson.contains("gps")) {
+                    imMeta.gps = metaJson["gps"].get<std::string>();
                 }
                 if (metaJson.contains("notes")) {
                     imMeta.notes = metaJson["notes"].get<std::string>();

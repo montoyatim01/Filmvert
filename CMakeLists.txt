@@ -178,6 +178,7 @@ set(TGRAIN_SRCS
     src/threadPool.cpp
     src/threadPool.h
     src/macOSFile.mm
+    src/preferences.cpp
     ${LICENSEWINDOW_SRC}
     ${IMGUI_SRCS}
 )

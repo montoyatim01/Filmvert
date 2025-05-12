@@ -19,19 +19,32 @@ class ocioProcessor {
     ~ocioProcessor(){};
 
     bool initialize(std::string &configFile);
+    bool initAltConfig(std::string path);
+    void setExtActive();
+    void setIntActive();
+
     void processImage(float* img, unsigned int width, unsigned int height);
-    std::string getMetalKernel();
+    std::string getMetalKernel(int _csOpt = 1, int _csDisp = 0, int _viewOp = 0);
     void processImageGPU(float *img, unsigned int width, unsigned int height);
 
+
+    std::vector<char*> colorspaces;
     std::vector<char*> displays;
     std::vector<std::vector<char*>> views;
 
+    int csDisp;
     int displayOp;
     int viewOp;
+    int cspOp;
+    bool validExternal = false;
 
     private:
+    bool useExt = false;
+    std::string internalConfig;
+    std::string externalConfigPath;
 
     OCIO::ConstConfigRcPtr OCIOconfig;
+    OCIO::ConstConfigRcPtr extOCIOconfig;
 };
 
 // OCIO

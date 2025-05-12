@@ -226,7 +226,7 @@ bool image::writeImg(const exportParam param) {
             break;
     }
 
-    std::string filePath = param.outPath + "/" + srcFilename + fileExt;
+    std::string filePath = expFullPath + "/" + srcFilename + fileExt;
     LOG_INFO("Exporting to: {}", filePath);
     if (std::filesystem::exists(filePath) && !param.overwrite) {
         LOG_INFO("Skipping file: {}", filePath);
@@ -250,6 +250,8 @@ bool image::writeImg(const exportParam param) {
     } else if (param.format == 1) {
         // EXR Compression
         spec["Compression"] = "zip";
+    } else if (param.format == 3 || param.format == 4) {
+        spec["Compression"] = param.compression;
     }
 
     // Open the destination file
@@ -270,6 +272,9 @@ bool image::writeImg(const exportParam param) {
     // Close the file
     out->close();
     clearTmpBuf();
+
+    // Write out the metadata
+    writeExpMeta(filePath);
     return true;
 
 }
@@ -414,10 +419,35 @@ void image::loadBuffers() {
     allocDispBuf();
     if(debayerImage(false, 2)) {
         imageLoaded = true;
-
     }
     else
         LOG_WARN("Unable to re-debayer image: {}", fullPath);
+}
+
+bool image::exportPreProcess(std::string outPath) {
+    workWidth = width;
+    workHeight = height;
+    fullIm = true;
+    expFullPath = outPath + "/" + srcFilename;
+    if (imageLoaded){
+        clearBuffers();
+    }
+    if(debayerImage(true, 11)) {
+        allocProcBuf();
+        imageLoaded = true;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void image::exportPostProcess() {
+    if (imageLoaded) {
+        clearBuffers();
+    }
+    width = workWidth;
+    height = workHeight;
+    fullIm = false;
 }
 
 void image::processMinMax() {

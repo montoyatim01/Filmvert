@@ -9,18 +9,18 @@ void imguistyle()
 
     ImGuiStyle * style = &ImGui::GetStyle();
 
-	style->WindowPadding = ImVec2(10, 10);
-	style->WindowRounding = 5.0f;
-	style->FramePadding = ImVec2(8, 4);
-	style->FrameRounding = 6.0f;
-	style->ItemSpacing = ImVec2(12, 8);
-	style->ItemInnerSpacing = ImVec2(8, 6);
+	style->WindowPadding = ImVec2(8, 8);
+	style->WindowRounding = 4.0f;
+	style->FramePadding = ImVec2(6, 4);
+	style->FrameRounding = 4.0f;
+	style->ItemSpacing = ImVec2(6, 6);
+	style->ItemInnerSpacing = ImVec2(6, 6);
 	style->IndentSpacing = 25.0f;
 	style->ScrollbarSize = 15.0f;
 	style->ScrollbarRounding = 9.0f;
 	style->GrabMinSize = 5.0f;
 	style->GrabRounding = 3.0f;
-
+return;
     ImVec4* colors = ImGui::GetStyle().Colors;
     colors[ImGuiCol_Text] = ImVec4(0.95f, 0.96f, 0.98f, 1.00f);
     colors[ImGuiCol_TextDisabled] = ImVec4(0.36f, 0.42f, 0.47f, 1.00f);
@@ -77,17 +77,31 @@ void imguistyle()
     colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 }
 
+bool ImRightAlign(const char* str_id)
+{
+    if(ImGui::BeginTable(str_id, 2, ImGuiTableFlags_SizingFixedFit, ImVec2(-1,0)))
+    {
+        ImGui::TableSetupColumn("a", ImGuiTableColumnFlags_WidthStretch);
+
+        ImGui::TableNextColumn();
+        ImGui::TableNextColumn();
+        return true;
+    }
+    return false;
+}
+
+
 // Function to calculate display dimensions while maintaining aspect ratio
-void mainWindow::CalculateDisplaySize(int imageWidth, int imageHeight, ImVec2 maxAvailable, ImVec2& outDisplaySize, int rotation) {
+void mainWindow::CalculateThumbDisplaySize(int imageWidth, int imageHeight, float maxHeight, ImVec2& outDisplaySize, int rotation) {
 
     bool rot = rotation == 6 || rotation == 8 ? true : false;
     int imWid = rot ? imageHeight : imageWidth;
     int imHei = rot ? imageWidth : imageHeight;
 
-    float scaleRatio = (float)maxAvailable.y / imHei;
+    float scaleRatio = (float)maxHeight / imHei;
 
     outDisplaySize.x = (float)imWid * scaleRatio;
-    outDisplaySize.y = (float)maxAvailable.y;
+    outDisplaySize.y = (float)maxHeight;
 }
 
 void mainWindow::calculateVisible() {
@@ -173,6 +187,16 @@ void mainWindow::paramUpdate() {
     lastChange = std::chrono::steady_clock::now();
     activeImage()->needMetaWrite = true;
     metaRefresh = true;
+}
+
+void mainWindow::removeRoll() {
+    // Check implication of background rendering
+    if (validRoll()) {
+        int delRoll = selRoll;
+        selRoll = activeRolls.size() > 1 ? selRoll == 0 ? 0 : selRoll-1 : selRoll-1;
+        activeRolls[delRoll].clearBuffers();
+        activeRolls.erase(activeRolls.begin() + delRoll);
+    }
 }
 
 // Helper function to transform coordinates based on rotation
@@ -319,6 +343,9 @@ void mainWindow::loadMappings()
     bitDepths.push_back("8");
     bitDepths.push_back("16");
     bitDepths.push_back("32");
+
+    colorspaceSet.push_back("Colorspace");
+    colorspaceSet.push_back("Display");
 
     /*activeRolls.resize(2);
     rollNames.push_back("roll 1");

@@ -29,6 +29,7 @@ metalGPU::metalGPU() {
 
   ocioKernelText1 = "#include <metal_math>\n #include <metal_common>\n #include <metal_compute>\n #include <metal_stdlib>\n using namespace metal;\n\n";
   ocioKernelText2 = "kernel void ocioProcess(device float4 *imgIn [[buffer(0)]], device uchar4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = (uchar4)(clamp(OCIOMain(imgIn[index]) * 255.0f, 0.0f, 255.0f));}";
+  ocioKernelText3 = "kernel void ocioProcessFull(device float4 *imgIn [[buffer(0)]], device float4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = OCIOMain(imgIn[index]);}";
 
   auto fs = cmrc::assets::get_filesystem();
   auto mtllib = fs.open("assets/default.metallib");
@@ -112,12 +113,15 @@ void metalGPU::initPipelineState() {
 
 }
 
-bool metalGPU::initOCIOKernels() {
+bool metalGPU::initOCIOKernels(int csSetting, int csDisp, int view) {
 
     std::string ocioKernel;
+
     ocioKernel = ocioKernelText1;
-    ocioKernel += ocioProc.getMetalKernel();
+    ocioKernel += ocioProc.getMetalKernel(csSetting, csDisp, view);
     ocioKernel += ocioKernelText2;
+    ocioKernel += ocioKernelText3;
+
     MTL::Library    *metalLibrary;     // Metal library
     MTL::Function   *kernelFunction;   // Compute kernel
     NS::Error* err;
@@ -136,13 +140,17 @@ bool metalGPU::initOCIOKernels() {
     auto ocioName = NS::String::string("ocioProcess", NS::ASCIIStringEncoding);
     kernelFunction = metalLibrary->newFunction(ocioName);
 
-    if (!kernelFunction) {
+    auto ocioNameFull = NS::String::string("ocioProcessFull", NS::ASCIIStringEncoding);
+    auto kernelFuncFull = metalLibrary->newFunction(ocioNameFull);
+
+    if (!kernelFunction || !kernelFuncFull) {
         LOG_ERROR("Error initializing the Metal OCIO pipeline");
         return false;
     }
 
     _ocioProcess = m_device->newComputePipelineState(kernelFunction, &err);
-    if (!_ocioProcess) {
+    _ocioProcessFull = m_device->newComputePipelineState(kernelFuncFull, &err);
+    if (!_ocioProcess || !_ocioProcessFull) {
         LOG_ERROR("Failed to init OCIO Pipeline State");
         return false;
     }
@@ -301,15 +309,17 @@ auto start = std::chrono::steady_clock::now();
     bufferCheck(_renderParams.width, _renderParams.height);
 
     // OCIO Kernels
-    if (ocioProc.displayOp != prevDisp || ocioProc.viewOp != prevView || !_ocioProcess) {
+    if (ocioProc.cspOp != prevCSOpt || ocioProc.displayOp != prevDisp || ocioProc.viewOp != prevView || !_ocioProcess) {
         // Compile new kernels
-        if (!initOCIOKernels()) {
+        if (!initOCIOKernels(ocioProc.cspOp, ocioProc.displayOp, ocioProc.viewOp)) {
             LOG_ERROR("Failure to build OCIO kernels, exiting render");
             return;
         }
+        prevCSOpt = ocioProc.cspOp;
         prevDisp = ocioProc.displayOp;
         prevView = ocioProc.viewOp;
     }
+
 
 
     // Src img
@@ -335,11 +345,20 @@ auto start = std::chrono::steady_clock::now();
         computeEncoder->setBuffer(renderParamBuf, 0, 2);
         computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
 
-        computeEncoder->setComputePipelineState(_ocioProcess);
-        computeEncoder->setBuffer(workingA, 0, 0);
-        computeEncoder->setBuffer(m_disp, 0, 1);
-        computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
-        computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
+        if (_image->fullIm) {
+            computeEncoder->setComputePipelineState(_ocioProcessFull);
+            computeEncoder->setBuffer(workingA, 0, 0);
+            computeEncoder->setBuffer(m_dst, 0, 1);
+            computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
+            computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
+        } else {
+            computeEncoder->setComputePipelineState(_ocioProcess);
+            computeEncoder->setBuffer(workingA, 0, 0);
+            computeEncoder->setBuffer(m_disp, 0, 1);
+            computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
+            computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
+        }
+
 
         computeEncoder->endEncoding();
         commandBuffer->commit();
@@ -348,10 +367,14 @@ auto start = std::chrono::steady_clock::now();
         // Copy completed image
         _image->allocDispBuf();
 
-        if (_image->fullIm)
+        if (_image->fullIm) {
+            _image->allocProcBuf();
             memcpy(_image->procImgData, m_dst->contents(), imgSize);
-        memcpy(_image->dispImgData, m_disp->contents(), dispSize);
-        _image->sdlUpdate = true;
+        } else {
+            memcpy(_image->dispImgData, m_disp->contents(), dispSize);
+            _image->sdlUpdate = true;
+        }
+
 
         auto end = std::chrono::steady_clock::now();
         auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

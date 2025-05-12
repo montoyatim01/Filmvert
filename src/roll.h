@@ -22,7 +22,13 @@ class filmRoll {
 
     void saveAll();
     bool exportRollMetaJSON();
+    bool exportRollCSV();
     bool importRollMetaJSON(const std::string& jsonFile);
+
+    bool unsavedImages();
+
+    void rollMetaPreEdit(metaBuff* meta);
+    void rollMetaPostEdit(metaBuff* meta);
 
     bool imagesLoading = false;
     bool rollLoaded = false;

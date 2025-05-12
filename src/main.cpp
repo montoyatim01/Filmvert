@@ -23,56 +23,72 @@ int main(void)
 
 
 // TODO/Wishlist:
-// - Interface
-// -- Allow pane resizing?
 //
 // - ImageIO
 // -- Reincorporate OIIO for non-raw formats
 // -- Single import image function, raw first?
 // --- How to handle when image has preview file (dng)
 // -- Import Pakon RAW files (Colorspace?)
+// -- Perf mode off enables full res?
 //
 // - Export Window:
-// -- Single/Multi-export
-// -- Roll export
-// -- Verify metadata
+// -* Single/Multi-export
+// -* Roll export
+// -* Verify metadata
+// -* Roll export asks for directory (sub-directories made based on roll name)
+// -* Debayering (how that works with the half res)
+// -* Fixing the SDL flags in the metal render function
+// -* Proper channel handling
+// -* Remember to write the metadata (with exiv2)
+// -* Remember to set the OCIO kernels correctly
+// -* Global image "export" flag?
+// -* Utilize threadpools
 //
 // - Colorspaces
-// -- OCIO Colorspaces in Export
-// -- Regular spaces as well (ADX10)?
-// -- Handling custom OCIO Configs?
+// -* OCIO Colorspaces in Export
+// -* Regular spaces as well (ADX10)?
+// -* Handling custom OCIO Configs?
 //
 // - Preferences/Settings
-// -- Auto-save/frequency
-// -- OCIO Config setting
+// -* Auto-save/frequency
+// -* OCIO Config setting
 // -- Default meta options (cameras, lenses)
+// -* Roll load/unload setting (turn off the unloading?)
 //
 // - Menu Bar
-// -- Roll based settings
-// --- Roll Analyze
-// --- Roll Metadata
-// --- Roll export
-// -- Saving
-// --- Save one
-// --- Save all
-// -- Metadata
-// --- Edit Roll Meta
-// --- Export Roll Meta
+// -* Roll based settings
+// --- Roll Analyze No
+// --* Roll Metadata
+// --* Roll export
+// --* Saving
+// --* Save one
+// --* Save all
+// --* Metadata
+// --* Edit Roll Meta
+// --* Export Roll Meta
 //
 // - Hotkeys
-// -- Copy/Paste meta **
-// -- Copy/Paste params **
+// -* Copy/Paste meta **
+// -* Copy/Paste params **
 // -* Save state
 // -* Save roll - Add Roll JSON
-// -- Save all - Add Roll JSON
+// -* Save all - Add Roll JSON
 // -* Rot left
 // -* Rot right
-// -- Local Meta edit? (cmd + e?)
-// -- Global Meta edit? (cmd + g)
+// -* Local Meta edit? (cmd + e?)
+// -* Global Meta edit? (cmd + g)
 // -- Printer lights? Other adjustments
+// -* Make a popup with key shortcuts displayed
 //
 // - Metadata
-// -- Roll-based metadata
-// -- Local image metadata
-// -- Cache of common options (user-pref)
-// -- Button in imParam for edit/export
+// -- Cache of common options (user-pref) Probably not
+// -- Button in imParam for edit/export No
+//
+// - Cleanup
+// -- Cleanup windows.h header
+// -- Break out the rolls.cpp file?
+// -- Break out the imageio file (rename to image? make class?)
+// -- Add additional functions to get active roll, etc in window
+//
+// - Bugs
+// -- Test exporting and OCIO configs

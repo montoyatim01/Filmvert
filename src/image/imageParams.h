@@ -30,6 +30,7 @@ struct imageParams {
     unsigned int cropBoxX[4];
     unsigned int cropBoxY[4];
 
+
     void rstBP();
     void rstWP();
     void rstBC();

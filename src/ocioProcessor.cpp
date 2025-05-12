@@ -1,42 +1,12 @@
 #include "ocioProcessor.h"
 #include "OpenColorIO/OpenColorIO.h"
+#include "OpenColorIO/OpenColorTransforms.h"
 #include "OpenColorIO/OpenColorTypes.h"
 #include <cstring>
+#include <istream>
 
 ocioProcessor ocioProc;
-/*
-// Helper function to set up OpenGL context on macOS
-bool setupOpenGLContext(int width, int height) {
-    // Initialize GLUT
-    int argc = 1;
-    char *argv[1] = {(char*)"Something"};
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
-    glutInitWindowSize(width, height);
 
-    // Create a hidden window for OpenGL context
-    int windowId = glutCreateWindow("OCIO Context");
-
-    // Check if context was created successfully
-    if (windowId <= 0) {
-        std::cerr << "Failed to create OpenGL context" << std::endl;
-        return false;
-    }
-
-#ifndef __APPLE__
-    // Initialize GLEW (not needed on macOS)
-    glewExperimental = GL_TRUE;
-    GLenum err = glewInit();
-    if (err != GLEW_OK) {
-        std::cerr << "GLEW initialization failed: " << glewGetErrorString(err) << std::endl;
-        glutDestroyWindow(windowId);
-        return false;
-    }
-#endif
-
-    return true;
-}
-*/
 bool ocioProcessor::initialize(std::string &configFile) {
     try {
         // Load config from the memory stream
@@ -62,13 +32,17 @@ bool ocioProcessor::initialize(std::string &configFile) {
     }
 
     // Get all available color spaces for debug info
-    LOG_INFO("Available color spaces:" );
+    //LOG_INFO("Available color spaces:" );
     for (int i = 0; i < OCIOconfig->getNumColorSpaces(); i++) {
-        LOG_INFO("{}", OCIOconfig->getColorSpaceNameByIndex(i));
+        //LOG_INFO("{}", OCIOconfig->getColorSpaceNameByIndex(i));
+        std::string colorspace = OCIOconfig->getColorSpaceNameByIndex(i);
+        colorspaces.resize(colorspaces.size() + 1);
+        colorspaces[i] = new char[colorspace.length() + 1];
+        std::strcpy(colorspaces[i], colorspace.c_str());
     }
 
     // Get all available displays
-    LOG_INFO("Available displays: ");
+    //LOG_INFO("Available displays: ");
     for (int i = 0; i < OCIOconfig->getNumDisplays(); i++) {
         std::string displayName = OCIOconfig->getDisplay(i);
 
@@ -76,7 +50,7 @@ bool ocioProcessor::initialize(std::string &configFile) {
         displays[i] = new char[displayName.length() + 1];
         std::strcpy(displays[i], displayName.c_str());
 
-        LOG_INFO("{}", displayName);
+        //LOG_INFO("{}", displayName);
         std::vector<char*> curView;
         // Get views for this display
         for (int j = 0; j < OCIOconfig->getNumViews(displayName.c_str()); j++) {
@@ -84,11 +58,114 @@ bool ocioProcessor::initialize(std::string &configFile) {
             curView.resize(curView.size() + 1);
             curView[j] = new char[view.length() + 1];
             std::strcpy(curView[j], view.c_str());
-            LOG_INFO("{}", OCIOconfig->getView(displayName.c_str(), j));
+            //LOG_INFO("{}", OCIOconfig->getView(displayName.c_str(), j));
         }
         views.push_back(curView);
     }
     return true;
+}
+
+bool ocioProcessor::initAltConfig(std::string path) {
+    try {
+        // Load config from file
+        extOCIOconfig = OCIO::Config::CreateFromFile(path.c_str());
+
+        // Sanity check the config
+        extOCIOconfig->validate();
+
+        // Set as current config
+        //OCIO::SetCurrentConfig(OCIOconfig);
+
+        LOG_INFO("Successfully loaded OCIO config from file");
+        externalConfigPath = path;
+        validExternal = true;
+        return true;
+
+    } catch (const OCIO::Exception& e) {
+        LOG_ERROR("Error loading OCIO config: {}", e.what());
+        return false;
+    }
+}
+
+void ocioProcessor::setExtActive() {
+    if (!validExternal)
+        return;
+
+    try {
+        OCIO::SetCurrentConfig(extOCIOconfig);
+        colorspaces.clear();
+        for (int i = 0; i < extOCIOconfig->getNumColorSpaces(); i++) {
+            std::string colorspace = extOCIOconfig->getColorSpaceNameByIndex(i);
+            colorspaces.resize(colorspaces.size() + 1);
+            colorspaces[i] = new char[colorspace.length() + 1];
+            std::strcpy(colorspaces[i], colorspace.c_str());
+        }
+
+        displays.clear();
+        views.clear();
+        for (int i = 0; i < extOCIOconfig->getNumDisplays(); i++) {
+            std::string displayName = extOCIOconfig->getDisplay(i);
+
+            displays.resize(displays.size() + 1);
+            displays[i] = new char[displayName.length() + 1];
+            std::strcpy(displays[i], displayName.c_str());
+
+            std::vector<char*> curView;
+            // Get views for this display
+            for (int j = 0; j < extOCIOconfig->getNumViews(displayName.c_str()); j++) {
+                std::string view = extOCIOconfig->getView(displayName.c_str(), j);
+                curView.resize(curView.size() + 1);
+                curView[j] = new char[view.length() + 1];
+                std::strcpy(curView[j], view.c_str());
+            }
+            views.push_back(curView);
+        }
+
+        useExt = true;
+
+    } catch (const OCIO::Exception& e) {
+        LOG_ERROR("Error setting ext OCIO config: {}", e.what());
+        return;
+    }
+}
+
+void ocioProcessor::setIntActive() {
+    try {
+        OCIO::SetCurrentConfig(OCIOconfig);
+        colorspaces.clear();
+        for (int i = 0; i < OCIOconfig->getNumColorSpaces(); i++) {
+            std::string colorspace = OCIOconfig->getColorSpaceNameByIndex(i);
+            colorspaces.resize(colorspaces.size() + 1);
+            colorspaces[i] = new char[colorspace.length() + 1];
+            std::strcpy(colorspaces[i], colorspace.c_str());
+        }
+
+        displays.clear();
+        views.clear();
+        for (int i = 0; i < OCIOconfig->getNumDisplays(); i++) {
+            std::string displayName = OCIOconfig->getDisplay(i);
+
+            displays.resize(displays.size() + 1);
+            displays[i] = new char[displayName.length() + 1];
+            std::strcpy(displays[i], displayName.c_str());
+
+            std::vector<char*> curView;
+            // Get views for this display
+            for (int j = 0; j < OCIOconfig->getNumViews(displayName.c_str()); j++) {
+                std::string view = OCIOconfig->getView(displayName.c_str(), j);
+                curView.resize(curView.size() + 1);
+                curView[j] = new char[view.length() + 1];
+                std::strcpy(curView[j], view.c_str());
+            }
+            views.push_back(curView);
+        }
+
+        useExt = false;
+
+    } catch (const OCIO::Exception& e) {
+        LOG_ERROR("Error setting ext OCIO config: {}", e.what());
+        return;
+    }
 }
 
 void ocioProcessor::processImage(float *img, unsigned int width, unsigned int height) {
@@ -136,16 +213,25 @@ void ocioProcessor::processImage(float *img, unsigned int width, unsigned int he
     }
 }
 
-std::string ocioProcessor::getMetalKernel() {
+std::string ocioProcessor::getMetalKernel(int _csOpt, int _csDisp, int _viewOp) {
+    const char* colorspace = OCIOconfig->getColorSpaceNameByIndex(_csDisp);
     const char* display = OCIOconfig->getDisplay(displayOp);
-    const char* view = OCIOconfig->getView(display, viewOp);
+    const char* view = OCIOconfig->getView(display, _viewOp);
 
-    OCIO::DisplayViewTransformRcPtr transform = OCIO::DisplayViewTransform::Create();
-    transform->setSrc("ACEScg");
-    transform->setDisplay(display);
-    transform->setView(view);
+    OCIO::ConstProcessorRcPtr processor;
+    if (_csOpt == 0){
+        OCIO::ColorSpaceTransformRcPtr transform = OCIO::ColorSpaceTransform::Create();
+        transform->setSrc("ACEScg");
+        transform->setDst(colorspace);
+        processor = OCIOconfig->getProcessor(transform);
+    } else {
+        OCIO::DisplayViewTransformRcPtr transform = OCIO::DisplayViewTransform::Create();
+        transform->setSrc("ACEScg");
+        transform->setDisplay(display);
+        transform->setView(view);
+        processor = OCIOconfig->getProcessor(transform);
+    }
 
-    OCIO::ConstProcessorRcPtr processor = OCIOconfig->getProcessor(transform);
     try {
         // Step 5: Create GPU shader description
         OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateShaderDesc();
@@ -154,6 +240,9 @@ std::string ocioProcessor::getMetalKernel() {
         // Step 6: Get the shader program info
         processor->getDefaultGPUProcessor()->extractGpuShaderInfo(shaderDesc);
         //LOG_INFO("GPU Shader: {}", shaderDesc->getShaderText());
+        csDisp = _csOpt;
+        displayOp = _csDisp;
+        viewOp = _viewOp;
         return shaderDesc->getShaderText();
     } catch (OCIO::Exception& e) {
         LOG_ERROR("OCIO processing error: {}", e.what());

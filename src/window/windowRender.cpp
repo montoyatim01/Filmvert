@@ -89,7 +89,8 @@ void mainWindow::rollRenderCheck() {
                 // And this is not the active roll
                 // And this roll is fully loaded
                 // And there are not images loading
-                activeRolls[r].clearBuffers();
+                if (preferences.perfMode)
+                    activeRolls[r].clearBuffers();
             }
     }
 

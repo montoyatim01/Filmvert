@@ -1,11 +1,11 @@
 #include "window.h"
 
 void mainWindow::checkMeta() {
-    if (!metaRefresh)
+    if (!metaRefresh || !preferences.autoSave)
         return;
     auto now = std::chrono::steady_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::seconds>(now - lastChange);
-    if (dur.count() > 5) {
+    if (dur.count() > preferences.autoSFreq) {
         for (int r = 0; r < activeRolls.size(); r++) {
             for (int i = 0; i < activeRolls[r].images.size(); i++) {
                 image* img = getImage(r, i);
@@ -21,4 +21,60 @@ void mainWindow::checkMeta() {
         metaRefresh = false;
     }
     return;
+}
+
+void mainWindow::imageMetaPreEdit() {
+    if (!validIm())
+        return;
+    metaEdit.frameNum = activeImage()->imMeta.frameNumber;
+    std::strcpy(metaEdit.camMake, activeImage()->imMeta.cameraMake.c_str());
+    std::strcpy(metaEdit.camModel, activeImage()->imMeta.cameraModel.c_str());
+    std::strcpy(metaEdit.lens, activeImage()->imMeta.lens.c_str());
+    std::strcpy(metaEdit.film, activeImage()->imMeta.filmStock.c_str());
+    std::strcpy(metaEdit.focal, activeImage()->imMeta.focalLength.c_str());
+    std::strcpy(metaEdit.fnum, activeImage()->imMeta.fNumber.c_str());
+    std::strcpy(metaEdit.exp, activeImage()->imMeta.exposureTime.c_str());
+
+    std::strcpy(metaEdit.date, activeImage()->imMeta.dateTime.c_str());
+    std::strcpy(metaEdit.loc, activeImage()->imMeta.location.c_str());
+    std::strcpy(metaEdit.gps, activeImage()->imMeta.gps.c_str());
+    std::strcpy(metaEdit.notes, activeImage()->imMeta.notes.c_str());
+    std::strcpy(metaEdit.dev, activeImage()->imMeta.devProcess.c_str());
+    std::strcpy(metaEdit.chem, activeImage()->imMeta.chemMfg.c_str());
+    std::strcpy(metaEdit.devnotes, activeImage()->imMeta.devNotes.c_str());
+}
+
+void mainWindow::imageMetaPostEdit() {
+    if (!validIm())
+        return;
+    if (metaEdit.a_camMake)
+        activeImage()->imMeta.cameraMake = metaEdit.camMake;
+    if (metaEdit.a_camModel)
+        activeImage()->imMeta.cameraModel = metaEdit.camModel;
+    if (metaEdit.a_lens)
+        activeImage()->imMeta.lens = metaEdit.lens;
+    if (metaEdit.a_film)
+        activeImage()->imMeta.filmStock = metaEdit.film;
+    if (metaEdit.a_focal)
+        activeImage()->imMeta.focalLength = metaEdit.focal;
+    if (metaEdit.a_fnum)
+        activeImage()->imMeta.fNumber = metaEdit.fnum;
+    if (metaEdit.a_exp)
+        activeImage()->imMeta.exposureTime = metaEdit.exp;
+
+    if (metaEdit.a_date)
+        activeImage()->imMeta.dateTime = metaEdit.date;
+    if (metaEdit.a_loc)
+        activeImage()->imMeta.location = metaEdit.loc;
+    if (metaEdit.a_gps)
+        activeImage()->imMeta.gps = metaEdit.gps;
+    if (metaEdit.a_notes)
+        activeImage()->imMeta.notes = metaEdit.notes;
+    if (metaEdit.a_dev)
+        activeImage()->imMeta.devProcess = metaEdit.dev;
+    if (metaEdit.a_chem)
+        activeImage()->imMeta.chemMfg = metaEdit.chem;
+    if (metaEdit.a_devnotes)
+        activeImage()->imMeta.devProcess = metaEdit.devnotes;
+
 }

@@ -23,6 +23,23 @@ void mainWindow::copyIntoParams() {
             copyParams.cropBoxY[i] = activeImage()->imgParam.cropBoxY[i];
         }
 
+        //---Metadata
+        copyMeta.cameraMake = activeImage()->imMeta.cameraMake;
+        copyMeta.cameraModel = activeImage()->imMeta.cameraModel;
+        copyMeta.lens = activeImage()->imMeta.lens;
+        copyMeta.filmStock = activeImage()->imMeta.filmStock;
+        copyMeta.focalLength = activeImage()->imMeta.focalLength;
+        copyMeta.fNumber = activeImage()->imMeta.fNumber;
+        copyMeta.exposureTime = activeImage()->imMeta.exposureTime;
+        copyMeta.dateTime = activeImage()->imMeta.dateTime;
+        copyMeta.location = activeImage()->imMeta.location;
+        copyMeta.gps = activeImage()->imMeta.gps;
+        copyMeta.notes = activeImage()->imMeta.notes;
+        copyMeta.devProcess = activeImage()->imMeta.devProcess;
+        copyMeta.chemMfg = activeImage()->imMeta.chemMfg;
+        copyMeta.devNotes = activeImage()->imMeta.devNotes;
+
+
     }
 }
 
@@ -89,6 +106,52 @@ void mainWindow::pasteIntoParams() {
                     metaChg = true;
                 }
             }
+
+            //---Metadata
+            if (pasteOptions.make) {
+                getImage(i)->imMeta.cameraMake = copyMeta.cameraMake;
+            }
+            if (pasteOptions.model) {
+                getImage(i)->imMeta.cameraModel = copyMeta.cameraModel;
+            }
+            if (pasteOptions.lens) {
+                getImage(i)->imMeta.lens = copyMeta.lens;
+            }
+            if (pasteOptions.stock) {
+                getImage(i)->imMeta.filmStock = copyMeta.filmStock;
+            }
+            if (pasteOptions.focal) {
+                getImage(i)->imMeta.focalLength = copyMeta.focalLength;
+            }
+            if (pasteOptions.fstop) {
+                getImage(i)->imMeta.fNumber = copyMeta.fNumber;
+            }
+            if (pasteOptions.exposure) {
+                getImage(i)->imMeta.exposureTime = copyMeta.exposureTime;
+            }
+            if (pasteOptions.date) {
+                getImage(i)->imMeta.dateTime = copyMeta.dateTime;
+            }
+            if (pasteOptions.location) {
+                getImage(i)->imMeta.location = copyMeta.location;
+            }
+            if (pasteOptions.gps) {
+                getImage(i)->imMeta.gps = copyMeta.gps;
+            }
+            if (pasteOptions.notes) {
+                getImage(i)->imMeta.notes = copyMeta.notes;
+            }
+            if (pasteOptions.dev) {
+                getImage(i)->imMeta.devNotes = copyMeta.devNotes;
+            }
+            if (pasteOptions.chem) {
+                getImage(i)->imMeta.chemMfg = copyMeta.chemMfg;
+            }
+            if (pasteOptions.devnote) {
+                getImage(i)->imMeta.devNotes = copyMeta.devNotes;
+            }
+
+
             getImage(i)->needMetaWrite |= metaChg;
             imgRender(getImage(i));
         }

@@ -1,12 +1,13 @@
 #include "window.h"
 #include "windowUtils.h"
+#include <imgui.h>
 
 void mainWindow::imageView() {
     bool calcBaseColor = false;
     ImGui::SetNextWindowPos(ImVec2(0,25));
-    ImGui::SetNextWindowSize(ImVec2(winWidth * 0.65,winHeight - (25 + 280)));
-    ImGui::Begin("Image Display", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-
+    ImGui::SetNextWindowSize(ImVec2(winWidth * 0.65,winHeight - (25 + thumbHeight)), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Image Display", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    imageWinSize = ImGui::GetWindowSize();
     if (validIm()) {
         // Pre-calc
         int displayWidth, displayHeight;

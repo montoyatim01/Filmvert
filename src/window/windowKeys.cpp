@@ -47,6 +47,16 @@ void mainWindow::checkHotkeys() {
         }
     }
 
+    // Preferences (Cmd + ,)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_Comma | ImGuiMod_Ctrl)) {
+        // Preferences
+        badOcioText = false;
+        std::strcpy(ocioPath, preferences.ocioPath.c_str());
+        if (preferences.ocioExt)
+            ocioSel = 1;
+        preferencesPopTrig = true;
+    }
+
     // Rotate Left (Cmd + [)
     if (ImGui::IsKeyChordPressed(ImGuiKey_LeftBracket | ImGuiMod_Ctrl)) {
         if (validIm()) {
@@ -76,9 +86,24 @@ void mainWindow::checkHotkeys() {
 
     }
 
-    // Open Image Metadata (Cmd + M)
-    if (ImGui::IsKeyChordPressed(ImGuiKey_M | ImGuiMod_Ctrl)) {
+    // Open Image Metadata (Cmd + E)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_E | ImGuiMod_Ctrl)) {
         // Metadata popup flag
+        if (validIm()) {
+            std::memset(&metaEdit, 0, sizeof(metaBuff));
+            localMetaPopTrig = true;
+            imageMetaPreEdit();
+        }
+    }
+
+    // Open Roll Metadata (Cmd + G)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_G | ImGuiMod_Ctrl)) {
+        // Metadata popup flag
+        if (validRoll()) {
+            std::memset(&metaEdit, 0, sizeof(metaBuff));
+            globalMetaPopTrig = true;
+            activeRolls[selRoll].rollMetaPreEdit(&metaEdit);
+        }
     }
 
     // Printer Lights?

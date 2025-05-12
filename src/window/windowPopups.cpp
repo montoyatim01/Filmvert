@@ -1,3 +1,6 @@
+#include "imageIO.h"
+#include "imageMeta.h"
+#include "ocioProcessor.h"
 #include "window.h"
 #include <cstring>
 #include <imgui.h>
@@ -8,10 +11,7 @@ void mainWindow::importImagePopup() {
     if (dispImportPop)
         ImGui::OpenPopup("Import Images");
     if (ImGui::BeginPopupModal("Import Images", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
-        ImGui::Text("Importing Images");
-        ImGui::Separator();
-        ImGui::Text("Rolls will be created (and filled) for each directory selected.");
-        ImGui::Text("Images in the base directory (or selected images) will go into the selected roll.");
+        ImGui::Text("Importing Images...");
         ImGui::Separator();
         ImGui::Text("Roll to insert images to:");
         ImGui::Combo("###", &impRoll, rollNames.data(), activeRolls.size());
@@ -24,8 +24,9 @@ void mainWindow::importImagePopup() {
             ImGui::OpenPopup("New Roll");
         if (ImGui::BeginPopupModal("New Roll", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
             ImGui::Text("Roll Name: ");
+            //ImGui::SetKeyboardFocusHere();
             ImGui::InputTextWithHint("###rName", "Roll Name", rollNameBuf, IM_ARRAYSIZE(rollNameBuf));
-            ImGui::Text("Roll Directory (for metadata saving:");
+            ImGui::Text("Roll Directory (for metadata saving):");
             ImGui::InputText("###rPath", rollPath, IM_ARRAYSIZE(rollPath));
             ImGui::SameLine();
             if (ImGui::Button("Browse")) {
@@ -39,7 +40,12 @@ void mainWindow::importImagePopup() {
                 std::memset(rollPath, 0, sizeof(rollPath));
                 ImGui::CloseCurrentPopup();
             }
+            bool createDisabled = false;
             ImGui::SameLine();
+            if (std::string(rollNameBuf).empty() || std::string(rollPath).empty()) {
+                createDisabled = true;
+                ImGui::BeginDisabled();
+            }
             if (ImGui::Button("Create Roll")) {
                 activeRolls.emplace_back(filmRoll(rollNameBuf));
                 rollNames.resize(rollNames.size() + 1);
@@ -52,6 +58,9 @@ void mainWindow::importImagePopup() {
 
                 newRollPopup = false;
                 ImGui::CloseCurrentPopup();
+            }
+            if (createDisabled) {
+                ImGui::EndDisabled();
             }
             ImGui::EndPopup();
         }
@@ -112,7 +121,15 @@ void mainWindow::importImagePopup() {
                     }
                 }
                 for (int i = baseIndex; i < activeRolls[impRoll].images.size(); i++) {
-                    imgRender(getImage(impRoll, i));
+                    image *img = getImage(impRoll, i);
+
+                    if (img) {
+                        imgRender(img);
+                        img->imMeta.rollName = activeRolls[impRoll].rollName;
+                        img->imMeta.frameNumber = i + 1;
+                    }
+
+
                 }
                 activeRolls[impRoll].imagesLoading = false;
                 selRoll = impRoll;
@@ -217,7 +234,13 @@ void mainWindow::importRollPopup() {
                     for (int i = 0; i < activeRolls[thisRoll].images.size(); i++) {
                         image* thisIm = getImage(thisRoll, i);
                         //LOG_INFO("Queueing Image: {} from Roll: {}, with iterator: {}, with pointer: {}", thisIm->srcFilename, thisRoll, i, fmt::ptr(thisIm));
-                        imgRender(thisIm);
+
+                        if (thisIm) {
+                            imgRender(thisIm);
+                            thisIm->imMeta.rollName = activeRolls[thisRoll].rollName;
+                            thisIm->imMeta.frameNumber = i + 1;
+                        }
+
                     }
 
                     if (r == 0) {
@@ -229,6 +252,7 @@ void mainWindow::importRollPopup() {
                     }
                     activeRolls[thisRoll].rollLoaded = true;
                     activeRolls[thisRoll].imagesLoading = false;
+                    activeRolls[thisRoll].rollPath = importFiles[r];
 
                 }
                 // After all images have finished
@@ -251,81 +275,102 @@ void mainWindow::importRollPopup() {
 
 void mainWindow::batchRenderPopup() {
     if (exportPopup)
-        ImGui::OpenPopup("ExportWindow");
-    if (ImGui::BeginPopupModal("ExportWindow", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
-        ImGui::Text("Export selected images");
+        ImGui::OpenPopup("Export Image(s)");
+    if (ImGui::BeginPopupModal("Export Image(s)", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
+        ImGui::Text("Export selected image(s)");
         ImGui::Separator();
+        if (expRolls) {
+            // Table for selecting rolls
+            if (ImGui::BeginChild("##Basket", ImVec2(-FLT_MIN, ImGui::GetFontSize() * 6), ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY))
+            {
+                //ImGuiMultiSelectIO* ms_io = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_NoAutoSelect | ImGuiMultiSelectFlags_NoAutoClear, -1, activeRolls.size());
+                //ImGuiSelectionExternalStorage storage_wrapper;
+                //storage_wrapper.AdapterSetItemSelected = [](ImGuiSelectionExternalStorage* self, int n, bool selected) { activeRolls[n].selected = selected; };
+                //storage_wrapper.ApplyRequests(ms_io);
+                for (int n = 0; n < activeRolls.size(); n++)
+                {
+                    ImGui::SetNextItemSelectionUserData(n);
+                    ImGui::Checkbox(activeRolls[n].rollName.c_str(), &activeRolls[n].selected);
+                }
+                //ms_io = ImGui::EndMultiSelect();
+                //storage_wrapper.ApplyRequests(ms_io);
+            }
+            ImGui::EndChild();
+        }
 
         ImGui::Text("File Format:");
-        ImGui::Combo("###FF", &outType, fileTypes.data(), fileTypes.size());
-        ImGui::Text("Bit-Depth:");
-        ImGui::Combo("###BD", &outDepth, bitDepths.data(), bitDepths.size());
-        ImGui::SliderInt("Quality", &quality, 10, 100);
-        ImGui::Checkbox("Overwrite Existing File(s)?", &overwrite);
+        ImGui::Combo("###FF", &expSetting.format, fileTypes.data(), fileTypes.size());
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Text("Format Settings");
+        if (expSetting.format != 2) {
+            ImGui::Text("Bit-Depth:");
+            ImGui::Combo("###BD", &expSetting.bitDepth, bitDepths.data(), bitDepths.size());
+        }
+        if (expSetting.format == 2) {
+            ImGui::SliderInt("Quality", &expSetting.quality, 10, 100);
+        } else if (expSetting.format == 3 || expSetting.format == 4) {
+            ImGui::SliderInt("Compression (loseless)", &expSetting.compression, 1, 9);
+        }
+
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Text("Colorspace Settings");
+
+        // Colorspace or display
+        ImGui::Combo("###CSO", &expSetting.colorspaceOpt, colorspaceSet.data(), colorspaceSet.size());
+        if (expSetting.colorspaceOpt == 0) {
+            // Colorspace
+            ImGui::Text("Colorspace:");
+            ImGui::Combo("###CS", &expSetting.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
+        } else {
+            ImGui::Text("Display:");
+            ImGui::Combo("###DSP", &expSetting.display, ocioProc.displays.data(), ocioProc.displays.size());
+
+            ImGui::Text("View:");
+            ImGui::Combo("##VW", &expSetting.view, ocioProc.views[expSetting.display].data(), ocioProc.views[expSetting.display].size());
+        }
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Checkbox("Overwrite Existing File(s)?", &expSetting.overwrite);
 
         // Output Directory
         static char buf1[256] = "";
         ImGui::InputTextWithHint("###Path", "Save Path", buf1, IM_ARRAYSIZE(buf1));
         ImGui::SameLine();
         if (ImGui::Button("Browse")) {
-            openDirectory();
-            strcpy(buf1, outPath.c_str());
+            auto directory = ShowFolderSelectionDialog(false);
+            if (!directory.empty()) {
+                strcpy(buf1, directory[0].c_str());
+            }
+
         }
+        if (expRolls)
+            ImGui::Text("(Rolls will save in sub-directories)");
+
+
         bool disableSet = false;
         if (isExporting) {
             ImGui::BeginDisabled();
             disableSet = true;
         }
 
-        /*if(ImGui::Button("Save")) {
+        if(ImGui::Button("Save")) {
             isExporting = true;
             exportParam params;
-            params.outPath = buf1;
-            params.format = outType;
-            params.bitDepth = outDepth;
-            params.quality = quality;
-            params.overwrite = overwrite;
+            expSetting.outPath = buf1;
+            expSetting.outPath += "/";
+
             elapsedTime = 0;
-            numIm = 0;
-            for (int i=0; i < activeRollSize(); i++) {
-                if (getImage(i)->selected)
-                    numIm++;
-            }
-            curIm = 0;
-            exportThread = std::thread{[this, params]() {
-                for (int i = 0; i < activeRollSize(); i++) {
-                    if (!isExporting) {
-                        exportPopup = false;
-                        return;
-                    }
+            exportImgCount = 0;
+            if (expRolls)
+                exportRolls();
+            else
+                exportImages();
+        }
 
-                    if (getImage(i)->selected) {
-                        auto start = std::chrono::steady_clock::now();
-                        //TODO: Figure out better solution for this (non-blocking)
-                        // but still will render out an image.
-                        if (!isRendering) {
-                            //isRendering = true;
-                            mtlGPU->addToRender(getImage(i), r_sdt);
-                            //getImage(i)->procDispImg();
-                            //getImage(i)->sdlUpdate = true;
-                            isRendering = false;
-                        }
-                        LOG_INFO("Exporting Image {}: {}", i, getImage(i)->srcFilename);
-                        getImage(i)->writeImg(params);
-                        auto end = std::chrono::steady_clock::now();
-                        auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-                        elapsedTime += dur.count();
-                        curIm++;
-                    }
 
-                }
-                exportPopup = false;
-                isExporting = false;
-            }};
-            exportThread.detach();
-            //exportPopup = false;
-            //ImGui::CloseCurrentPopup();
-        }*/
         if (disableSet)
             ImGui::EndDisabled();
         ImGui::SameLine();
@@ -336,12 +381,13 @@ void mainWindow::batchRenderPopup() {
         }
         if (isExporting) {
             ImGui::Separator();
-            float progress = (float)curIm / ((float)(numIm-1) + 0.5f);
+            float progress = (float)exportProcCount / ((float)(exportImgCount-1) + 0.5f);
             ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
             unsigned int avgTime = 0;
-            if (curIm !=0)
-                avgTime = elapsedTime / curIm;
-            unsigned int remainingTime = (numIm - (curIm + 1)) * avgTime;
+            elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - expStart).count();
+            if (exportProcCount !=0)
+                avgTime = elapsedTime / exportProcCount;
+            unsigned int remainingTime = (exportImgCount - (exportProcCount + 1)) * avgTime;
             unsigned int remainingSec = remainingTime / 1000;
             unsigned int hr = remainingSec / 3600;
             remainingSec %= 3600;
@@ -349,13 +395,11 @@ void mainWindow::batchRenderPopup() {
             remainingSec %= 60;
             std::string remMsg = "";
             remMsg = fmt::format("{:3} of {:3} Images Processed. {:02}:{:02}:{:02} Remaining",
-                curIm, numIm, hr, min, remainingSec);
-            ImGui::Text(remMsg.c_str());
+                exportProcCount, exportImgCount, hr, min, remainingSec);
+            ImGui::Text("%s", remMsg.c_str());
         }
         if (!exportPopup && !isExporting)
             ImGui::CloseCurrentPopup();
-
-
 
         ImGui::EndPopup();
     }
@@ -363,42 +407,93 @@ void mainWindow::batchRenderPopup() {
 
 void mainWindow::pastePopup() {
     if (pasteTrigger)
-        ImGui::OpenPopup("PasteWindow");
-    if (ImGui::BeginPopupModal("PasteWindow", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
+        ImGui::OpenPopup("Paste");
+    if (ImGui::BeginPopupModal("Paste", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
         ImGui::Text("Paste selected options");
         ImGui::Separator();
+
+        //---Analysis---//
+        ImVec2 btnSize = ImGui::CalcTextSize("Blur");
+        //btnSize.x += (ImGui::GetStyle().FramePadding.x*2);
+        //btnSize.y += (ImGui::GetStyle().FramePadding.y*2);
+
+        btnSize.x += (ImGui::GetStyle().ItemSpacing.x);
+        btnSize.y += (ImGui::GetStyle().ItemSpacing.y + 2);
+        /*ImGui::SetCursorPosX(ImGui::GetWindowWidth() * 0.38);
+        if(ImGui::Button("All Analysis")) {
+            pasteOptions.analysisGlobal();
+        }*/
+
+        ImGui::BeginGroup();
+        ImGui::InvisibleButton("##01", btnSize);
+        ImGui::Checkbox("Base Color", &pasteOptions.baseColor);
+        ImGui::Checkbox("Analysis", &pasteOptions.analysis);
+        ImGui::Separator();
+        ImGui::InvisibleButton("##02", btnSize);
+        ImGui::Checkbox("Temperature", &pasteOptions.temp);
+        ImGui::Checkbox("Tint", &pasteOptions.tint);
+        ImGui::Checkbox("Blackpoint", &pasteOptions.bp);
+        ImGui::Separator();
+        ImGui::InvisibleButton("##03", btnSize);
+        ImGui::Checkbox("Camera Make", &pasteOptions.make);
+        ImGui::Checkbox("Camera Model", &pasteOptions.model);
+        ImGui::Checkbox("Lens", &pasteOptions.lens);
+        ImGui::Checkbox("Film Stock", &pasteOptions.stock);
+        ImGui::Checkbox("Focal Length", &pasteOptions.focal);
+        ImGui::EndGroup();
+
+        ImGui::SameLine();
+
+        ImGui::BeginGroup();
         if(ImGui::Button("All Analysis")) {
             pasteOptions.analysisGlobal();
         }
-        ImGui::Checkbox("Base Color", &pasteOptions.baseColor);
-        ImGui::SameLine();
-        ImGui::Checkbox("Crop Points", &pasteOptions.cropPoints);
-
         ImGui::Checkbox("Analysis Blur", &pasteOptions.analysisBlur);
-        ImGui::SameLine();
-        ImGui::Checkbox("Analysis", &pasteOptions.analysis);
+        ImGui::InvisibleButton("##04", btnSize);
+        ImGui::Spacing();
 
-        ImGui::Separator();
         if (ImGui::Button("All Grade")) {
             pasteOptions.gradeGlobal();
         }
-        ImGui::Checkbox("Temperature", &pasteOptions.temp);
-        ImGui::SameLine();
-        ImGui::Checkbox("Tint", &pasteOptions.tint);
-
-        ImGui::Checkbox("Blackpoint", &pasteOptions.bp);
-        ImGui::SameLine();
         ImGui::Checkbox("Whitepoint", &pasteOptions.wp);
-
         ImGui::Checkbox("Lift", &pasteOptions.lift);
-        ImGui::SameLine();
         ImGui::Checkbox("Gain", &pasteOptions.gain);
+        ImGui::Spacing();
 
-        ImGui::Checkbox("Multiply", &pasteOptions.mult);
+        if (ImGui::Button("All Metadata")) {
+            pasteOptions.metaGlobal();
+        }
+        ImGui::Checkbox("f Number", &pasteOptions.fstop);
+        ImGui::Checkbox("Exposure", &pasteOptions.exposure);
+        ImGui::Checkbox("Date/Time", &pasteOptions.date);
+        ImGui::Checkbox("Location", &pasteOptions.location);
+        ImGui::Checkbox("GPS", &pasteOptions.gps);
+        ImGui::EndGroup();
+
         ImGui::SameLine();
-        ImGui::Checkbox("Offset", &pasteOptions.offset);
 
+        ImGui::BeginGroup();
+        ImGui::InvisibleButton("##05", btnSize);
+        ImGui::Checkbox("Crop Points", &pasteOptions.cropPoints);
+        ImGui::InvisibleButton("##06", btnSize);
+        ImGui::Spacing();
+
+        ImGui::InvisibleButton("##07", btnSize);
+        ImGui::Checkbox("Multiply", &pasteOptions.mult);
+        ImGui::Checkbox("Offset", &pasteOptions.offset);
         ImGui::Checkbox("Gamma", &pasteOptions.gamma);
+        ImGui::Spacing();
+
+        ImGui::InvisibleButton("##08", btnSize);
+        ImGui::Checkbox("Notes", &pasteOptions.notes);
+        ImGui::Checkbox("Development Process", &pasteOptions.dev);
+        ImGui::Checkbox("Chemistry Manufacturer", &pasteOptions.chem);
+        ImGui::Checkbox("Development Notes", &pasteOptions.devnote);
+        ImGui::InvisibleButton("##09", btnSize);
+        ImGui::EndGroup();
+
+
+        ImGui::Separator();
 
         if(ImGui::Button("Cancel")) {
             pasteTrigger = false;
@@ -410,6 +505,489 @@ void mainWindow::pastePopup() {
             pasteTrigger = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::EndPopup();
+    }
+}
+
+
+void mainWindow::unsavedRollPopup() {
+    if (unsavedPopTrigger)
+        ImGui::OpenPopup("Unsaved Changes");
+    if (ImGui::BeginPopupModal("Unsaved Changes", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text("There are unsaved changes!");
+
+        if (ImGui::Button("Cancel")) {
+            unsavedPopTrigger = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Discard")) {
+            // TODO: Program in selector for wanting to close as well
+            // How does it interact with the macOS window state?
+            // Figure out the dotted red circle
+            removeRoll();
+            unsavedPopTrigger = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save")) {
+            // TODO: Program in selector for wanting to close as well
+            // How does it interact with the macOS window state?
+            // Figure out the dotted red circle
+            // In Close mode this would save all rolls
+            if (validRoll()) {
+                activeRolls[selRoll].saveAll();
+                removeRoll();
+            }
+
+            unsavedPopTrigger = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+
+}
+
+void mainWindow::globalMetaPopup() {
+    if (globalMetaPopTrig)
+        ImGui::OpenPopup("Roll Metadata");
+    if (ImGui::BeginPopupModal("Roll Metadata", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+
+        ImGui::Text("Edit roll-wide metadata");
+        ImGui::Separator();
+
+        const char imgWarn[] = "Image-specific values set!";
+
+        ImGui::Text("Roll Path:");
+        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.55);
+        metaEdit.a_rollPath |= ImGui::InputText("##00",
+            metaEdit.rollPath,
+            IM_ARRAYSIZE(metaEdit.rollPath));
+        ImGui::SameLine();
+        if (ImGui::Button("Browse")) {
+            auto folder = ShowFolderSelectionDialog(false);
+            if (!folder.empty()) {
+                std::strcpy(metaEdit.rollPath, folder[0].c_str());
+                metaEdit.a_rollPath = true;
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##00", (bool*)&metaEdit.a_rollPath);
+
+        ImGui::Text("Roll Name:");
+        metaEdit.a_rollname |= ImGui::InputTextWithHint("##01",
+            metaEdit.dif_rollname ? imgWarn : "", metaEdit.rollname,
+            IM_ARRAYSIZE(metaEdit.rollname));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##01", (bool*)&metaEdit.a_rollname);
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::BeginGroup();
+        ImGui::Text("Camera Make:");
+        metaEdit.a_camMake |= ImGui::InputTextWithHint("##02",
+            metaEdit.dif_camMake ? imgWarn : "", metaEdit.camMake,
+            IM_ARRAYSIZE(metaEdit.camMake));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##02", (bool*)&metaEdit.a_camMake);
+
+        ImGui::Text("Camera Model:");
+        metaEdit.a_camModel |= ImGui::InputTextWithHint("##03",
+            metaEdit.dif_camModel ? imgWarn : "", metaEdit.camModel,
+            IM_ARRAYSIZE(metaEdit.camModel));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##03", (bool*)&metaEdit.a_camModel);
+
+        ImGui::Text("Lens:");
+        metaEdit.a_lens |= ImGui::InputTextWithHint("##04",
+            metaEdit.dif_lens ? imgWarn : "", metaEdit.lens,
+            IM_ARRAYSIZE(metaEdit.lens));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##04", (bool*)&metaEdit.a_lens);
+
+        ImGui::Text("Film Stock:");
+        metaEdit.a_film |= ImGui::InputTextWithHint("##05",
+            metaEdit.dif_film ? imgWarn : "", metaEdit.film,
+            IM_ARRAYSIZE(metaEdit.film));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##05", (bool*)&metaEdit.a_film);
+
+        ImGui::Text("Focal Length:");
+        metaEdit.a_focal |= ImGui::InputTextWithHint("##06",
+            metaEdit.dif_focal ? imgWarn : "", metaEdit.focal,
+            IM_ARRAYSIZE(metaEdit.focal));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##06", (bool*)&metaEdit.a_focal);
+        ImGui::Text("Date/Time:");
+        metaEdit.a_date |= ImGui::InputTextWithHint("##07",
+            metaEdit.dif_date ? imgWarn : "", metaEdit.date,
+            IM_ARRAYSIZE(metaEdit.date));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##07", (bool*)&metaEdit.a_date);
+        ImGui::EndGroup();
+
+
+        ImGui::SameLine();
+        ImVec2 bottomPos = ImGui::GetCursorPos();
+        ImGui::SetCursorPosX(bottomPos.x + 10);
+        ImGui::BeginGroup();
+        ImGui::Text("Location:");
+        metaEdit.a_loc |= ImGui::InputTextWithHint("##08",
+            metaEdit.dif_loc ? imgWarn : "", metaEdit.loc,
+            IM_ARRAYSIZE(metaEdit.loc));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##08", (bool*)&metaEdit.a_loc);
+
+        ImGui::Text("GPS:");
+        metaEdit.a_gps |= ImGui::InputTextWithHint("##09",
+            metaEdit.dif_gps ? imgWarn : "", metaEdit.gps,
+            IM_ARRAYSIZE(metaEdit.gps));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##09", (bool*)&metaEdit.a_gps);
+
+        ImGui::Text("Notes:");
+        metaEdit.a_notes |= ImGui::InputTextWithHint("##10",
+            metaEdit.dif_notes ? imgWarn : "", metaEdit.notes,
+            IM_ARRAYSIZE(metaEdit.notes));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##10", (bool*)&metaEdit.a_notes);
+
+        ImGui::Text("Development Process:");
+        metaEdit.a_dev |= ImGui::InputTextWithHint("##11",
+            metaEdit.dif_dev ? imgWarn : "", metaEdit.dev,
+            IM_ARRAYSIZE(metaEdit.dev));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##11", (bool*)&metaEdit.a_dev);
+
+        ImGui::Text("Chemistry Manufacturer:");
+        metaEdit.a_chem |= ImGui::InputTextWithHint("##12",
+            metaEdit.dif_chem ? imgWarn : "",  metaEdit.chem,
+            IM_ARRAYSIZE(metaEdit.chem));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##12", (bool*)&metaEdit.a_chem);
+
+        ImGui::Text("Development Notes:");
+        metaEdit.a_devnotes |= ImGui::InputTextWithHint("##13",
+            metaEdit.dif_devnotes ? imgWarn : "",
+            metaEdit.devnotes, IM_ARRAYSIZE(metaEdit.devnotes));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##13", (bool*)&metaEdit.a_devnotes);
+        ImGui::EndGroup();
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Cancel")) {
+            std::memset(&metaEdit, 0, sizeof(metaBuff));
+            globalMetaPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Apply")) {
+            // Save the metadata
+            if (validRoll()) {
+                activeRolls[selRoll].rollMetaPostEdit(&metaEdit);
+                std::memset(&metaEdit, 0, sizeof(metaBuff));
+            }
+
+            globalMetaPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void mainWindow::localMetaPopup() {
+    if (localMetaPopTrig)
+        ImGui::OpenPopup("Image Metadata");
+    if (ImGui::BeginPopupModal("Image Metadata", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text("Edit %s metadata", activeImage()->srcFilename.c_str());
+        ImGui::Separator();
+
+        const char imgWarn[] = "";
+
+        ImGui::Text("Frame Number:");
+        ImGui::InputInt("###", &metaEdit.frameNum);
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::BeginGroup();
+        ImGui::Text("Camera Make:");
+        metaEdit.a_camMake |= ImGui::InputTextWithHint("##02",
+            metaEdit.dif_camMake ? imgWarn : "", metaEdit.camMake,
+            IM_ARRAYSIZE(metaEdit.camMake));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##02", (bool*)&metaEdit.a_camMake);
+
+        ImGui::Text("Camera Model:");
+        metaEdit.a_camModel |= ImGui::InputTextWithHint("##03",
+            metaEdit.dif_camModel ? imgWarn : "", metaEdit.camModel,
+            IM_ARRAYSIZE(metaEdit.camModel));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##03", (bool*)&metaEdit.a_camModel);
+
+        ImGui::Text("Lens:");
+        metaEdit.a_lens |= ImGui::InputTextWithHint("##04",
+            metaEdit.dif_lens ? imgWarn : "", metaEdit.lens,
+            IM_ARRAYSIZE(metaEdit.lens));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##04", (bool*)&metaEdit.a_lens);
+
+        ImGui::Text("Film Stock:");
+        metaEdit.a_film |= ImGui::InputTextWithHint("##05",
+            metaEdit.dif_film ? imgWarn : "", metaEdit.film,
+            IM_ARRAYSIZE(metaEdit.film));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##05", (bool*)&metaEdit.a_film);
+
+        ImGui::Text("Focal Length:");
+        metaEdit.a_focal |= ImGui::InputTextWithHint("##06",
+            metaEdit.dif_focal ? imgWarn : "", metaEdit.focal,
+            IM_ARRAYSIZE(metaEdit.focal));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##06", (bool*)&metaEdit.a_focal);
+
+        ImGui::Text("f Number:");
+        metaEdit.a_fnum |= ImGui::InputTextWithHint("##07",
+            metaEdit.dif_fnum ? imgWarn : "", metaEdit.fnum,
+            IM_ARRAYSIZE(metaEdit.fnum));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##07", (bool*)&metaEdit.a_fnum);
+
+        ImGui::Text("Exposure Time:");
+        metaEdit.a_exp |= ImGui::InputTextWithHint("##08",
+            metaEdit.dif_exp ? imgWarn : "", metaEdit.exp,
+            IM_ARRAYSIZE(metaEdit.exp));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##08", (bool*)&metaEdit.a_exp);
+        ImGui::EndGroup();
+
+        ImGui::SameLine();
+        ImVec2 bottomPos = ImGui::GetCursorPos();
+        ImGui::SetCursorPosX(bottomPos.x + 10);
+        ImGui::BeginGroup();
+
+        ImGui::Text("Date/Time:");
+        metaEdit.a_date |= ImGui::InputTextWithHint("##09",
+            metaEdit.dif_date ? imgWarn : "", metaEdit.date,
+            IM_ARRAYSIZE(metaEdit.date));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##09", (bool*)&metaEdit.a_date);
+
+        ImGui::Text("Location:");
+        metaEdit.a_loc |= ImGui::InputTextWithHint("##10",
+            metaEdit.dif_loc ? imgWarn : "", metaEdit.loc,
+            IM_ARRAYSIZE(metaEdit.loc));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##1-", (bool*)&metaEdit.a_loc);
+
+        ImGui::Text("GPS:");
+        metaEdit.a_gps |= ImGui::InputTextWithHint("##11",
+            metaEdit.dif_gps ? imgWarn : "", metaEdit.gps,
+            IM_ARRAYSIZE(metaEdit.gps));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##11", (bool*)&metaEdit.a_gps);
+
+        ImGui::Text("Notes:");
+        metaEdit.a_notes |= ImGui::InputTextWithHint("##12",
+            metaEdit.dif_notes ? imgWarn : "", metaEdit.notes,
+            IM_ARRAYSIZE(metaEdit.notes));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##12", (bool*)&metaEdit.a_notes);
+
+        ImGui::Text("Development Process:");
+        metaEdit.a_dev |= ImGui::InputTextWithHint("##13",
+            metaEdit.dif_dev ? imgWarn : "", metaEdit.dev,
+            IM_ARRAYSIZE(metaEdit.dev));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##13", (bool*)&metaEdit.a_dev);
+
+        ImGui::Text("Chemistry Manufacturer:");
+        metaEdit.a_chem |= ImGui::InputTextWithHint("##14",
+            metaEdit.dif_chem ? imgWarn : "",  metaEdit.chem,
+            IM_ARRAYSIZE(metaEdit.chem));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##14", (bool*)&metaEdit.a_chem);
+
+        ImGui::Text("Development Notes:");
+        metaEdit.a_devnotes |= ImGui::InputTextWithHint("##15",
+            metaEdit.dif_devnotes ? imgWarn : "",
+            metaEdit.devnotes, IM_ARRAYSIZE(metaEdit.devnotes));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##15", (bool*)&metaEdit.a_devnotes);
+        ImGui::EndGroup();
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Cancel")) {
+            std::memset(&metaEdit, 0, sizeof(metaBuff));
+            localMetaPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Apply")) {
+            imageMetaPostEdit();
+            std::memset(&metaEdit, 0, sizeof(metaBuff));
+            localMetaPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void mainWindow::preferencesPopup() {
+    if (preferencesPopTrig)
+        ImGui::OpenPopup("Preferences");
+    if (ImGui::BeginPopupModal("Preferences", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text("Application Preferences");
+
+        ImGui::Separator();
+
+        ImGui::Text("Auto-save");
+        ImGui::Checkbox("###01", &preferences.autoSave);
+        if (preferences.autoSave) {
+            ImGui::SameLine();
+            ImGui::InputInt("Frequency (seconds)", &preferences.autoSFreq);
+        }
+
+        ImGui::Text("Roll Performance Mode");
+        ImGui::Checkbox("###02", &preferences.perfMode);
+
+        ImGui::Separator();
+
+        ImGui::Text("Custom OCIO Config:");
+        ImGui::InputText("###03", ocioPath, IM_ARRAYSIZE(ocioPath));
+        ImGui::SameLine();
+        if (ImGui::Button("Open")) {
+            auto selection = ShowFileOpenDialog(false);
+            if (!selection.empty()) {
+                if (!ocioProc.initAltConfig(selection[0])) {
+                    //We've supplied a bad config
+                    std::strcpy(ackMsg, "Unable to open OCIO Config!");
+                    badOcioText = true;
+                } else {
+                    badOcioText = false;
+                    preferences.ocioPath = selection[0];
+                    std::strcpy(ocioPath, preferences.ocioPath.c_str());
+                }
+            }
+        }
+        if (badOcioText) {
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255,0,0,255));
+            ImGui::Text("Invalid Config!");
+            ImGui::PopStyleColor();
+        }
+        if (ocioProc.validExternal) {
+            std::vector<char*> ocioOpts;
+            ocioOpts.push_back("Internal");
+            ocioOpts.push_back("External");
+            ImGui::Text("Config");
+            ImGui::Combo("###04", &ocioSel, ocioOpts.data(), ocioOpts.size());
+        }
+
+        if (ImGui::Button("Cancel")) {
+            std::memset(ocioPath, 0, sizeof(ocioPath));
+            preferencesPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save")) {
+            if (ocioSel == 0) {
+                ocioProc.setIntActive();
+                preferences.ocioExt = false;
+            } else {
+                ocioProc.setExtActive();
+                preferences.ocioExt = true;
+            }
+            std::memset(ocioPath, 0, sizeof(ocioPath));
+            preferences.saveToFile();
+            preferencesPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void mainWindow::ackPopup() {
+    if (ackPopTrig)
+        ImGui::OpenPopup("Alert!");
+    if (ImGui::BeginPopupModal("Alert!", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+
+        ImGui::Text("%s", ackMsg);
+        ImGui::Text("%s", ackError);
+
+        if (ImGui::Button("Okay")) {
+            ackPopTrig = false;
+            std::memset(ackMsg, 0, sizeof(ackMsg));
+            std::memset(ackError, 0, sizeof(ackError));
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
+void mainWindow::shortcutsPopup() {
+    if (shortPopTrig)
+        ImGui::OpenPopup("Keyboard Shortcuts");
+    if (ImGui::BeginPopupModal("Keyboard Shortcuts", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+
+        ImGui::BeginGroup();
+        ImGui::Text("Cmd + O ");
+        ImGui::Text("Cmd + Shift + O ");
+        ImGui::Separator();
+        ImGui::Text("Cmd + S ");
+        ImGui::Text("Cmd + Shift + S ");
+        ImGui::Text("Opt   + Shift + S ");
+        ImGui::Separator();
+        ImGui::Text("Cmd + E ");
+        ImGui::Text("Cmd + G ");
+        ImGui::Separator();
+        ImGui::Text("Cmd + [ ");
+        ImGui::Text("Cmd + ] ");
+        ImGui::Separator();
+        ImGui::Text("Cmd + A ");
+        ImGui::Text("Cmd + C ");
+        ImGui::Text("Cmd + V ");
+        ImGui::Separator();
+        ImGui::Text("Cmd + , ");
+        ImGui::EndGroup();
+
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        ImGui::Text("Open Image(s)");
+        ImGui::Text("Open Roll(s)");
+        ImGui::Spacing();
+        ImGui::Text("Save Image");
+        ImGui::Text("Save Roll");
+        ImGui::Text("Save All Rolls");
+        ImGui::Spacing();
+        ImGui::Text("Edit Image Metadata");
+        ImGui::Text("Edit Roll Metadata");
+        ImGui::Spacing();
+        ImGui::Text("Rotate Left");
+        ImGui::Text("Rotate Right");
+        ImGui::Spacing();
+        ImGui::Text("Select All");
+        ImGui::Text("Copy");
+        ImGui::Text("Paste");
+        ImGui::Spacing();
+        ImGui::Text("Open Preferences");
+        ImGui::EndGroup();
+
+        if (ImGui::Button("Okay")) {
+            shortPopTrig = false;
+
+            ImGui::CloseCurrentPopup();
+        }
+
         ImGui::EndPopup();
     }
 }

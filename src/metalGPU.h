@@ -35,7 +35,7 @@ class metalGPU {
 
         void addToRender(image* _image, renderType type);
         void renderBlurPass(image* _image);
-        bool initOCIOKernels();
+        bool initOCIOKernels(int csSetting, int csDisp, int view);
         bool isInQueue(image* _image);
         gpuTimer rdTimer;
         bool rendering = false;
@@ -48,10 +48,12 @@ class metalGPU {
         std::mutex queueLock;
 
         image* prevIm;
+        int prevCSOpt;
         int prevDisp;
         int prevView;
         std::string ocioKernelText1;
         std::string ocioKernelText2;
+        std::string ocioKernelText3;
 
         MTL::Device *m_device;
         MTL::CommandQueue *m_command_queue;
@@ -63,6 +65,7 @@ class metalGPU {
         MTL::ComputePipelineState *_baseColor;
         MTL::ComputePipelineState *_mainProcess;
         MTL::ComputePipelineState *_ocioProcess;
+        MTL::ComputePipelineState *_ocioProcessFull;
 
         unsigned long long bufferSize;
         MTL::Buffer *m_src;

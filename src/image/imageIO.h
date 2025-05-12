@@ -19,11 +19,15 @@
 
 struct exportParam {
   std::string outPath;
-  int format;
-  int bitDepth;
-  int quality;
-  bool overwrite;
-
+  int format = 4;
+  int bitDepth = 1;
+  int quality = 85;
+  int compression = 8;
+  bool overwrite = false;
+  int colorspaceOpt = 1;
+  int colorspace = 0;
+  int display = 0;
+  int view = 0;
 };
 
 struct minMaxPoint {
@@ -61,6 +65,10 @@ struct image {
     unsigned int nChannels;
     unsigned int width;
     unsigned int height;
+    unsigned int workWidth;
+    unsigned int workHeight;
+
+    std::string expFullPath;
 
     bool blurReady = false;
     bool imageLoaded = false;
@@ -77,6 +85,7 @@ struct image {
     std::string fullPath;
 
     void* texture = nullptr;
+    int sdlRotation;
     //void* thumbTexture = nullptr;
 
 
@@ -90,6 +99,10 @@ struct image {
     void procDispImg();
     void allocateTmpBuf();
     void clearTmpBuf();
+
+    bool exportPreProcess(std::string outPath);
+    void exportPostProcess();
+
     bool writeImg(const exportParam param);
 
     bool debayerImage(bool fullRes, int quality);
@@ -98,6 +111,7 @@ struct image {
     std::optional<nlohmann::json> getJSONMeta();
     void updateMetaStr();
     void writeXMPFile();
+    bool writeExpMeta(std::string filename);
 
 
     void rotLeft();

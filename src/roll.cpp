@@ -1,8 +1,11 @@
 #include "roll.h"
 #include "imageIO.h"
+#include "imageMeta.h"
 #include "nlohmann/json_fwd.hpp"
 #include "threadPool.h"
 #include "logger.h"
+#include <cstring>
+#include <fstream>
 
 image* filmRoll::selImage() {
     if (validIm())
@@ -56,9 +59,11 @@ void filmRoll::saveAll() {
     for (int i = 0; i < images.size(); i++) {
         images[i].writeXMPFile();
     }
+    exportRollMetaJSON();
 }
 //TODO IMPORT ROLL JSON
 //TODO DEFAULT ROLL SAVE DIRECTORY
+//TODO: Roll name in images not applied from roll
 bool filmRoll::exportRollMetaJSON() {
     try {
         nlohmann::json j;
@@ -89,6 +94,42 @@ bool filmRoll::exportRollMetaJSON() {
     }
 }
 
+bool filmRoll::exportRollCSV() {
+    std::string csvFileName = rollPath + "/" + rollName + ".csv";
+    std::ofstream csvFile(csvFileName, std::ios::trunc);
+    if (!csvFile) {
+        LOG_ERROR("Could not open CSV file for writing! {}", csvFileName);
+        return false;
+    }
+    csvFile << "FrameNumber,FileName,CameraMake,CameraModel,Lens,FilmStock,";
+    csvFile << "FocalLength,fNumber,ExposureTime,RollName,Date/Time,Location,";
+    csvFile << "GPS,Notes,DevelopmentProcess,ChemicalManufacturer,";
+    csvFile << "DevelopmentNotes\n";
+
+    for (int i = 0; i < images.size(); i++) {
+        csvFile << images[i].imMeta.frameNumber << ",";
+        csvFile << images[i].srcFilename << ",";
+        csvFile << images[i].imMeta.cameraMake << ",";
+        csvFile << images[i].imMeta.cameraModel << ",";
+        csvFile << images[i].imMeta.lens << ",";
+        csvFile << images[i].imMeta.filmStock << ",";
+        csvFile << images[i].imMeta.focalLength << ",";
+        csvFile << images[i].imMeta.fNumber << ",";
+        csvFile << images[i].imMeta.exposureTime << ",";
+        csvFile << images[i].imMeta.rollName << ",";
+        csvFile << images[i].imMeta.dateTime << ",";
+        csvFile << images[i].imMeta.location << ",";
+        csvFile << images[i].imMeta.gps << ",";
+        csvFile << images[i].imMeta.notes << ",";
+        csvFile << images[i].imMeta.devProcess << ",";
+        csvFile << images[i].imMeta.chemMfg << ",";
+        csvFile << images[i].imMeta.devNotes << "\n";
+    }
+
+    csvFile.close();
+    return true;
+}
+
 bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
      try {
         nlohmann::json jIn;
@@ -111,6 +152,206 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
         LOG_WARN("Unable to import roll from JSON file: {}", e.what());
         return false;
     }
+
+}
+
+bool filmRoll::unsavedImages() {
+    for (int i = 0; i < images.size(); i++) {
+        if (images[i].needMetaWrite)
+            return true;
+    }
+    return false;
+}
+
+void filmRoll::rollMetaPreEdit(metaBuff *meta) {
+    if (!meta)
+        return;
+    if (images.size() < 1)
+        return;
+
+    std::strcpy(meta->rollPath, rollPath.c_str());
+
+    std::strcpy(meta->rollname, rollName.c_str());
+
+
+    meta->dif_camMake = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.cameraMake == images.front().imMeta.cameraMake;
+        });
+    if (!meta->dif_camMake)
+        std::strcpy(meta->camMake, images[0].imMeta.cameraMake.c_str());
+    //------
+    meta->dif_camModel = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.cameraModel == images.front().imMeta.cameraModel;
+        });
+    if (!meta->dif_camModel)
+        std::strcpy(meta->camModel, images[0].imMeta.cameraModel.c_str());
+    //------
+    meta->dif_lens = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.lens == images.front().imMeta.lens;
+        });
+    if (!meta->dif_lens)
+        std::strcpy(meta->lens, images[0].imMeta.lens.c_str());
+    //------
+    meta->dif_film = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.filmStock == images.front().imMeta.filmStock;
+        });
+    if (!meta->dif_film)
+        std::strcpy(meta->film, images[0].imMeta.filmStock.c_str());
+    //------
+    meta->dif_focal = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.focalLength == images.front().imMeta.focalLength;
+        });
+    if (!meta->dif_focal)
+        std::strcpy(meta->focal, images[0].imMeta.focalLength.c_str());
+    //------
+    meta->dif_date = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.dateTime == images.front().imMeta.dateTime;
+        });
+    if (!meta->dif_date)
+        std::strcpy(meta->date, images[0].imMeta.dateTime.c_str());
+    //------
+    meta->dif_loc = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.location == images.front().imMeta.location;
+        });
+    if (!meta->dif_loc)
+        std::strcpy(meta->loc, images[0].imMeta.location.c_str());
+    //------
+    meta->dif_gps = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.gps == images.front().imMeta.gps;
+        });
+    if (!meta->dif_gps)
+        std::strcpy(meta->gps, images[0].imMeta.gps.c_str());
+    //------
+    meta->dif_notes = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.notes == images.front().imMeta.notes;
+        });
+    if (!meta->dif_notes)
+        std::strcpy(meta->notes, images[0].imMeta.notes.c_str());
+    //------
+    meta->dif_dev = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.devProcess == images.front().imMeta.devProcess;
+        });
+    if (!meta->dif_dev)
+        std::strcpy(meta->dev, images[0].imMeta.devProcess.c_str());
+    //------
+    meta->dif_chem = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.chemMfg == images.front().imMeta.chemMfg;
+        });
+    if (!meta->dif_chem)
+        std::strcpy(meta->chem, images[0].imMeta.chemMfg.c_str());
+    //------
+    meta->dif_devnotes = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.devNotes == images.front().imMeta.devNotes;
+        });
+    if (!meta->dif_devnotes)
+        std::strcpy(meta->devnotes, images[0].imMeta.devNotes.c_str());
+    //------
+}
+
+void filmRoll::rollMetaPostEdit(metaBuff *meta) {
+    if (!meta)
+        return;
+    if (meta->a_rollPath)
+        rollPath = meta->rollPath;
+    if (meta->a_rollname)
+        rollName = meta->rollname;
+
+    if (images.size() < 1)
+        return;
+
+    if (meta->a_rollname)
+        for (auto &img : images){
+            img.imMeta.rollName = meta->rollname;
+            img.needMetaWrite = true;
+        }
+
+    //------
+    if (meta->a_camMake)
+        for (auto &img : images) {
+            img.imMeta.cameraMake = meta->camMake;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_camModel)
+        for (auto &img : images) {
+            img.imMeta.cameraModel = meta->camModel;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_lens)
+        for (auto &img : images) {
+            img.imMeta.lens = meta->lens;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_film)
+        for (auto &img : images) {
+            img.imMeta.filmStock = meta->film;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_focal)
+        for (auto &img : images) {
+            img.imMeta.focalLength = meta->focal;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_date)
+        for (auto &img : images) {
+            img.imMeta.dateTime = meta->date;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_loc)
+        for (auto &img : images) {
+            img.imMeta.location = meta->loc;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_gps)
+        for (auto &img : images) {
+            img.imMeta.gps = meta->gps;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_notes)
+        for (auto &img : images) {
+            img.imMeta.notes = meta-> notes;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_dev)
+        for (auto &img : images) {
+            img.imMeta.devProcess = meta->dev;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_chem)
+        for (auto &img : images) {
+            img.imMeta.chemMfg = meta->chem;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_devnotes)
+        for (auto &img : images) {
+            img.imMeta.devNotes = meta->devnotes;
+            img.needMetaWrite = true;
+        }
+    //------
+
+    std::memset(meta, 0, sizeof(metaBuff));
 
 }
 

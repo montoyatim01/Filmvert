@@ -1,9 +1,10 @@
 #include "window.h"
+#include <imgui.h>
 
 void mainWindow::thumbView() {
-    ImGui::SetNextWindowPos(ImVec2(0,winHeight - 280));
-            ImGui::SetNextWindowSize(ImVec2(winWidth,280));
-            ImGui::Begin("Thumbnails", 0, ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
+    ImGui::SetNextWindowPos(ImVec2(0,imageWinSize.y + 25));
+    ImGui::SetNextWindowSize(ImVec2(winWidth,winHeight - imageWinSize.y));
+    ImGui::Begin("Thumbnails", 0, ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
             {
                 //SDL_GetWindowSize(window, &winWidth, &winHeight);
 
@@ -20,13 +21,22 @@ void mainWindow::thumbView() {
                         if (getImage(i)->sdlUpdate) {
                             updateSDLTexture(getImage(i));
                         }
+                        ImVec2 thumbWinSize = ImGui::GetWindowSize();
+                        ImGui::SetWindowFontScale(std::clamp(thumbWinSize.y / 280.0f, 0.6f, 1.2f));
 
-                            ImVec2 maxAvailable = {320,240};
-                            ImVec2 displaySize;
-                            ImVec2 elGuideSize;
+
+                        float maxAvailable = thumbWinSize.y - ImGui::CalcTextSize("ABCD").y;
+                        float padding = ImGui::GetStyle().FramePadding.y * 4;
+                        float spacing = ImGui::GetStyle().ItemSpacing.y * 2;
+                        float spacingB = ImGui::GetStyle().ItemInnerSpacing.y * 2;
+                        maxAvailable -= padding;
+                        maxAvailable -= spacing;
+                        maxAvailable -= spacingB;
+
+                        ImVec2 displaySize;
 
                             // Example image dimensions (replace with actual)
-                            CalculateDisplaySize(getImage(i)->width, getImage(i)->height, maxAvailable, displaySize, getImage(i)->imRot);
+                            CalculateThumbDisplaySize(getImage(i)->width, getImage(i)->height, maxAvailable, displaySize, getImage(i)->imRot);
 
                             // Start a group to contain the image and its filename
                             ImGui::BeginGroup();
