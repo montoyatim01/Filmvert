@@ -8,7 +8,7 @@ int main(void)
 {
     // Start Logger
     LOG_INFO("Logging started");
-    LOG_INFO("Version: {}.{}.{}", 3, 1, 0);
+    LOG_INFO("Version: {}.{}.{}", 1, 0, 0);
     LOG_INFO("Build {:.8}-{}", GIT_COMMIT_HASH, BUILD_DATE);
 
     // Initialize Metal/CUDA Subsystem
@@ -25,10 +25,10 @@ int main(void)
 // TODO/Wishlist:
 //
 // - ImageIO
-// -- Reincorporate OIIO for non-raw formats
-// -- Single import image function, raw first?
-// --- How to handle when image has preview file (dng)
-// -- Import Pakon RAW files (Colorspace?)
+// -* Reincorporate OIIO for non-raw formats
+// -* Single import image function, raw first?
+// --* How to handle when image has preview file (dng)
+// -* Import Pakon RAW files (Colorspace?)
 // -- Perf mode off enables full res?
 //
 // - Export Window:
@@ -87,8 +87,17 @@ int main(void)
 // - Cleanup
 // -- Cleanup windows.h header
 // -- Break out the rolls.cpp file?
-// -- Break out the imageio file (rename to image? make class?)
+// -* Break out the imageio file (rename to image? make class?)
+// --- Continue work on this
 // -- Add additional functions to get active roll, etc in window
 //
 // - Bugs
 // -- Test exporting and OCIO configs
+// -* Rework entire OCIO system (try and get rid of the global variable nonsense)
+// -* How does the Metal GPU know what CS settings to use (image based?)
+// -- Now that OCIO image render is CPU based, are there thread-safety issues?
+// -* Metadata for scanning methods/variables? (Two fields?)
+// -- Add in import from image (import the metadata or inversion settings)
+// -- How does performance mode affect OIIO opened images and their IDTs?
+// --- Someone opens a bunch of images, changes their config, and then it can't re-read?
+// -- Program in OIIO/Raw-data dump and reload.

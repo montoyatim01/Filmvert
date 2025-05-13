@@ -1,0 +1,148 @@
+#ifndef _image_h
+#define _image_h
+
+
+#include <string>
+#include <optional>
+#include <variant>
+#include <thread>
+#include <OpenImageIO/imageio.h>
+#include "nlohmann/json.hpp"
+#include "renderParams.h"
+#include "imageParams.h"
+#include "imageMeta.h"
+#include "structs.h"
+#include <exiv2/exiv2.hpp>
+/*
+#include "OpenColorIO/OpenColorTransforms.h"
+#include "OpenColorIO/OpenColorTypes.h"
+#include "imageMeta.h"
+#include <math.h>
+#include <chrono>
+#include <thread>
+#include <variant>
+#include "ocioProcessor.h"
+#include <OpenImageIO/imageio.h>
+#include <OpenImageIO/typedesc.h>
+#include <libraw/libraw.h>
+
+#include <cstdlib>
+#include <cstring>
+#include <csignal>
+#include <filesystem>
+#include <stdexcept>
+#include <string>
+*/
+
+
+struct image {
+    // Buffers
+    float* rawImgData = nullptr;
+    float* procImgData = nullptr;
+    float* tmpOutData = nullptr;
+    float* blurImgData = nullptr;
+    uint8_t* dispImgData = nullptr;
+    //uint8_t* thumbData;
+
+    // Metadata
+    Exiv2::ExifData exifData;
+    Exiv2::XmpData intxmpData;
+    Exiv2::XmpData scxmpData;
+    bool hasSCXMP = false;
+    bool needMetaWrite = false;
+    std::string jsonMeta;
+    int imRot = 1;
+    imageMetadata imMeta;
+
+    // Core information
+    unsigned int nChannels;
+    unsigned int width;
+    unsigned int height;
+    unsigned int workWidth;
+    unsigned int workHeight;
+    bool isRawImage = false;
+
+    std::string srcFilename;
+    std::string srcPath;
+    std::string fullPath;
+    std::string expFullPath;
+
+    // Analysis/Grade parameters
+    imageParams imgParam;
+    ocioSetting intOCIOSet;
+
+
+    // Status flags
+    bool blurReady = false;
+    bool renderReady = false;
+    bool imageLoaded = false;
+    bool fullIm = false;
+    bool analyzed = false;
+    bool selected = false;
+
+    // Display/Render flags
+    bool renderBypass;
+    bool gradeBypass;
+
+
+    // SDL Display
+    void* texture = nullptr;
+    int sdlRotation;
+    bool sdlUpdate = false;
+
+
+
+    // imageBuffers.cpp
+    void allocBlurBuf();
+    void delBlurBuf();
+    void allocateTmpBuf();
+    void clearTmpBuf();
+
+    void allocProcBuf();
+    void delProcBuf();
+
+    void allocDispBuf();
+    void delDispBuf();
+
+    void clearBuffers();
+    void loadBuffers();
+    void padToRGBA();
+    void trimForSave();
+
+
+
+    // imageIO.cpp
+    bool exportPreProcess(std::string outPath);
+    void exportPostProcess();
+    bool writeImg(const exportParam param, ocioSetting ocioSet);
+    bool debayerImage(bool fullRes, int quality);
+
+    // imageMeta.cpp
+    void readMetaFromFile();
+    bool loadMetaFromStr(const std::string& j);
+    std::optional<nlohmann::json> getJSONMeta();
+    void updateMetaStr();
+    void writeXMPFile();
+    bool writeExpMeta(std::string filename);
+
+    // image.cpp
+    void rotLeft();
+    void rotRight();
+
+
+    // imageProcessing.cpp
+    void processBaseColor();
+    void processMinMax();
+
+};
+
+// imageIO.cpp
+std::variant<image, std::string> readImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet);
+std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet);
+std::variant<image, std::string> readRawImage(std::string imagePath);
+std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSetting ocioSet);
+
+// image.cpp
+renderParams img_to_param(image* _img);
+
+#endif

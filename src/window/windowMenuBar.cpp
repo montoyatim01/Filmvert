@@ -37,18 +37,23 @@ void mainWindow::menuBar() {
             ImGui::Separator();
 
             if (ImGui::MenuItem("Export Image(s)")) {
-                expSetting.display = ocioProc.displayOp;
-                expSetting.view = ocioProc.viewOp;
+                //exportOCIO.display = dispOCIO.display;
+                //exportOCIO.view = dispOCIO.view;
                 expRolls = false;
                 exportPopup = true;
             }
             if (ImGui::MenuItem("Export Roll(s)")) {
-                expSetting.display = ocioProc.displayOp;
-                expSetting.view = ocioProc.viewOp;
+               // exportOCIO.display = dispOCIO.display;
+               // exportOCIO.view = dispOCIO.view;
                 expRolls = true;
                 exportPopup = true;
             }
             ImGui::Separator();
+            if (ImGui::MenuItem("Close Image")) {
+                if (validIm()) {
+                    //activeImage()
+                }
+            }
             if (ImGui::MenuItem("Close Roll")) {
                 //closeRoll;
                 //Actions needed to close a roll
@@ -69,8 +74,8 @@ void mainWindow::menuBar() {
             ImGui::Separator();
             if (ImGui::MenuItem("Preferences")) {
                 badOcioText = false;
-                std::strcpy(ocioPath, preferences.ocioPath.c_str());
-                if (preferences.ocioExt)
+                std::strcpy(ocioPath, appPrefs.ocioPath.c_str());
+                if (appPrefs.ocioExt)
                     ocioSel = 1;
                 preferencesPopTrig = true;
             }
@@ -192,6 +197,7 @@ void mainWindow::menuBar() {
         for (const auto& item : activeRolls) {
             itemPointers.push_back(item.rollName.c_str());
         }
+        //--- Roll Selector
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetWindowWidth() * 0.05f));
                 ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25f);
                 if (ImGui::Combo("###", &selRoll, itemPointers.data(), itemPointers.size())) {
@@ -200,7 +206,7 @@ void mainWindow::menuBar() {
                     for (int i = 0; i < activeRolls.size(); i++) {
                         if (selRoll != i) {
                             activeRolls[i].selected = false;
-                            if (preferences.perfMode)
+                            if (appPrefs.perfMode)
                                 activeRolls[i].clearBuffers();
                         }
                         if (selRoll == i) {
@@ -208,6 +214,22 @@ void mainWindow::menuBar() {
                         }
                     }
                 }
+
+        //--- OCIO Settings
+
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetWindowWidth() * 0.05f));
+        ImGui::Text("Display:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.15f);
+        renderCall |= ImGui::Combo("##01", &dispOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
+        ImGui::SameLine();
+        ImGui::Text("View:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20f);
+        renderCall |= ImGui::Combo("##02", &dispOCIO.view, ocioProc.views[dispOCIO.display].data(), ocioProc.views[dispOCIO.display].size());
+
                 ImGui::EndMainMenuBar();
     }
 }

@@ -1,10 +1,10 @@
-#include "imageIO.h"
+#include "image.h"
 #include "imageMeta.h"
 #include "exifUtils.h"
 #include "exiv2/xmp_exiv2.hpp"
 #include "imageParams.h"
 #include "logger.h"
-#include "nlohmann/json_fwd.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -12,38 +12,27 @@
 
 // Metadata workflow:
 // Import:
-// - Read in all exif data from camera raw
-// - Read in xmp data from file, if not available from camera raw
+// - Read in all exif/xmp data from image
+// - Read in xmp data from file, if not available from image
 // - If parameters available from xmp, load parameters
 // - Save all metadata alongside image struct (xmp + exif)
 // - When user makes changes, periodically update the xmp sidecar file
-//
-// - Make a timer in the main window loop. Only after interactions have
-// stopped for say 2-5 seconds, then write out the active file if necessary
-//
-// - Add a menu item to sync/save all roll changes to disk
-//
-// Metadata editing:
-// - Custom fields for tagging?
-// - What tags are available, and where do they get stored? (exif?)
-// - Check what's available in LR and make interactions easy there
-// - Potential CSV output?
-//
-// Export:
-// - When user exports images, save the sidecar file once more
-// - Export all metadata to output file
-// - Metadata specific output window (for special formats?)
 
 
+//--- Read Metadata From File---//
+/*
+    Attempt to open the image file and read the EXIF and XMP
+    data from it. Also attempt to open the XMP Sidecar file.
 
-// TODO: What happens when there is xmp sidecar but
-// Exiv2 can't load the image? Load xmp first?
+    Load in all available fv metadata from EXIF, then XMP (internal)
+    then from XMP (sidecar).
+*/
 void image::readMetaFromFile() {
     try {
         Exiv2::enableBMFF();
         auto image = Exiv2::ImageFactory::open(fullPath);
         if (!image) {
-            throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Could not open the image");
+            throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Could not open the image for metadata reading");
         }
 
         image->readMetadata();
@@ -54,6 +43,11 @@ void image::readMetaFromFile() {
         // Read XMP Data into Image
         intxmpData = image->xmpData();
 
+    } catch (const Exiv2::Error& e) {
+        LOG_ERROR("Exiv2 image exception: {}", e.what());
+    }
+
+    try {
         // Read sidecar XMP Data into Image
         std::filesystem::path imPath(fullPath);
         imPath.replace_extension(".xmp");
@@ -62,7 +56,7 @@ void image::readMetaFromFile() {
         std::string xmpPacket;
         std::ifstream sidecarFile(sidecarPath, std::ios::in);
         if (!sidecarFile) {
-            // Do nothing
+            hasSCXMP = false;
         } else {
             std::ostringstream sidecarContents;
             sidecarContents << sidecarFile.rdbuf();
@@ -71,9 +65,8 @@ void image::readMetaFromFile() {
             Exiv2::XmpParser::decode(scxmpData, xmpPacket);
             hasSCXMP = true;
         }
-
     } catch (const Exiv2::Error& e) {
-        LOG_ERROR("Exiv2 exception: {}", e.what());
+        LOG_ERROR("Exiv2 sidecar exception: {}", e.what());
     }
 
     // Attempt to load in the film values based on the metadata in the exif
@@ -127,10 +120,20 @@ void image::readMetaFromFile() {
             }
         }
     }
-
-    // Any cleanup?
 }
 
+
+//--- Write Export Metadata---//
+/*
+    Update the metadata string variable with
+    the current parameters and metadata values.
+    Fill in the ImageDescription EXIF/XMP values
+    in the loaded metadata, and write all metadata
+    out to the file specified.
+
+    Used in image export, all metadata is written to
+    the output files after OIIO has completed writes.
+*/
 bool image::writeExpMeta(std::string filename) {
     updateMetaStr();
     exifData["Exif.Image.ImageDescription"] = jsonMeta;
@@ -176,6 +179,11 @@ bool image::writeExpMeta(std::string filename) {
     }
 }
 
+//---Get Json Metadata---//
+/*
+    Fill out a json object with all parameters
+    and metadata present in the image
+*/
 std::optional<nlohmann::json> image::getJSONMeta() {
     try {
         nlohmann::json j;
@@ -244,6 +252,8 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         metaParams["devProcess"] = imMeta.devProcess;
         metaParams["chemMfg"] = imMeta.chemMfg;
         metaParams["devNotes"] = imMeta.devNotes;
+        metaParams["scanner"] = imMeta.scanner;
+        metaParams["scanNotes"] = imMeta.scanNotes;
 
         j["filmvert"] = fvParams;
         j["metadata"] = metaParams;
@@ -254,6 +264,13 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         return nullptr;
     }
 }
+
+//---Update Metadata String Variable---//
+/*
+    Simple helper function to dump the json object
+    with all params and metadata to the jsonMeta
+    string variable.
+*/
 void image::updateMetaStr() {
     try {
         std::optional<nlohmann::json> j = getJSONMeta();
@@ -268,6 +285,18 @@ void image::updateMetaStr() {
         return;
     }
 }
+
+//---Write XMP File---//
+/*
+    Flush all params and metadata to the metadata
+    string variable, then attempt to write out the
+    XMP data to disk (sidecar file). If only source
+    XMP data was present on image load in (no sidecar),
+    That existing data is updated and written to sidecar.
+
+    Otherwise the data present in the sidecar upon load
+    will be the data written back to the sidecar
+*/
 
 void image::writeXMPFile() {
     updateMetaStr();
@@ -303,7 +332,15 @@ void image::writeXMPFile() {
     }
 }
 
-
+//--- Load Metadata from String---//
+/*
+    Attempt to load in and populate the inversion
+    params and metadata from a json string (usually
+    from within the xmp or exif data in a file).
+    Will only update the params if a full set is
+    found and matched. Otherwise will match available
+    metadata values (incomplete match possible)
+*/
 
 bool image::loadMetaFromStr(const std::string& j) {
     try {
@@ -549,6 +586,12 @@ bool image::loadMetaFromStr(const std::string& j) {
                 }
                 if (metaJson.contains("devNotes")) {
                     imMeta.devNotes = metaJson["devNotes"].get<std::string>();
+                }
+                if (metaJson.contains("scanner")) {
+                    imMeta.scanner = metaJson["scanner"].get<std::string>();
+                }
+                if (metaJson.contains("scanNotes")) {
+                    imMeta.scanNotes = metaJson["scanNotes"].get<std::string>();
                 }
             } else {
                 LOG_WARN("No metadata found!");

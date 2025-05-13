@@ -73,3 +73,24 @@ void ap0_to_ap1(float* in, float* out) {
 
     return;
 }
+
+void srgb_to_ap1(float* in, float* out) {
+
+    out[0] = in[0] * 0.612494198537 + in[1] * 0.338737251924 + in[2] * 0.048855526065;
+    out[1] = in[0] * 0.070594251611 + in[1] * 0.917671483736 + in[2] * 0.011704306146;
+    out[2] = in[0] * 0.020727335004 + in[1] * 0.106882231793 + in[2] * 0.872338062224;
+
+    return;
+}
+
+// Helper functions for endian conversion
+uint16_t swapBytes16(uint16_t value) {
+    return (value << 8) | (value >> 8);
+}
+
+uint32_t swapBytes32(uint32_t value) {
+    return ((value & 0xFF000000) >> 24) |
+           ((value & 0x00FF0000) >> 8)  |
+           ((value & 0x0000FF00) << 8)  |
+           ((value & 0x000000FF) << 24);
+}

@@ -1,4 +1,4 @@
-#include "imageIO.h"
+#include "image.h"
 #include "imageMeta.h"
 #include "ocioProcessor.h"
 #include "window.h"
@@ -6,6 +6,61 @@
 #include <imgui.h>
 
 
+void mainWindow::importRawSettings() {
+    //ImGui::Separator();
+    ImGui::Text("RAW Image Settings");
+
+    ImGui::BeginGroup();
+    ImGui::Text("Width");
+    ImGui::InputScalar("###01a", ImGuiDataType_U16, &rawSet.width,  NULL, NULL, "%d", ImGuiInputFlags_None);
+    ImGui::Text("Channels");
+    ImGui::InputScalar("###03a", ImGuiDataType_U16, &rawSet.channels,  NULL, NULL, "%d", ImGuiInputFlags_None);
+    ImGui::Text("Byte Order IBM PC");
+    ImGui::Checkbox("###05a", &rawSet.littleE);
+    ImGui::EndGroup();
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::Text("Height");
+    ImGui::InputScalar("###02a", ImGuiDataType_U16, &rawSet.height,  NULL, NULL, "%d", ImGuiInputFlags_None);
+    ImGui::Text("Bit Depth");
+    ImGui::InputScalar("###04a", ImGuiDataType_U16, &rawSet.bitDepth,  NULL, NULL, "%d", ImGuiInputFlags_None);
+    ImGui::Text("Planar Data");
+    ImGui::Checkbox("###06a", &rawSet.planar);
+    ImGui::EndGroup();
+    rawSet.bitDepth = rawSet.bitDepth < 13 ? 8 :
+        rawSet.bitDepth > 12 && rawSet.bitDepth < 25 ? 16 : 32;
+
+
+    if (ImGui::Button("Auto-detect")) {
+        testFirstRawFile();
+    }
+
+    ImGui::Separator();
+
+
+}
+
+void mainWindow::importIDTSetting() {
+    //ImGui::Separator();
+    ImGui::Text("Image Colorspace Setting:");
+    ImGui::Combo("###CSO", &ocioCS_Disp, colorspaceSet.data(), colorspaceSet.size());
+    if (ocioCS_Disp == 0) {
+        // Colorspace
+        ImGui::Text("Colorspace:");
+        ImGui::Combo("###CS", &importOCIO.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
+        importOCIO.useDisplay = false;
+    } else {
+        ImGui::Text("Display:");
+        ImGui::Combo("###DSP", &importOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
+
+        ImGui::Text("View:");
+        ImGui::Combo("##VW", &importOCIO.view, ocioProc.views[importOCIO.display].data(), ocioProc.views[importOCIO.display].size());
+        importOCIO.useDisplay = true;
+    }
+
+    ImGui::Separator();
+
+}
 
 void mainWindow::importImagePopup() {
     if (dispImportPop)
@@ -13,6 +68,9 @@ void mainWindow::importImagePopup() {
     if (ImGui::BeginPopupModal("Import Images", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
         ImGui::Text("Importing Images...");
         ImGui::Separator();
+        if (impRawCheck)
+            importRawSettings();
+        importIDTSetting();
         ImGui::Text("Roll to insert images to:");
         ImGui::Combo("###", &impRoll, rollNames.data(), activeRolls.size());
         ImGui::SameLine();
@@ -80,6 +138,7 @@ void mainWindow::importImagePopup() {
         if (ImGui::Button("Cancel")) {
             impRoll = 0;
             dispImportPop = false;
+            impRawCheck = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -98,7 +157,7 @@ void mainWindow::importImagePopup() {
                 for (size_t i = 0; i < importFiles.size(); ++i) {
                         const std::string& file = importFiles[i];
                         futures.push_back(pool.submit([file, i, this]() -> IndexedResult {
-                            auto result = readRawImage(file);
+                            auto result = readImage(file, rawSet, importOCIO);
                             ++completedTasks; // Increment counter when done
                             return IndexedResult{i, std::move(result)};
                         }));
@@ -138,6 +197,8 @@ void mainWindow::importImagePopup() {
                 completedTasks = 0;
                 impRoll = 0;
                 importFiles.clear();
+                rawSet.pakonHeader = false;
+                impRawCheck = false;
 
             }};
             impThread.detach();
@@ -157,6 +218,9 @@ void mainWindow::importRollPopup() {
     if (ImGui::BeginPopupModal("Import Rolls", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
         ImGui::Text("Importing Rolls...");
         ImGui::Separator();
+        if (impRawCheck)
+            importRawSettings();
+        importIDTSetting();
         ImGui::Text("Rolls will be created based on the folders selected");
         ImGui::Text("After the first roll, the remaining will load in the background");
         ImGui::Separator();
@@ -170,6 +234,7 @@ void mainWindow::importRollPopup() {
         if (ImGui::Button("Cancel")) {
             impRoll = 0;
             dispImpRollPop = false;
+            impRawCheck = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -208,7 +273,7 @@ void mainWindow::importRollPopup() {
                     for (size_t i = 0; i < images.size(); ++i) {
                             const std::string& file = images[i];
                             futures.push_back(pool.submit([file, i, this]() -> IndexedResult {
-                                auto result = readRawImage(file);
+                                auto result = readImage(file, rawSet, importOCIO);
                                 ++completedTasks; // Increment counter when done
                                 return IndexedResult{i, std::move(result)};
                             }));
@@ -260,6 +325,9 @@ void mainWindow::importRollPopup() {
                 completedTasks = 0;
                 impRoll = 0;
                 importFiles.clear();
+                rawSet.pakonHeader = false;
+                impRawCheck = false;
+
 
             }};
             impThread.detach();
@@ -627,6 +695,12 @@ void mainWindow::globalMetaPopup() {
             IM_ARRAYSIZE(metaEdit.date));
         ImGui::SameLine();
         ImGui::Checkbox("Apply##07", (bool*)&metaEdit.a_date);
+        ImGui::Text("Location:");
+        metaEdit.a_loc |= ImGui::InputTextWithHint("##08",
+            metaEdit.dif_loc ? imgWarn : "", metaEdit.loc,
+            IM_ARRAYSIZE(metaEdit.loc));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##08", (bool*)&metaEdit.a_loc);
         ImGui::EndGroup();
 
 
@@ -634,13 +708,6 @@ void mainWindow::globalMetaPopup() {
         ImVec2 bottomPos = ImGui::GetCursorPos();
         ImGui::SetCursorPosX(bottomPos.x + 10);
         ImGui::BeginGroup();
-        ImGui::Text("Location:");
-        metaEdit.a_loc |= ImGui::InputTextWithHint("##08",
-            metaEdit.dif_loc ? imgWarn : "", metaEdit.loc,
-            IM_ARRAYSIZE(metaEdit.loc));
-        ImGui::SameLine();
-        ImGui::Checkbox("Apply##08", (bool*)&metaEdit.a_loc);
-
         ImGui::Text("GPS:");
         metaEdit.a_gps |= ImGui::InputTextWithHint("##09",
             metaEdit.dif_gps ? imgWarn : "", metaEdit.gps,
@@ -675,6 +742,20 @@ void mainWindow::globalMetaPopup() {
             metaEdit.devnotes, IM_ARRAYSIZE(metaEdit.devnotes));
         ImGui::SameLine();
         ImGui::Checkbox("Apply##13", (bool*)&metaEdit.a_devnotes);
+
+        ImGui::Text("Scanner:");
+        metaEdit.a_scanner |= ImGui::InputTextWithHint("##14",
+            metaEdit.dif_scanner ? imgWarn : "",
+            metaEdit.scanner, IM_ARRAYSIZE(metaEdit.scanner));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##14", (bool*)&metaEdit.a_scanner);
+
+        ImGui::Text("Scanner Notes:");
+        metaEdit.a_scannotes |= ImGui::InputTextWithHint("##15",
+            metaEdit.dif_scannotes ? imgWarn : "",
+            metaEdit.scannotes, IM_ARRAYSIZE(metaEdit.scannotes));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##15", (bool*)&metaEdit.a_scannotes);
         ImGui::EndGroup();
 
         ImGui::Spacing();
@@ -765,12 +846,6 @@ void mainWindow::localMetaPopup() {
             IM_ARRAYSIZE(metaEdit.exp));
         ImGui::SameLine();
         ImGui::Checkbox("Apply##08", (bool*)&metaEdit.a_exp);
-        ImGui::EndGroup();
-
-        ImGui::SameLine();
-        ImVec2 bottomPos = ImGui::GetCursorPos();
-        ImGui::SetCursorPosX(bottomPos.x + 10);
-        ImGui::BeginGroup();
 
         ImGui::Text("Date/Time:");
         metaEdit.a_date |= ImGui::InputTextWithHint("##09",
@@ -778,6 +853,12 @@ void mainWindow::localMetaPopup() {
             IM_ARRAYSIZE(metaEdit.date));
         ImGui::SameLine();
         ImGui::Checkbox("Apply##09", (bool*)&metaEdit.a_date);
+        ImGui::EndGroup();
+
+        ImGui::SameLine();
+        ImVec2 bottomPos = ImGui::GetCursorPos();
+        ImGui::SetCursorPosX(bottomPos.x + 10);
+        ImGui::BeginGroup();
 
         ImGui::Text("Location:");
         metaEdit.a_loc |= ImGui::InputTextWithHint("##10",
@@ -820,6 +901,20 @@ void mainWindow::localMetaPopup() {
             metaEdit.devnotes, IM_ARRAYSIZE(metaEdit.devnotes));
         ImGui::SameLine();
         ImGui::Checkbox("Apply##15", (bool*)&metaEdit.a_devnotes);
+
+        ImGui::Text("Scanner:");
+        metaEdit.a_scanner |= ImGui::InputTextWithHint("##16",
+            metaEdit.dif_scanner ? imgWarn : "",
+            metaEdit.scanner, IM_ARRAYSIZE(metaEdit.scanner));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##16", (bool*)&metaEdit.a_scanner);
+
+        ImGui::Text("Scan Notes:");
+        metaEdit.a_scannotes |= ImGui::InputTextWithHint("##17",
+            metaEdit.dif_scannotes ? imgWarn : "",
+            metaEdit.scannotes, IM_ARRAYSIZE(metaEdit.scannotes));
+        ImGui::SameLine();
+        ImGui::Checkbox("Apply##17", (bool*)&metaEdit.a_scannotes);
         ImGui::EndGroup();
 
         ImGui::Spacing();
@@ -851,14 +946,14 @@ void mainWindow::preferencesPopup() {
         ImGui::Separator();
 
         ImGui::Text("Auto-save");
-        ImGui::Checkbox("###01", &preferences.autoSave);
-        if (preferences.autoSave) {
+        ImGui::Checkbox("###01", &appPrefs.autoSave);
+        if (appPrefs.autoSave) {
             ImGui::SameLine();
-            ImGui::InputInt("Frequency (seconds)", &preferences.autoSFreq);
+            ImGui::InputInt("Frequency (seconds)", &appPrefs.autoSFreq);
         }
 
         ImGui::Text("Roll Performance Mode");
-        ImGui::Checkbox("###02", &preferences.perfMode);
+        ImGui::Checkbox("###02", &appPrefs.perfMode);
 
         ImGui::Separator();
 
@@ -874,8 +969,8 @@ void mainWindow::preferencesPopup() {
                     badOcioText = true;
                 } else {
                     badOcioText = false;
-                    preferences.ocioPath = selection[0];
-                    std::strcpy(ocioPath, preferences.ocioPath.c_str());
+                    appPrefs.ocioPath = selection[0];
+                    std::strcpy(ocioPath, appPrefs.ocioPath.c_str());
                 }
             }
         }
@@ -901,13 +996,13 @@ void mainWindow::preferencesPopup() {
         if (ImGui::Button("Save")) {
             if (ocioSel == 0) {
                 ocioProc.setIntActive();
-                preferences.ocioExt = false;
+                appPrefs.ocioExt = false;
             } else {
                 ocioProc.setExtActive();
-                preferences.ocioExt = true;
+                appPrefs.ocioExt = true;
             }
             std::memset(ocioPath, 0, sizeof(ocioPath));
-            preferences.saveToFile();
+            appPrefs.saveToFile();
             preferencesPopTrig = false;
             ImGui::CloseCurrentPopup();
         }
@@ -940,24 +1035,24 @@ void mainWindow::shortcutsPopup() {
     if (ImGui::BeginPopupModal("Keyboard Shortcuts", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
 
         ImGui::BeginGroup();
-        ImGui::Text("Cmd + O ");
-        ImGui::Text("Cmd + Shift + O ");
+        ImGui::Text("⌘ + O ");
+        ImGui::Text("⌘ + Shift + O ");
         ImGui::Separator();
-        ImGui::Text("Cmd + S ");
-        ImGui::Text("Cmd + Shift + S ");
-        ImGui::Text("Opt   + Shift + S ");
+        ImGui::Text("⌘ + S ");
+        ImGui::Text("⌘ + Shift + S ");
+        ImGui::Text("⌥ + Shift + S ");
         ImGui::Separator();
-        ImGui::Text("Cmd + E ");
-        ImGui::Text("Cmd + G ");
+        ImGui::Text("⌘ + E ");
+        ImGui::Text("⌘ + G ");
         ImGui::Separator();
-        ImGui::Text("Cmd + [ ");
-        ImGui::Text("Cmd + ] ");
+        ImGui::Text("⌘ + [ ");
+        ImGui::Text("⌘ + ] ");
         ImGui::Separator();
-        ImGui::Text("Cmd + A ");
-        ImGui::Text("Cmd + C ");
-        ImGui::Text("Cmd + V ");
+        ImGui::Text("⌘ + A ");
+        ImGui::Text("⌘ + C ");
+        ImGui::Text("⌘ + V ");
         ImGui::Separator();
-        ImGui::Text("Cmd + , ");
+        ImGui::Text("⌘ + , ");
         ImGui::EndGroup();
 
         ImGui::SameLine();

@@ -40,6 +40,9 @@ struct imageMetadata {
     std::string devProcess;
     std::string chemMfg;
     std::string devNotes;
+
+    std::string scanner;
+    std::string scanNotes;
 };
 
 struct metaBuff {
@@ -108,6 +111,14 @@ struct metaBuff {
     char devnotes[4096];
     uint8_t a_devnotes;
     uint8_t dif_devnotes;
+
+    char scanner[256];
+    uint8_t a_scanner;
+    uint8_t dif_scanner;
+
+    char scannotes[4096];
+    uint8_t a_scannotes;
+    uint8_t dif_scannotes;
 
 };
 

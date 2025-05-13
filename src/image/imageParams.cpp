@@ -1,5 +1,6 @@
 #include "imageParams.h"
 #include <algorithm>
+
 void imageParams::rstBP() {
     std::fill(std::begin(blackPoint), std::end(blackPoint), 0.0f);
 }

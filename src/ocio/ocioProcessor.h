@@ -1,6 +1,7 @@
 #ifndef _ocioprocessor_h
 #define _ocioprocessor_h
 
+#include "structs.h"
 #include <string>
 #include <sstream>
 #include <thread>
@@ -23,8 +24,8 @@ class ocioProcessor {
     void setExtActive();
     void setIntActive();
 
-    void processImage(float* img, unsigned int width, unsigned int height);
-    std::string getMetalKernel(int _csOpt = 1, int _csDisp = 0, int _viewOp = 0);
+    void processImage(float* img, unsigned int width, unsigned int height, ocioSetting &ocioSet);
+    std::string getMetalKernel(ocioSetting ocioSet);
     void processImageGPU(float *img, unsigned int width, unsigned int height);
 
 
@@ -32,10 +33,7 @@ class ocioProcessor {
     std::vector<char*> displays;
     std::vector<std::vector<char*>> views;
 
-    int csDisp;
-    int displayOp;
-    int viewOp;
-    int cspOp;
+
     bool validExternal = false;
 
     private:

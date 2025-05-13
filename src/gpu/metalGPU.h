@@ -8,7 +8,8 @@
 #include <chrono>
 #include <deque>
 #include <queue>
-#include "imageIO.h"
+#include "image.h"
+#include "structs.h"
 
 struct gpuTimer {
     float renderTime;
@@ -16,14 +17,19 @@ struct gpuTimer {
 };
 enum renderType {
     r_sdt = 0,
-    r_blr = 1
+    r_blr = 1,
+    r_full = 2
 };
 struct gpuQueue {
     image* _img;
     renderType _type;
-    gpuQueue(image* img, renderType type)
+    ocioSetting _ocioSet;
+
+
+    gpuQueue(image* img, renderType type, ocioSetting ocioSet)
     {_img = img;
-    _type = type;}
+    _type = type;
+    _ocioSet = ocioSet;}
 
 
 };
@@ -33,9 +39,9 @@ class metalGPU {
         metalGPU();
         ~metalGPU();
 
-        void addToRender(image* _image, renderType type);
-        void renderBlurPass(image* _image);
-        bool initOCIOKernels(int csSetting, int csDisp, int view);
+        void addToRender(image* _image, renderType type, ocioSetting ocioSet);
+
+        bool initOCIOKernels(ocioSetting ocioSet);
         bool isInQueue(image* _image);
         gpuTimer rdTimer;
         bool rendering = false;
@@ -48,9 +54,7 @@ class metalGPU {
         std::mutex queueLock;
 
         image* prevIm;
-        int prevCSOpt;
-        int prevDisp;
-        int prevView;
+        ocioSetting prevOCIO;
         std::string ocioKernelText1;
         std::string ocioKernelText2;
         std::string ocioKernelText3;
@@ -89,7 +93,8 @@ class metalGPU {
 
         void computeKernels(float strength, float* kernels);
 
-        void renderImage(image* _image);
+        void renderImage(image* _image, ocioSetting ocioSet);
+        void renderBlurPass(image* _image);
 
 };
 

@@ -7,7 +7,7 @@ void mainWindow::initRender(int start, int end) {
         for (int i = start; i < end; i++) {
             if (i >= activeRollSize())
                 break;
-            mtlGPU->addToRender(getImage(i), r_sdt);
+            mtlGPU->addToRender(getImage(i), r_sdt, dispOCIO);
             //getImage(i)->procDispImg();
            //getImage(i)->sdlUpdate = true;
             //updateSDLTexture(getImage(i));
@@ -24,7 +24,7 @@ void mainWindow::imgRender() {
 
         //std::thread renThread = std::thread{ [this]() {
             //isRendering = true;
-            mtlGPU->addToRender(activeImage(), r_sdt);
+            mtlGPU->addToRender(activeImage(), r_sdt, dispOCIO);
             //activeImage()->procDispImg();
             //activeImage()->sdlUpdate = true;
             //updateSDLTexture(activeImage());
@@ -40,7 +40,7 @@ void mainWindow::imgRender(image *img) {
 
     if (img) {
         //isRendering = true;
-        mtlGPU->addToRender(img, r_sdt);
+        mtlGPU->addToRender(img, r_sdt, dispOCIO);
         //img->procDispImg();
         //img->sdlUpdate = true;
 
@@ -89,7 +89,7 @@ void mainWindow::rollRenderCheck() {
                 // And this is not the active roll
                 // And this roll is fully loaded
                 // And there are not images loading
-                if (preferences.perfMode)
+                if (appPrefs.perfMode)
                     activeRolls[r].clearBuffers();
             }
     }
@@ -103,7 +103,7 @@ void mainWindow::analyzeImage() {
         //isRendering = true;
         if (!activeImage()->blurImgData)
             activeImage()->allocBlurBuf();
-        mtlGPU->addToRender(activeImage(), r_blr);
+        mtlGPU->addToRender(activeImage(), r_blr, dispOCIO);
         while (!activeImage()->blurReady){}
         activeImage()->processMinMax();
         activeImage()->needMetaWrite = true;

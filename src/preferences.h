@@ -25,4 +25,6 @@ class userPreferences {
 
 };
 
+extern userPreferences appPrefs;
+
 #endif

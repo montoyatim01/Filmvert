@@ -1,198 +1,84 @@
-#include "imageIO.h"
-#include "OpenColorIO/OpenColorTransforms.h"
-#include "OpenColorIO/OpenColorTypes.h"
-#include "grainParams.h"
-#include "imageMeta.h"
-#include "logger.h"
-#include "renderParams.h"
+#include "image.h"
+#include "structs.h"
 #include "utils.h"
-#include "ocioProcessor.h"
-#include <OpenImageIO/imageio.h>
-#include <OpenImageIO/typedesc.h>
-#include <libraw/libraw.h>
-#include <cstdlib>
-#include <cstring>
-#include <csignal>
+#include "preferences.h"
+
+#include <variant>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
-#include <math.h>
-#include <chrono>
 
+#include "ocioProcessor.h"
+#include <libraw/libraw.h>
 
+//---Export Pre-Process---//
+/*
+    Image specific pre-processing step for
+    prepping a full render and write out.
 
-void image::padToRGBA() {
-    if (nChannels == 4)
-    {
-        // We already have an alpha channel
-        return;
-    }
-    allocProcBuf();
-    if (!procImgData || !rawImgData) {
-        LOG_ERROR("Either source or destination rgba buffer is null");
-    }
+    Temporarily store the working width/height
+    (for performance mode half-res debayers)
 
-    // Define the number of threads to use
-    unsigned int numThreads = std::thread::hardware_concurrency();
-    if (numThreads == 0) {
-        numThreads = 2; // Default value if concurrent threads can't be determined
-    }
+    Reload/Debayer full image in highest quality
+    (11 for libraw)
 
-
-    // Create a vector of threads
-    std::vector<std::thread> threads(numThreads);
-
-    // Divide the workload into equal parts for each thread
-    int rowsPerThread = height / numThreads;
-
-    auto processRows = [&](int startRow, int endRow) {
-        for (int y=startRow; y<endRow; y++)
-        {
-            for (int x=0; x<width; x++)
-            {
-                int index = (y * width) + x;
-                procImgData[4 * index] = nChannels >= 1 ? rawImgData[nChannels * index] : 0.0f; // R channel
-                procImgData[4 * index + 1] = nChannels >= 2 ? rawImgData[nChannels * index + 1] : 0.0f; // G channel
-                procImgData[4 * index + 2] = nChannels >= 3 ? rawImgData[nChannels * index + 2] : 0.0f; // B channel
-                procImgData[4 * index + 3] = nChannels >= 4 ? rawImgData[nChannels * index + 3] : 1.0f; // A channel
-            }
+    Allocate necessary buffers for processing
+*/
+bool image::exportPreProcess(std::string outPath) {
+    workWidth = width;
+    workHeight = height;
+    fullIm = true;
+    expFullPath = outPath + "/";
+    if (isRawImage) {
+        if (imageLoaded){
+            clearBuffers();
         }
-    };
-
-    // Launch the threads
-    for (int i=0; i<numThreads; ++i) {
-        int startRow = i * rowsPerThread;
-        int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-        threads[i] = std::thread(processRows, startRow, endRow);
-    }
-
-        // Wait for all threads to finish
-    for (auto& thread : threads) {
-        thread.join();
-    }
-    memcpy(rawImgData, procImgData, width * height * 4 * sizeof(float));
-    delProcBuf();
-}
-
-void image::trimForSave() {
-    if (nChannels == 4)
-    {
-        // We already have an alpha channel
-        return;
-    }
-    if (!procImgData || !tmpOutData) {
-        LOG_ERROR("Either source or destination rgba buffer is null");
-    }
-
-    // Define the number of threads to use
-    unsigned int numThreads = std::thread::hardware_concurrency();
-    if (numThreads == 0) {
-        numThreads = 2; // Default value if concurrent threads can't be determined
-    }
-
-
-    // Create a vector of threads
-    std::vector<std::thread> threads(numThreads);
-
-    // Divide the workload into equal parts for each thread
-    int rowsPerThread = height / numThreads;
-
-    auto processRows = [&](int startRow, int endRow) {
-        for (int y=startRow; y<endRow; y++)
-        {
-            for (int x=0; x<width; x++)
-            {
-                int index = (y * width) + x;
-                tmpOutData[nChannels * index] = procImgData[4 * index]; // R channel
-                if (nChannels > 1)
-                    tmpOutData[nChannels * index + 1] = nChannels >= 2 ? procImgData[4 * index + 1] : 0.0f; // G channel
-                if (nChannels > 2)
-                    tmpOutData[nChannels * index + 2] = nChannels >= 3 ? procImgData[4 * index + 2] : 0.0f; // B channel
-                if (nChannels > 3)
-                    tmpOutData[nChannels * index + 3] = nChannels >= 4 ? procImgData[4 * index + 3] : 1.0f; // A channel
-            }
+        if(debayerImage(true, 11)) {
+            allocProcBuf();
+            imageLoaded = true;
+            return true;
+        } else {
+            return false;
         }
-    };
+    } else {
+        // TODO: Reload image if necessary
+        if (!imageLoaded) {
 
-    // Launch the threads
-    for (int i=0; i<numThreads; ++i) {
-        int startRow = i * rowsPerThread;
-        int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-        threads[i] = std::thread(processRows, startRow, endRow);
-    }
-
-        // Wait for all threads to finish
-    for (auto& thread : threads) {
-        thread.join();
-    }
-}
-void image::allocateTmpBuf() {
-    if (nChannels == 4)
-    {
-        // We already have an alpha channel
-        tmpOutData = procImgData;
-        return;
-    }
-    tmpOutData = new float[width * height * nChannels];
-}
-void image::clearTmpBuf() {
-    if (tmpOutData && tmpOutData != procImgData) {
-        delete[] tmpOutData;
-        tmpOutData = nullptr;
-    }
-
-}
-
-void image::procDispImg() {
-
-    if (!procImgData || !dispImgData || !rawImgData) {
-        LOG_ERROR("Either source or destination buffer is null");
-    }
-    // Define the number of threads to use
-    unsigned int numThreads = std::thread::hardware_concurrency();
-    if (numThreads == 0) {
-        numThreads = 2; // Default value if concurrent threads can't be determined
-    }
-
-    float* buffer = procImgData; //procImgData
-
-    // OCIO Display Process
-    //ocioProc.processImageGPU(buffer, width, height);
-
-    // Create a vector of threads
-    std::vector<std::thread> threads(numThreads);
-
-    // Divide the workload into equal parts for each thread
-    int rowsPerThread = height / numThreads;
-
-    auto processRows = [&](int startRow, int endRow) {
-        for (int y=startRow; y<endRow; y++)
-        {
-            for (int x=0; x<width; x++)
-            {
-                int index = (y * width) + x;
-                dispImgData[4 * index + 0] = (uint8_t)(std::clamp(buffer[4 * index + 0] * 255.0f, 0.0f, 255.0f)); // R channel
-                dispImgData[4 * index + 1] = (uint8_t)(std::clamp(buffer[4 * index + 1] * 255.0f, 0.0f, 255.0f)); // G channel
-                dispImgData[4 * index + 2] = (uint8_t)(std::clamp(buffer[4 * index + 2] * 255.0f, 0.0f, 255.0f)); // B channel
-                dispImgData[4 * index + 3] = (uint8_t)(std::clamp(buffer[4 * index + 3] * 255.0f, 0.0f, 255.0f)); // A channel
-
-            }
         }
-    };
-
-    // Launch the threads
-    for (int i=0; i<numThreads; ++i) {
-        int startRow = i * rowsPerThread;
-        int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-        threads[i] = std::thread(processRows, startRow, endRow);
+        allocProcBuf();
     }
-
-        // Wait for all threads to finish
-    for (auto& thread : threads) {
-        thread.join();
-    }
+    return true;
 }
 
-bool image::writeImg(const exportParam param) {
+//---Export Post-Process---//
+/*
+    Clear out buffers for performance mode
+    Reset the width/height back to working values
+*/
+void image::exportPostProcess() {
+    if (imageLoaded && isRawImage) {
+        clearBuffers();
+    } else {
+        delProcBuf();
+    }
+    width = workWidth;
+    height = workHeight;
+    fullIm = false;
+    renderReady = false;
+}
+
+//---Write Image---//
+/*
+    Given the provided parameters write
+    out the final image from the proc buffer
+
+    Called after metal render is queued up.
+    Will wait for render to finish, and then apply
+    selected ODT.
+
+    Write metadata to final file after OIIO close
+*/
+bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
     OIIO::TypeDesc format = OIIO::TypeDesc::FLOAT;
     OIIO::TypeDesc outFormat;
     switch (param.bitDepth) {
@@ -238,8 +124,6 @@ bool image::writeImg(const exportParam param) {
             return false;
     }
     OIIO::ImageSpec spec(width, height, nChannels, outFormat);
-    //spec.from_xml(imgMeta.c_str());
-    //spec.erase_attribute("Exif:LensSpecification");
 
 
     if (param.format == 2) {
@@ -250,8 +134,11 @@ bool image::writeImg(const exportParam param) {
     } else if (param.format == 1) {
         // EXR Compression
         spec["Compression"] = "zip";
-    } else if (param.format == 3 || param.format == 4) {
-        spec["Compression"] = param.compression;
+    } else if (param.format == 3) {
+        spec["png:compressionLevel"] = param.compression;
+    } else if (param.format == 4) {
+        // Tiff Compression
+        spec["tiff:zipquality"] = param.compression;
     }
 
     // Open the destination file
@@ -262,6 +149,21 @@ bool image::writeImg(const exportParam param) {
 
     // Trim proc data for save
     allocateTmpBuf();
+    auto start = std::chrono::steady_clock::now();
+    while (!renderReady) {
+        auto end = std::chrono::steady_clock::now();
+        auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+        if (dur.count() > 15000) {
+            // Bailing out after waiting 15 seconds for Metal to finish rendering..
+            // At avg of 20-30fps it should never take this long
+            LOG_ERROR("Stuck waiting for Metal GPU render. Cannot export file: {}!", srcFilename);
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+    //TODO FIX TO TAKE OCIO SET FROM EXPORT
+    ocioProc.processImage(procImgData, width, height, ocioSet);
     trimForSave();
     // Write the image data
     if (!out->write_image(format, tmpOutData)) {
@@ -279,324 +181,23 @@ bool image::writeImg(const exportParam param) {
 
 }
 
-void image::processBaseColor() {
 
-    unsigned int x0, x1, y0, y1;
-    x0 = imgParam.sampleX[0] < imgParam.sampleX[1] ? imgParam.sampleX[0] : imgParam.sampleX[1];
-    x1 = imgParam.sampleX[0] > imgParam.sampleX[1] ? imgParam.sampleX[0] : imgParam.sampleX[1];
-
-    x0 = std::clamp(x0, 0u, width - 2);
-    x1 = std::clamp(x0, 0u, width - 2);
-
-    y0 = imgParam.sampleY[0] < imgParam.sampleY[1] ? imgParam.sampleY[0] : imgParam.sampleY[1];
-    y1 = imgParam.sampleY[0] > imgParam.sampleY[1] ? imgParam.sampleY[0] : imgParam.sampleY[1];
-
-    y0 = std::clamp(y0, 0u, height - 2);
-    y1 = std::clamp(y0, 0u, height - 2);
-
-    unsigned int pixCount = 0;
-    float rTotal = 0.0f;
-    float gTotal = 0.0f;
-    float bTotal = 0.0f;
-    for (int y = y0; y <= y1; y++) {
-        for (int x = x0; x <= x1; x++) {
-            int index = ((y * width) + x) * 4;
-            rTotal += rawImgData[index + 0];
-            gTotal += rawImgData[index + 1];
-            bTotal += rawImgData[index + 2];
-
-            pixCount++;
-        }
-    }
-    if (pixCount == 0) {
-        LOG_ERROR("No base average!");
-        return;
-    }
-
-    imgParam.baseColor[0] = rTotal / (float)pixCount;
-    imgParam.baseColor[1] = gTotal / (float)pixCount;
-    imgParam.baseColor[2] = bTotal / (float)pixCount;
-
-}
-
-void image::rotRight() {
-    switch(imRot) {
-        case 1: // Upright
-            imRot = 6; break;
-        case 6: // Left
-            imRot = 3; break;
-        case 3: // Upside
-            imRot = 8; break;
-        case 8: // Right
-            imRot = 1; break;
-    }
-}
-
-void image::rotLeft() {
-    switch(imRot) {
-        case 1: // Upright
-            imRot = 8; break;
-        case 8: // Right
-            imRot = 3; break;
-        case 3: // Upside
-            imRot = 6; break;
-        case 6: // Left
-            imRot = 1; break;
-    }
-}
-
-void image::allocBlurBuf() {
-    if (!blurImgData)
-        blurImgData = new float[width * height * 4];
-}
-
-void image::delBlurBuf() {
-    blurReady = false;
-    if (blurImgData)
-    {
-        delete [] blurImgData;
-        blurImgData = nullptr;
-    }
-
-}
-
-void image::allocProcBuf() {
-    if (!procImgData)
-        procImgData = new float [width * height * 4];
-}
-void image::delProcBuf() {
-    if (procImgData) {
-        delete [] procImgData;
-        procImgData = nullptr;
-    }
-}
-
-void image::allocDispBuf() {
-    if (!dispImgData)
-        dispImgData = new uint8_t[width * height * 4];
-}
-
-void image::delDispBuf() {
-    if (dispImgData) {
-        delete [] dispImgData;
-        dispImgData = nullptr;
-    }
-}
-
-void image::clearBuffers() {
-    // Delete raw buffer
-    if (rawImgData) {
-        delete [] rawImgData;
-        rawImgData = nullptr;
-    }
-    // Delete proc buffer
-    if (procImgData) {
-        delete [] procImgData;
-        procImgData = nullptr;
-    }
-    // Delete temp buffer
-    if (tmpOutData) {
-        delete [] tmpOutData;
-        tmpOutData = nullptr;
-    }
-    // Delete Blur buff
-    if (blurImgData) {
-        delete [] blurImgData;
-        blurImgData = nullptr;
-    }
-    // Delete disp buffer
-    if (dispImgData) {
-        delete [] dispImgData;
-        dispImgData = nullptr;
-    }
-    imageLoaded = false;
-}
-
-void image::loadBuffers() {
-    if (imageLoaded)
-        return;
-    allocProcBuf();
-    allocDispBuf();
-    if(debayerImage(false, 2)) {
-        imageLoaded = true;
-    }
-    else
-        LOG_WARN("Unable to re-debayer image: {}", fullPath);
-}
-
-bool image::exportPreProcess(std::string outPath) {
-    workWidth = width;
-    workHeight = height;
-    fullIm = true;
-    expFullPath = outPath + "/" + srcFilename;
-    if (imageLoaded){
-        clearBuffers();
-    }
-    if(debayerImage(true, 11)) {
-        allocProcBuf();
-        imageLoaded = true;
-        return true;
-    } else {
-        return false;
-    }
-}
-
-void image::exportPostProcess() {
-    if (imageLoaded) {
-        clearBuffers();
-    }
-    width = workWidth;
-    height = workHeight;
-    fullIm = false;
-}
-
-void image::processMinMax() {
-
-    if (!blurImgData) {
-            LOG_ERROR("No Blur Buffer!");
-            return; //TODO: Error status return
-        }
-
-        unsigned int numThreads = std::thread::hardware_concurrency();
-        if (numThreads == 0) {
-            numThreads = 2; // Default value if concurrent threads can't be determined
-        }
-
-        float* buffer = blurImgData;
-
-        // Create a vector of threads
-       /*  std::vector<std::thread> threads(numThreads);
-        std::vector<minMaxPoint> points(numThreads);
-
-        // Initialize points with default values
-        for (auto& point : points) {
-            point.minLuma = 1.0f;
-            point.maxLuma = 0.0f;
-        }
-
-        // Divide the workload into equal parts for each thread
-        int rowsPerThread = height / numThreads;
-
-        auto processRows = [&](int startRow, int endRow, int threadPos) {
-            // Initialize with appropriate starting values
-            float minLuma = 1.0f;  // Max possible value
-            float maxLuma = 0.0f;  // Min possible value
-
-            for (unsigned int y = startRow; y < endRow; y++) {
-                for (unsigned int x = 0; x < width; x++) {
-                    if (isPointInBox(x, y, cropBoxX, cropBoxY)) {
-                        int index = ((y * width) + x) * 4;
-                        float lum = Luma(buffer[index + 0], buffer[index + 1], buffer[index + 2]);
-
-                        if (lum < minLuma) {
-                            minLuma = lum;
-                            points[threadPos].minLuma = lum;
-                            points[threadPos].minX = x;
-                            points[threadPos].minY = y;
-                            points[threadPos].minRGB[0] = buffer[index + 0];
-                            points[threadPos].minRGB[1] = buffer[index + 1]; // Fixed index
-                            points[threadPos].minRGB[2] = buffer[index + 2]; // Fixed index
-                        }
-
-                        if (lum > maxLuma) {
-                            maxLuma = lum;
-                            points[threadPos].maxLuma = lum;
-                            points[threadPos].maxX = x;
-                            points[threadPos].maxY = y;
-                            points[threadPos].maxRGB[0] = buffer[index + 0];
-                            points[threadPos].maxRGB[1] = buffer[index + 1]; // Fixed index
-                            points[threadPos].maxRGB[2] = buffer[index + 2]; // Fixed index
-                        }
-                    }
-                }
-            }
-        };
-
-        // Launch the threads
-        for (int i = 0; i < numThreads; ++i) {
-            int startRow = i * rowsPerThread;
-            int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
-            threads[i] = std::thread(processRows, startRow, endRow, i);
-        }
-
-        // Wait for all threads to finish
-        for (auto& thread : threads) {
-            thread.join();
-            }*/
-        float maxLuma = -100.0f;
-        float minLuma = 100.0f;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                if (isPointInBox(x, y, imgParam.cropBoxX, imgParam.cropBoxY)) {
-                    unsigned int index = (y * width) + x;
-                    float luma = Luma(buffer[4 * index + 0], buffer[4 * index + 1], buffer[4 * index + 2]);
-                    if (luma < minLuma) {
-                        minLuma = luma;
-                        imgParam.minX = x;
-                        imgParam.minY = y;
-                        imgParam.blackPoint[0] = buffer[4 * index + 0];
-                        imgParam.blackPoint[1] = buffer[4 * index + 1];
-                        imgParam.blackPoint[2] = buffer[4 * index + 2];
-                    }
-                    if (luma > maxLuma) {
-                        maxLuma = luma;
-                        imgParam.maxX = x;
-                        imgParam.maxY = y;
-                        imgParam.whitePoint[0] = buffer[4 * index + 0];
-                        imgParam.whitePoint[1] = buffer[4 * index + 1];
-                        imgParam.whitePoint[2] = buffer[4 * index + 2];
-                    }
-                }
-            }
-        }
-
-        // If you need to debug, uncomment the line below
-        // std::raise(SIGINT);  // THIS IS A KEY ISSUE - it interrupts execution
-
-        /*float minLum = 1.0f;
-        float maxLum = 0.0f;
-
-        for (int i = 0; i < points.size(); i++) {
-            if (points[i].minLuma < minLum) {
-                minLum = points[i].minLuma;
-                blackPoint[0] = points[i].minRGB[0];
-                blackPoint[1] = points[i].minRGB[1];
-                blackPoint[2] = points[i].minRGB[2];
-
-                minX = points[i].minX;
-                minY = points[i].minY;
-            }
-
-            if (points[i].maxLuma > maxLum) {
-                maxLum = points[i].maxLuma;
-                whitePoint[0] = points[i].maxRGB[0];
-                whitePoint[1] = points[i].maxRGB[1];
-                whitePoint[2] = points[i].maxRGB[2];
-
-                maxX = points[i].maxX;
-                maxY = points[i].maxY;
-            }
-            }*/
-
-        LOG_INFO("Analysis finished!");
-        LOG_INFO("Min Pixel: {},{}", imgParam.minX, imgParam.minY);
-        LOG_INFO("Min Values: {}, {}, {}", imgParam.blackPoint[0], imgParam.blackPoint[1], imgParam.blackPoint[2]);
-        LOG_INFO("Max Pixel: {},{}", imgParam.maxX, imgParam.maxY);
-        LOG_INFO("Max Values: {}, {}, {}", imgParam.whitePoint[0], imgParam.whitePoint[1], imgParam.whitePoint[2]);
-    //std::raise(SIGINT);
-}
-
+//---Debayer Image---//
+/*
+    Reload/debayer the image using the given
+    quality settings.
+*/
 bool image::debayerImage(bool fullRes, int quality) {
     std::unique_ptr<LibRaw> rawProcessor(new LibRaw);
 
     // Set parameters for linear output
     rawProcessor->imgdata.params.output_bps = 16;       // 16-bit output
-    rawProcessor->imgdata.params.gamm[0] = 1;           // Set gamma to 1.0 for linear output
+    rawProcessor->imgdata.params.gamm[0] = 1;           // gamma 1.0 for linear output
     rawProcessor->imgdata.params.gamm[1] = 1;
     rawProcessor->imgdata.params.no_auto_bright = 1;    // Disable auto-brightening
     rawProcessor->imgdata.params.use_camera_wb = 1;     // Use camera white balance
-    rawProcessor->imgdata.params.output_color = 6;      // Output color space: 1 = sRGB
-    rawProcessor->imgdata.params.user_qual = quality;   // 0 for draft, 3 for good
+    rawProcessor->imgdata.params.output_color = 6;      // Output color space: ACES
+    rawProcessor->imgdata.params.user_qual = quality;
     rawProcessor->imgdata.params.half_size = !fullRes;
 
     // Open the raw file
@@ -637,13 +238,23 @@ bool image::debayerImage(bool fullRes, int quality) {
     rawImgData = new float[width * height * 4];
 
     // Convert to float (assuming 16-bit output)
-        if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
-            uint16_t* raw_data = reinterpret_cast<uint16_t*>(processedImage->data);
-            for (int y = 0; y < processedImage->height; y++) {
-                for (int x = 0; x < processedImage->width; x++) {
+    if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
+        unsigned int numThreads = std::thread::hardware_concurrency();
+        numThreads = numThreads == 0 ? 2 : numThreads;
+        // Create a vector of threads
+        std::vector<std::thread> threads(numThreads);
+        // Divide the workload into equal parts for each thread
+        int rowsPerThread = processedImage->height / numThreads;
+
+        uint16_t* raw_data = reinterpret_cast<uint16_t*>(processedImage->data);
+        auto processRows = [&](int startRow, int endRow) {
+            float pIn[3] = {0};
+            float pOut[3] = {0};
+            for (int y=startRow; y<endRow; y++)
+            {
+                for (int x=0; x<processedImage->width; x++)
+                {
                     int index = ((y * processedImage->width) + x) * processedImage->colors;
-                    float* pIn = new float[3];
-                    float* pOut = new float[3];
                     pIn[0] = static_cast<float>(raw_data[index + 0]) / 65535.0f;
                     pIn[1] = static_cast<float>(raw_data[index + 1]) / 65535.0f;
                     pIn[2] = static_cast<float>(raw_data[index + 2]) / 65535.0f;
@@ -652,21 +263,266 @@ bool image::debayerImage(bool fullRes, int quality) {
                     rawImgData[index + 1] = pOut[1] * 2.0f;
                     rawImgData[index + 2] = pOut[2] * 2.0f;
                     rawImgData[index + 3] = 1.0f;
-                    delete [] pIn;
-                    delete [] pOut;
                 }
             }
+        };
+        // Launch the threads
+        for (int i=0; i<numThreads; ++i) {
+            int startRow = i * rowsPerThread;
+            int endRow = (i == numThreads - 1) ? processedImage->height : (i + 1) * rowsPerThread;
+            threads[i] = std::thread(processRows, startRow, endRow);
         }
-    padToRGBA();
-    // Clean up
+
+            // Wait for all threads to finish
+        for (auto& thread : threads) {
+            thread.join();
+        }
+        padToRGBA();
+        imageLoaded = true;
+        // Clean up
+        LibRaw::dcraw_clear_mem(processedImage);
+        rawProcessor->recycle();
+        return true;
+    }
     LibRaw::dcraw_clear_mem(processedImage);
     rawProcessor->recycle();
-    return true;
+    return false;
 }
 
 
 
 
+
+//--------------IMAGE LOADER FUNCTIONS-----------------//
+
+//---Read Image---//
+/*
+    Read in an image with a given path.
+    Will attempt data-raw first, then camera-raw,
+    then OpenImageIO after.
+
+    This prevents OpenImageIO from reading just the
+    thumbnail image that may be present in a file.
+
+    Function returns a valid image object set up based
+    on the type of image loaded, otherwise an error string
+*/
+std::variant<image, std::string> readImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet) {
+    // Attempt data raw
+    auto drIm = readDataImage(imagePath, rawSet, ocioSet);
+    if (std::holds_alternative<image>(drIm))
+        return std::get<image>(drIm);
+
+    // Attempt camera raw
+    auto crIm = readRawImage(imagePath);
+    if (std::holds_alternative<image>(crIm))
+        return std::get<image>(crIm);
+
+    // Finally, attempt OpenImageIO
+    return readImageOIIO(imagePath, ocioSet);
+}
+
+//---Read File Raw Image---//
+/*
+    Attempt to load a raw-data file (Pakon)
+    with the given image specifications
+    (width, height, channels, bit depth)
+
+    Applies a gamma 2.2 transform, and selected IDT
+    returns an image object if successful, error string otherwise
+*/
+
+std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet) {
+
+    std::filesystem::path imgP(imagePath);
+    if (imgP.extension().string() == ".raw" ||
+        imgP.extension().string() == ".RAW") {
+
+        image img;
+        img.srcFilename = imgP.stem().string();
+        img.srcPath = imgP.parent_path().string();
+        img.fullPath = imagePath;
+
+        try {
+            img.width = rawSet.width;
+            img.height = rawSet.height;
+            img.nChannels = rawSet.channels;
+            long expByteCount = img.width * img.height * img.nChannels;
+            expByteCount *= (rawSet.bitDepth / 8);
+
+            if (std::filesystem::file_size(imgP) < expByteCount) {
+                // File is too small for dimensions
+                throw std::runtime_error("Error: Filesize less than expected! Skipping");
+            }
+            if (std::filesystem::file_size(imgP) == expByteCount) {
+                // File is exactly right (without header)
+                rawSet.pakonHeader = false;
+            }
+            if (std::filesystem::file_size(imgP) == expByteCount + 16) {
+                // File has Pakon header
+                rawSet.pakonHeader = true;
+            } else {
+                // We've got the wrong dimensions
+                throw std::runtime_error("Error: Incorrect dimensions for RAW file! Skipping");
+            }
+
+            img.rawImgData = new float[img.width * img.height * 4];
+            // Load in the image and pre-process to Linear AP1
+            unsigned int numThreads = std::thread::hardware_concurrency();
+            numThreads = numThreads == 0 ? 2 : numThreads;
+            // Create a vector of threads
+            std::vector<std::thread> threads(numThreads);
+            // Divide the workload into equal parts for each thread
+            int rowsPerThread = img.height / numThreads;
+
+            std::ifstream file(imagePath, std::ios::binary | std::ios::ate);
+            if (!file) {
+                delete [] img.rawImgData;
+                throw std::runtime_error("Error: Unable to open input file: " + imagePath);
+            }
+
+            // Get total file size
+            file.seekg(0, std::ios::end);
+            size_t totalSize = file.tellg();
+
+            // Calculate data size (excluding header if present)
+            size_t dataSize = rawSet.pakonHeader ? totalSize - 16 : totalSize;
+
+            // Seek to start of data (skip header if present)
+            if (rawSet.pakonHeader)
+                file.seekg(16, std::ios::beg);
+            else
+                file.seekg(0, std::ios::beg);
+
+            // Allocate buffer for data only
+            std::unique_ptr<char[]> buffer(new char[dataSize]);
+
+            // Read the data
+            file.read(buffer.get(), dataSize);
+            file.close();
+
+            char* raw_ptr = buffer.get();
+
+            float maxValue = static_cast<float>((1 << rawSet.bitDepth) - 1);
+            int bytesPerChannel = (rawSet.bitDepth > 8) ? (rawSet.bitDepth > 16 ? 4 : 2) : 1;
+            int planeSize = img.width * img.height * bytesPerChannel;
+
+            auto processRows = [&](int startRow, int endRow) {
+                float pIn[3] = {0};
+                float pOut[3] = {0};
+
+                for (int y = startRow; y < endRow; y++) {
+                    for (int x = 0; x < img.width; x++) {
+                        // Calculate the starting byte position for this pixel
+                        // Calculate pixel position
+                        int pixelIndex = y * img.width + x;
+
+                        // For interleaved data, calculate the byte offset
+                        int pixelByteOffset = pixelIndex * img.nChannels * bytesPerChannel;
+
+                        // For float output array
+                        int floatIndex = pixelIndex * img.nChannels;
+
+
+                        for (int c = 0; c < img.nChannels && c < 3; c++) {
+                            // Calculate the byte offset for this specific channel
+                            int channelByteOffset;
+                            channelByteOffset = rawSet.planar ? (c * planeSize) + (pixelIndex * bytesPerChannel) : pixelByteOffset + (c * bytesPerChannel);
+
+                            if (rawSet.bitDepth <= 8) {
+                                pIn[c] = static_cast<float>(static_cast<unsigned char>(raw_ptr[channelByteOffset])) / maxValue;
+                            } else if (rawSet.bitDepth <= 16) {
+                                // For 16-bit, we read from the correct channel offset
+                                uint16_t value = *reinterpret_cast<uint16_t*>(&raw_ptr[channelByteOffset]);
+                                value = !rawSet.littleE ? swapBytes16(value) : value;
+                                pIn[c] = static_cast<float>(value) / maxValue;
+                            } else if (rawSet.bitDepth <= 32) {
+                                // For 32-bit, we read from the correct channel offset
+                                uint32_t value = *reinterpret_cast<uint32_t*>(&raw_ptr[channelByteOffset]);
+                                value = !rawSet.littleE ? swapBytes32(value) : value;
+                                pIn[c] = static_cast<float>(value) / maxValue;
+                            }
+                        }
+                        if (x == 0 && y == 0) {
+                            LOG_INFO("First pixel values:");
+                            for (int c = 0; c < img.nChannels; c++) {
+                                LOG_INFO("Channel {}: {}", c, pIn[c]);
+                            }
+                        }
+
+                        // Apply 2.2 gamma correction
+                        for (int c = 0; c < img.nChannels; c++) {
+                            pOut[c] = std::pow(pIn[c], 1.0f/2.2f);
+                        }
+
+
+                        // Write to output
+                        for (int c = 0; c < img.nChannels; c++) {
+                            img.rawImgData[floatIndex + c] = pOut[c];
+                        }
+
+                        // Set alpha channel if it exists
+                        if (img.nChannels == 4) {
+                            img.rawImgData[floatIndex + 3] = 1.0f;
+                        }
+                    }
+                }
+            };
+            // Launch the threads
+            for (int i=0; i<numThreads; ++i) {
+                int startRow = i * rowsPerThread;
+                int endRow = (i == numThreads - 1) ? img.height : (i + 1) * rowsPerThread;
+                threads[i] = std::thread(processRows, startRow, endRow);
+            }
+
+            // Wait for all threads to finish
+            for (auto& thread : threads) {
+                thread.join();
+            }
+
+            // Image is good
+            img.imgParam.cropBoxX[0] = img.width * 0.1;
+            img.imgParam.cropBoxY[0] = img.height * 0.1;
+
+            img.imgParam.cropBoxX[1] = img.width * 0.9;
+            img.imgParam.cropBoxY[1] = img.height * 0.1;
+
+            img.imgParam.cropBoxX[2] = img.width * 0.9;
+            img.imgParam.cropBoxY[2] = img.height * 0.9;
+
+            img.imgParam.cropBoxX[3] = img.width * 0.1;
+            img.imgParam.cropBoxY[3] = img.height * 0.9;
+            img.renderBypass = true;
+            img.imageLoaded = true;
+            img.padToRGBA();
+            img.intOCIOSet = ocioSet;
+            ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
+            img.imageLoaded = true;
+            return img;
+
+
+        } catch(const std::exception& e) {
+            LOG_ERROR("Error decoding raw image: {}", e.what());
+            return "Unable to decode raw-data image";
+        }
+
+    }
+    return "Not a data-raw image, continuing";
+
+}
+
+
+
+
+//---Read Camera Raw Image---//
+/*
+    Attempt to read in a camera raw file and debayer it
+    using the LibRaw library.
+    Will read half-size and lower quality if performance
+    mode is enabled.
+
+    Returns an image object if successful, error string otherwise
+*/
 std::variant<image, std::string> readRawImage(std::string imagePath) {
     auto start = std::chrono::steady_clock::now();
     image img;
@@ -686,8 +542,8 @@ std::variant<image, std::string> readRawImage(std::string imagePath) {
     rawProcessor->imgdata.params.no_auto_bright = 1;    // Disable auto-brightening
     rawProcessor->imgdata.params.use_camera_wb = 1;     // Use camera white balance
     rawProcessor->imgdata.params.output_color = 6;      // Output color space: 1 = sRGB
-    rawProcessor->imgdata.params.user_qual = 2;
-    rawProcessor->imgdata.params.half_size = 1;
+    rawProcessor->imgdata.params.user_qual = appPrefs.perfMode ? 2 : 11;
+    rawProcessor->imgdata.params.half_size = appPrefs.perfMode ? 1 : 0;
 
     // Open the raw file
     int result = rawProcessor->open_file(imagePath.c_str());
@@ -721,59 +577,26 @@ auto c1 = std::chrono::steady_clock::now();
     img.width = processedImage->width;
     img.height = processedImage->height;
     img.nChannels = processedImage->colors;
-    LOG_INFO("CR3 Channels: {}", img.nChannels);
-    LOG_INFO("Width: {}, Height: {}", img.width, img.height);
     img.rawImgData = new float[img.width * img.height * 4];
-    //img.allocBlurBuf();
 
     // Convert to float (assuming 16-bit output)
-        if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
-            unsigned int numThreads = std::thread::hardware_concurrency();
-            numThreads = numThreads == 0 ? 2 : numThreads;
-            // Create a vector of threads
-            std::vector<std::thread> threads(numThreads);
-            // Divide the workload into equal parts for each thread
-            int rowsPerThread = processedImage->height / numThreads;
+    if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
+        unsigned int numThreads = std::thread::hardware_concurrency();
+        numThreads = numThreads == 0 ? 2 : numThreads;
+        // Create a vector of threads
+        std::vector<std::thread> threads(numThreads);
+        // Divide the workload into equal parts for each thread
+        int rowsPerThread = processedImage->height / numThreads;
 
-            uint16_t* raw_data = reinterpret_cast<uint16_t*>(processedImage->data);
-            auto processRows = [&](int startRow, int endRow) {
-                for (int y=startRow; y<endRow; y++)
+        uint16_t* raw_data = reinterpret_cast<uint16_t*>(processedImage->data);
+        auto processRows = [&](int startRow, int endRow) {
+            float pIn[3] = {0};
+            float pOut[3] = {0};
+            for (int y=startRow; y<endRow; y++)
+            {
+                for (int x=0; x<processedImage->width; x++)
                 {
-                    for (int x=0; x<processedImage->width; x++)
-                    {
-                        int index = ((y * processedImage->width) + x) * processedImage->colors;
-                        float* pIn = new float[3];
-                        float* pOut = new float[3];
-                        pIn[0] = static_cast<float>(raw_data[index + 0]) / 65535.0f;
-                        pIn[1] = static_cast<float>(raw_data[index + 1]) / 65535.0f;
-                        pIn[2] = static_cast<float>(raw_data[index + 2]) / 65535.0f;
-                        ap0_to_ap1(pIn, pOut);
-                        img.rawImgData[index + 0] = pOut[0] * 2.0f;
-                        img.rawImgData[index + 1] = pOut[1] * 2.0f;
-                        img.rawImgData[index + 2] = pOut[2] * 2.0f;
-                        img.rawImgData[index + 3] = 1.0f;
-                        delete [] pIn;
-                        delete [] pOut;
-                    }
-                }
-            };
-            // Launch the threads
-            for (int i=0; i<numThreads; ++i) {
-                int startRow = i * rowsPerThread;
-                int endRow = (i == numThreads - 1) ? processedImage->height : (i + 1) * rowsPerThread;
-                threads[i] = std::thread(processRows, startRow, endRow);
-            }
-
-                // Wait for all threads to finish
-            for (auto& thread : threads) {
-                thread.join();
-            }
-
-            /*for (int y = 0; y < processedImage->height; y++) {
-                for (int x = 0; x < processedImage->width; x++) {
                     int index = ((y * processedImage->width) + x) * processedImage->colors;
-                    float* pIn = new float[3];
-                    float* pOut = new float[3];
                     pIn[0] = static_cast<float>(raw_data[index + 0]) / 65535.0f;
                     pIn[1] = static_cast<float>(raw_data[index + 1]) / 65535.0f;
                     pIn[2] = static_cast<float>(raw_data[index + 2]) / 65535.0f;
@@ -783,13 +606,23 @@ auto c1 = std::chrono::steady_clock::now();
                     img.rawImgData[index + 2] = pOut[2] * 2.0f;
                     img.rawImgData[index + 3] = 1.0f;
                 }
-            }*/
             }
+        };
+        // Launch the threads
+        for (int i=0; i<numThreads; ++i) {
+            int startRow = i * rowsPerThread;
+            int endRow = (i == numThreads - 1) ? processedImage->height : (i + 1) * rowsPerThread;
+            threads[i] = std::thread(processRows, startRow, endRow);
+        }
+
+        // Wait for all threads to finish
+        for (auto& thread : threads) {
+            thread.join();
+        }
+
+    }
 auto d1 = std::chrono::steady_clock::now();
 
-    //img.procImgData = new float[img.width * img.height * 4];
-    //img.dispImgData = new uint8_t[img.width * img.height * 4];
-    //img.sampleVisible = false;
     img.imgParam.cropBoxX[0] = img.width * 0.1;
     img.imgParam.cropBoxY[0] = img.height * 0.1;
 
@@ -807,19 +640,17 @@ auto d1 = std::chrono::steady_clock::now();
     // Pad to RGBA
     img.padToRGBA();
 auto e1 = std::chrono::steady_clock::now();
-    // Process Disp Img
-    //img.procDispImg();
+
 auto f1 = std::chrono::steady_clock::now();
 
     // Read metadata
     img.readMetaFromFile();
-    //readAllMetadata(imagePath);
-    //writeCustomMetadata(imagePath, "dc", "Filmvertv1");
-    //writeExifMetadata(imagePath, "Exif.Photo.UserComment", "Filmvertv1");
+
 
     // Clean up
     LibRaw::dcraw_clear_mem(processedImage);
     rawProcessor->recycle();
+    img.isRawImage = true;
 auto end = std::chrono::steady_clock::now();
 
 auto durA = std::chrono::duration_cast<std::chrono::microseconds>(a1 - start);
@@ -843,9 +674,17 @@ LOG_INFO("----------------------------------");
     return img;
 }
 
-std::variant<image, std::string> readImage(std::string imagePath) {
-    image newImg;
-    LOG_INFO("reading image: {}", imagePath);
+
+//---Read Image OpenImageIO---//
+/*
+    Attempts to read in the selected file using
+    OpenImageIO. Applies the user-selected IDT settings
+    to the image during opening.
+
+    Returns an image object if successful, error string otherwise
+*/
+std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSetting ocioSet) {
+    image img;
 
     OIIO::ImageInput::unique_ptr inputImage;
     inputImage = OIIO::ImageInput::open(imagePath);
@@ -856,92 +695,56 @@ std::variant<image, std::string> readImage(std::string imagePath) {
         LOG_ERROR("[oiio] Error: {}", OIIO::geterror());
         return "Could not open image";
     }
+
     std::filesystem::path imgP = imagePath;
-    newImg.srcFilename = imgP.stem().string();
-    newImg.srcPath = imgP.parent_path().string();
-    if (newImg.srcFilename == "" || newImg.srcPath == "") {
+    img.srcFilename = imgP.stem().string();
+    img.srcPath = imgP.parent_path().string();
+    if (img.srcFilename == "" || img.srcPath == "") {
         LOG_ERROR("Unable to parse image: {}, empty paths", imagePath);
         return "Could not parse image path";
     }
 
     const OIIO::ImageSpec &inputSpec = inputImage->spec();
-    newImg.width = inputSpec.width;
-    newImg.height = inputSpec.height;
-    newImg.nChannels = inputSpec.nchannels;
-    //newImg.imgMeta = inputSpec.to_xml();
-    //newImg.sampleVisible = false;
+    img.width = inputSpec.width;
+    img.height = inputSpec.height;
+    img.nChannels = inputSpec.nchannels;
 
-    newImg.imgParam.cropBoxX[0] = newImg.width * 0.1;
-    newImg.imgParam.cropBoxY[0] = newImg.height * 0.1;
+    img.imgParam.cropBoxX[0] = img.width * 0.1;
+    img.imgParam.cropBoxY[0] = img.height * 0.1;
 
-    newImg.imgParam.cropBoxX[1] = newImg.width * 0.9;
-    newImg.imgParam.cropBoxY[1] = newImg.height * 0.1;
+    img.imgParam.cropBoxX[1] = img.width * 0.9;
+    img.imgParam.cropBoxY[1] = img.height * 0.1;
 
-    newImg.imgParam.cropBoxX[2] = newImg.width * 0.9;
-    newImg.imgParam.cropBoxY[2] = newImg.height * 0.9;
+    img.imgParam.cropBoxX[2] = img.width * 0.9;
+    img.imgParam.cropBoxY[2] = img.height * 0.9;
 
-    newImg.imgParam.cropBoxX[3] = newImg.width * 0.1;
-    newImg.imgParam.cropBoxY[3] = newImg.height * 0.9;
-    newImg.renderBypass = true;
+    img.imgParam.cropBoxX[3] = img.width * 0.1;
+    img.imgParam.cropBoxY[3] = img.height * 0.9;
+    img.renderBypass = true;
 
-    //readMetadata(inputSpec, &newImg, imgP.stem().string(), imgP.extension().string());
-    LOG_INFO("Reading in image with size: {}x{}x{}", newImg.width, newImg.height, newImg.nChannels);
+    LOG_INFO("Reading in image with size: {}x{}x{}", img.width, img.height, img.nChannels);
 
-    newImg.rawImgData = new float[newImg.width * newImg.height * 4];
-    //newImg.procImgData = new float[newImg.width * newImg.height * 4];
-    newImg.dispImgData = new uint8_t[newImg.width * newImg.height * 4];
-    if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)newImg.rawImgData))
+    img.rawImgData = new float[img.width * img.height * 4];
+    if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)img.rawImgData))
     {
         LOG_ERROR("[oiio] Failed to read image: {}", imagePath);
         LOG_ERROR("[oiio] Error: {}", inputImage->geterror());
+        delete [] img.rawImgData;
         return "Could not read image";
     }
 
     inputImage->close();
 
     // Pad to RGBA
-    newImg.padToRGBA();
-    // Process Disp Img
-    //newImg.procDispImg();
+    img.padToRGBA();
 
-    return newImg;
-}
+    // Read metadata
+    img.readMetaFromFile();
 
+    // Process IDT
+    img.intOCIOSet = ocioSet;
+    ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
+    img.imageLoaded = true;
 
-renderParams img_to_param(image* _img) {
-    renderParams params;
-
-    params.width = _img->width;
-    params.height = _img->height;
-
-    params.sigmaFilter = _img->imgParam.blurAmount;
-    params.temp = _img->imgParam.temp;
-    params.tint = _img->imgParam.tint;
-
-    params.bypass = _img->renderBypass ? 1 : 0;
-    params.gradeBypass = _img->gradeBypass ? 1 : 0;
-
-    for (int i = 0; i < 4; i++) {
-        params.baseColor[i] = i == 3 ? 0.0f : _img->imgParam.baseColor[i];
-        params.blackPoint[i] = i == 3 ? 0.0f : _img->imgParam.blackPoint[i] + _img->imgParam.blackPoint[3];
-        params.whitePoint[i] = i == 3 ? 1.0f : _img->imgParam.whitePoint[i] * _img->imgParam.whitePoint[3];
-        params.G_blackpoint[i] = i == 3 ? 0.0f : _img->imgParam.g_blackpoint[i] + _img->imgParam.g_blackpoint[3];
-        params.G_whitepoint[i] = i == 3 ? 1.0f : _img->imgParam.g_whitepoint[i] * _img->imgParam.g_whitepoint[3];
-        params.G_lift[i] = i == 3 ? 0.0f : _img->imgParam.g_lift[i] + _img->imgParam.g_lift[3];
-        params.G_gain[i] = i == 3 ? 1.0f : _img->imgParam.g_gain[i] * _img->imgParam.g_gain[3];
-        params.G_mult[i] = i == 3 ? 1.0f : _img->imgParam.g_mult[i] * _img->imgParam.g_mult[3];
-        params.G_offset[i] = i == 3 ? 0.0f : _img->imgParam.g_offset[i] + _img->imgParam.g_offset[3];
-        params.G_gamma[i] = i == 3 ? 1.0f : _img->imgParam.g_gamma[i] * _img->imgParam.g_gamma[3];
-    }
-
-    //params.baseColor[0] = 0.01f;
-    //params.baseColor[1] = 0.01f;
-    //params.baseColor[2] = 0.01f;
-
-    //LOG_INFO("Render Params:");
-    //LOG_INFO("Base Color: {}, {}, {}, {}", params.baseColor[0], params.baseColor[1], params.baseColor[2], params.baseColor[3]);
-    //LOG_INFO("Width: {}, Height: {}", params.width, params.height);
-    return params;
-
-
+    return img;
 }

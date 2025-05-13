@@ -1,6 +1,7 @@
 #include "ocioProcessor.h"
 #include "window.h"
 #include <chrono>
+#include <filesystem>
 
 
 // Open up a folder with sub-folders
@@ -23,6 +24,7 @@ void mainWindow::openImages() {
     if (selection.size() > 0) {
         dispImportPop = true;
         importFiles = selection;
+        checkForRaw();
     }
 
 
@@ -53,6 +55,7 @@ void mainWindow::openRolls() {
     if (selection.size() > 0) {
         dispImpRollPop = true;
         importFiles = selection;
+        checkForRaw();
     }
 }
 
@@ -69,20 +72,13 @@ void mainWindow::exportImages() {
         std::vector<std::future<void>> futures;
 
         for (int i = 0; i < activeRollSize(); i++) {
-            futures.push_back(pool.submit([this, &i]() {
-                if (!isExporting) {
-                    exportPopup = false;
-                    return;
-                }
+            futures.push_back(pool.submit([this, i]() {
                 if (getImage(i) && getImage(i)->selected) {
 
                     getImage(i)->exportPreProcess(expSetting.outPath);
-                    ocioProc.cspOp = expSetting.colorspaceOpt;
-                    ocioProc.csDisp = expSetting.colorspaceOpt == 0 ? expSetting.colorspace : expSetting.display;
-                    ocioProc.viewOp = expSetting.view;
-                    mtlGPU->addToRender(getImage(i), r_sdt);
+                    mtlGPU->addToRender(getImage(i), r_sdt, exportOCIO);
                     LOG_INFO("Exporting Image {}: {}", i, getImage(i)->srcFilename);
-                    getImage(i)->writeImg(expSetting);
+                    getImage(i)->writeImg(expSetting, exportOCIO);
                     getImage(i)->exportPostProcess();
                     exportProcCount++;
                 }
@@ -104,13 +100,13 @@ void mainWindow::exportImages() {
 void mainWindow::exportRolls() {
     for (int r=0; r < activeRolls.size(); r++) {
         if (activeRolls[r].selected) {
-            for (int i = 0; activeRolls[r].images.size(); i++) {
+            for (int i = 0; i < activeRolls[r].images.size(); i++) {
                 if (getImage(r, i))
                     exportImgCount++;
             }
         }
     } // Total file count
-
+LOG_INFO("Exporting {} Files", exportImgCount);
     exportProcCount = 0;
     exportThread = std::thread{[this]() {
         expStart = std::chrono::steady_clock::now();
@@ -121,22 +117,21 @@ void mainWindow::exportRolls() {
         for (int r = 0; r < activeRolls.size(); r++) {
             if (activeRolls[r].selected) {
                 for (int i = 0; i < activeRolls[r].images.size(); i++) {
-                    futures.push_back(pool.submit([this, &r, &i]() {
-                        if (!isExporting) {
-                            exportPopup = false;
-                            return;
-                        }
-                        if (getImage(r, i) && getImage(r, i)->selected) {
+                    LOG_INFO("Exporting {} Image from {} Roll", i, r);
+                    futures.push_back(pool.submit([this, r, i]() {
+                        if (getImage(r, i)) {
+                            getImage(r, i)->exportPreProcess(expSetting.outPath + activeRolls[r].rollName);
+                            if (!std::filesystem::exists(getImage(r, i)->expFullPath)) {
+                                std::filesystem::create_directories(getImage(r, i)->expFullPath);
+                            }
 
-                            getImage(r, i)->exportPreProcess(expSetting.outPath + "/" + activeRolls[r].rollName);
-                            ocioProc.cspOp = expSetting.colorspaceOpt;
-                            ocioProc.csDisp = expSetting.colorspaceOpt == 0 ? expSetting.colorspace : expSetting.display;
-                            ocioProc.viewOp = expSetting.view;
-                            mtlGPU->addToRender(getImage(r, i), r_sdt);
+                            mtlGPU->addToRender(getImage(r, i), r_full, exportOCIO);
                             LOG_INFO("Exporting Roll: {}, Image {}: {}", r, i, getImage(r, i)->srcFilename);
-                            getImage(r, i)->writeImg(expSetting);
+                            getImage(r, i)->writeImg(expSetting, exportOCIO);
                             getImage(r, i)->exportPostProcess();
                             exportProcCount++;
+                        } else {
+                            LOG_WARN("Could not get {} img from {} roll", i, r);
                         }
                     }));
                 }

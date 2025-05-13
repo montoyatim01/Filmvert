@@ -10,7 +10,7 @@ void mainWindow::paramView() {
 
     ImGui::Begin("Controls", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
     {
-        ImGui::SetWindowFontScale(std::clamp(ImGui::GetWindowWidth() / 500.0f, 0.80f, 1.15f));
+        ImGui::SetWindowFontScale(std::clamp(ImGui::GetWindowWidth() / 600.0f, 0.80f, 1.15f));
         /* PRESETS */
         if (ImGui::Button("Rotate Left")) {
             if (validIm()) {
@@ -49,11 +49,6 @@ void mainWindow::paramView() {
             }
         }
 
-        ImGui::Separator();
-        ImGui::Text("OCIO Display:");
-        renderCall |= ImGui::Combo("##01", &ocioProc.displayOp, ocioProc.displays.data(), ocioProc.displays.size());
-        ImGui::Text("OCIO View:");
-        renderCall |= ImGui::Combo("##02", &ocioProc.viewOp, ocioProc.views[ocioProc.displayOp].data(), ocioProc.views[ocioProc.displayOp].size());
         ImGui::Separator();
 
         /* INVERSION PARAMS */

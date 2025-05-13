@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <deque>
-#include "imageIO.h"
+#include "image.h"
 #include "imageMeta.h"
 
 

@@ -1,4 +1,5 @@
 
+#include "structs.h"
 #include <chrono>
 #include <spdlog/details/log_msg_buffer.h>
 #include <thread>
@@ -10,7 +11,7 @@
 #include <QuartzCore/QuartzCore.hpp>
 //#include "Metal/MTLResource.hpp"
 //#include "Metal/MTLTypes.hpp"
-#include "imageIO.h"
+#include "image.h"
 #include "renderParams.h"
 
 
@@ -113,12 +114,12 @@ void metalGPU::initPipelineState() {
 
 }
 
-bool metalGPU::initOCIOKernels(int csSetting, int csDisp, int view) {
+bool metalGPU::initOCIOKernels(ocioSetting ocioSet) {
 
     std::string ocioKernel;
 
     ocioKernel = ocioKernelText1;
-    ocioKernel += ocioProc.getMetalKernel(csSetting, csDisp, view);
+    ocioKernel += ocioProc.getMetalKernel(ocioSet);
     ocioKernel += ocioKernelText2;
     ocioKernel += ocioKernelText3;
 
@@ -133,6 +134,7 @@ bool metalGPU::initOCIOKernels(int csSetting, int csDisp, int view) {
     metalLibrary = m_device->newLibrary(nsOCIO, options, &err);
     if (!metalLibrary) {
         LOG_ERROR("Error creating OCIO Metal Library: {}", err->description()->cString(NS::ASCIIStringEncoding));
+        LOG_ERROR("Metal Kernels: {}", ocioKernel);
         return false;
     }
     options->release();
@@ -166,7 +168,7 @@ void metalGPU::initBuffers() {
     m_src = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
     m_dst = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
     m_disp = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
-    workingA = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
+    workingA = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
     workingB = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
 
     // Render Parameters
@@ -191,7 +193,7 @@ void metalGPU::bufferCheck(unsigned int width, unsigned int height) {
         m_src = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
         m_dst = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
         m_disp = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
-        workingA = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
+        workingA = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
         workingB = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
     }
 }
@@ -220,9 +222,9 @@ void metalGPU::computeKernels(float strength, float* kernels)
   //safetyMutex.unlock();
 }
 
-void metalGPU::addToRender(image *_image, renderType type) {
+void metalGPU::addToRender(image *_image, renderType type, ocioSetting ocioSet) {
 
-    renderQueue.push(gpuQueue(_image, type));
+    renderQueue.push(gpuQueue(_image, type, ocioSet));
 }
 
 bool metalGPU::isInQueue(image* _image) {
@@ -249,7 +251,10 @@ void metalGPU::processQueue() {
             queueLock.lock();
             image* img = renderQueue.front()._img;
             renderType _type = renderQueue.front()._type;
-            while (renderQueue.size() > 0 && renderQueue.front()._img == img) {
+            ocioSetting ocioSet = renderQueue.front()._ocioSet;
+            while (renderQueue.size() > 0 &&
+                renderQueue.front()._img == img &&
+                renderQueue.front()._ocioSet == ocioSet) {
                 // Removing duplicates to only run a single
                 // instance of this image through the render
                 renderQueue.pop();
@@ -257,7 +262,8 @@ void metalGPU::processQueue() {
             queueLock.unlock();
             switch (_type) {
                 case r_sdt:
-                    renderImage(img);
+                case r_full:
+                    renderImage(img, ocioSet);
                     break;
                 case r_blr:
                     renderBlurPass(img);
@@ -278,7 +284,7 @@ void metalGPU::processQueue() {
 }
 
 
-void metalGPU::renderImage(image* _image) {
+void metalGPU::renderImage(image* _image, ocioSetting ocioSet) {
 if (!_image)
     return;
 if (!_image->imageLoaded)
@@ -309,15 +315,14 @@ auto start = std::chrono::steady_clock::now();
     bufferCheck(_renderParams.width, _renderParams.height);
 
     // OCIO Kernels
-    if (ocioProc.cspOp != prevCSOpt || ocioProc.displayOp != prevDisp || ocioProc.viewOp != prevView || !_ocioProcess) {
+    if (_image->fullIm){}
+    else if (prevOCIO != ocioSet || !_ocioProcess || !_ocioProcessFull) {
         // Compile new kernels
-        if (!initOCIOKernels(ocioProc.cspOp, ocioProc.displayOp, ocioProc.viewOp)) {
+        if (!initOCIOKernels(ocioSet)) {
             LOG_ERROR("Failure to build OCIO kernels, exiting render");
             return;
         }
-        prevCSOpt = ocioProc.cspOp;
-        prevDisp = ocioProc.displayOp;
-        prevView = ocioProc.viewOp;
+        prevOCIO = ocioSet;
     }
 
 
@@ -346,11 +351,11 @@ auto start = std::chrono::steady_clock::now();
         computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
 
         if (_image->fullIm) {
-            computeEncoder->setComputePipelineState(_ocioProcessFull);
+            /*computeEncoder->setComputePipelineState(_ocioProcessFull);
             computeEncoder->setBuffer(workingA, 0, 0);
             computeEncoder->setBuffer(m_dst, 0, 1);
             computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
-            computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
+            computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);*/
         } else {
             computeEncoder->setComputePipelineState(_ocioProcess);
             computeEncoder->setBuffer(workingA, 0, 0);
@@ -365,12 +370,12 @@ auto start = std::chrono::steady_clock::now();
         commandBuffer->waitUntilCompleted();
 
         // Copy completed image
-        _image->allocDispBuf();
-
         if (_image->fullIm) {
             _image->allocProcBuf();
-            memcpy(_image->procImgData, m_dst->contents(), imgSize);
+            memcpy(_image->procImgData, workingA->contents(), imgSize);
+            _image->renderReady = true;
         } else {
+            _image->allocDispBuf();
             memcpy(_image->dispImgData, m_disp->contents(), dispSize);
             _image->sdlUpdate = true;
         }

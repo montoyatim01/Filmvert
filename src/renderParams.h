@@ -12,21 +12,6 @@
 #define MINLOG 0.0001f
 
 
-//const float pi = 3.14159265358979323846f;
-
-/*#define pickerAR = 99.0f/255.0f
-#define pickerAG = 76.0f/255.0f
-#define pickerAB = 44.0f/255.0f
-
-#define pickerBR = 38.0f/255.0f
-#define pickerBG = 54.0f/255.0f
-#define pickerBB = 46.0f/255.0f
-
-#define pickerCR = 20.0f/255.0f
-#define pickerCG = 22.0f/255.0f
-#define pickerCB = 34.0f/255.0f*/
-
-//int iDivUp(int a, int b);
 
 struct renderParams
 {
@@ -54,17 +39,6 @@ struct renderParams
   float G_gamma[4];
 
 
-};
-
-struct noise_prng
-{
-    uint32_t state;
-};
-
-struct vec2d
-{
-    float x;
-    float y;
 };
 
 

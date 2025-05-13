@@ -52,7 +52,10 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -DDEBUG_BUILD")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
 include_directories(src)
+include_directories(src/gpu)
 include_directories(src/image)
+include_directories(src/ocio)
+include_directories(src/roll)
 include_directories(src/window)
 include_directories("${CMAKE_BINARY_DIR}/bindings")
 #INCLUDE_DIRECTORIES("/Users/timothymontoya/Downloads/exiv2-0.28.5-Darwin-arm64/include")
@@ -156,12 +159,15 @@ NAMESPACE assets
 assets/fonts/Roboto-Black.ttf
 assets/fonts/Roboto-Bold.ttf
 assets/fonts/Roboto-Regular.ttf
+assets/fonts/JetBrainsMono-Regular.ttf
 assets/default.metallib
 assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio
 )
 set_property(TARGET resources PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 file(GLOB_RECURSE IMAGE_SRCS src/image/*.cpp)
+file(GLOB_RECURSE OCIO_SRCS src/ocio/*.cpp)
+file(GLOB_RECURSE ROLL_SRCS src/roll/*.cpp)
 file(GLOB_RECURSE WINDOW_SRCS src/window/*.cpp)
 
 
@@ -170,11 +176,10 @@ set(TGRAIN_SRCS
     src/logger.cpp
     ${WINDOW_SRCS}
     ${IMAGE_SRCS}
-    src/roll.cpp
+    ${ROLL_SRCS}
+    ${OCIO_SRCS}
     src/utils.cpp
-    src/grainParams.cpp
-    src/metalGPU.cpp
-    src/ocioProcessor.cpp
+    src/gpu/metalGPU.cpp
     src/threadPool.cpp
     src/threadPool.h
     src/macOSFile.mm

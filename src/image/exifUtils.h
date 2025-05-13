@@ -1,5 +1,5 @@
 #include "exiv2/xmp_exiv2.hpp"
-#include "imageIO.h"
+#include "image.h"
 #include <string>
 #include <optional>
 

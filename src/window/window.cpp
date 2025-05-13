@@ -1,5 +1,6 @@
 #include "window.h"
 #include "ocioProcessor.h"
+#include "preferences.h"
 #include <SDL_pixels.h>
 #include <SDL_render.h>
 #include <SDL_video.h>
@@ -71,7 +72,7 @@ int mainWindow::openWindow()
 
     //Font Loading
     auto fs = cmrc::assets::get_filesystem();
-    auto regularFont = fs.open("assets/fonts/Roboto-Regular.ttf");
+    auto regularFont = fs.open("assets/fonts/JetBrainsMono-Regular.ttf");
     if (!regularFont)
     {
         LOG_ERROR("Failed to load regular font");
@@ -86,9 +87,14 @@ int mainWindow::openWindow()
 
     ImFontConfig font_cfg;
     font_cfg.FontDataOwnedByAtlas = false;
-
-    ImFont* ft_text = io.Fonts->AddFontFromMemoryTTF((void*)(regularFont->begin()), int(regularFont->size()), 18.0f, &font_cfg);
-    ImFont* ft_header = io.Fonts->AddFontFromMemoryTTF((void*)(boldFont->begin()), int(boldFont->size()), 20.0f, &font_cfg);
+    ImVector<ImWchar> ranges;
+    ImFontGlyphRangesBuilder builder;
+    builder.AddChar(0x2318);
+    builder.AddChar(0x2325);
+    builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+    builder.BuildRanges(&ranges);
+    ImFont* ft_text = io.Fonts->AddFontFromMemoryTTF((void*)(regularFont->begin()), int(regularFont->size()), 18.0f, &font_cfg, ranges.Data);
+    ImFont* ft_header = io.Fonts->AddFontFromMemoryTTF((void*)(boldFont->begin()), int(boldFont->size()), 20.0f, &font_cfg, ranges.Data);
 
     if (!ft_text || !ft_header)
     {
@@ -108,13 +114,13 @@ int mainWindow::openWindow()
     }
 
     // Initialie the OCIO metal kernel
-    mtlGPU->initOCIOKernels(1, 0, 0);
+    mtlGPU->initOCIOKernels(dispOCIO);
 
     // Load in user preferences
-    preferences.loadFromFile();
+    appPrefs.loadFromFile();
 
-    if (!preferences.ocioPath.empty()) {
-        if (ocioProc.initAltConfig(preferences.ocioPath) && preferences.ocioExt) {
+    if (!appPrefs.ocioPath.empty()) {
+        if (ocioProc.initAltConfig(appPrefs.ocioPath) && appPrefs.ocioExt) {
             ocioProc.setExtActive();
         } else {
             ocioProc.setIntActive();

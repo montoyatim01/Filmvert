@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <fstream>
 
+userPreferences appPrefs;
+
 void userPreferences::loadFromFile() {
     try {
         std::ifstream f(getPrefFile().c_str());

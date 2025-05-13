@@ -1,4 +1,5 @@
 #include "window.h"
+#include <filesystem>
 
 
 void imguistyle()
@@ -196,6 +197,134 @@ void mainWindow::removeRoll() {
         selRoll = activeRolls.size() > 1 ? selRoll == 0 ? 0 : selRoll-1 : selRoll-1;
         activeRolls[delRoll].clearBuffers();
         activeRolls.erase(activeRolls.begin() + delRoll);
+    }
+}
+
+void mainWindow::checkForRaw() {
+    impRawCheck = false;
+
+    auto isRawFile = [](const std::filesystem::path& path) {
+        auto ext = path.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                      [](unsigned char c){ return std::tolower(c); });
+        return ext == ".raw";
+    };
+
+    for (const auto& selection : importFiles) {
+        try {
+            std::filesystem::path selPath(selection);
+
+            if (std::filesystem::is_directory(selPath)) {
+                for (const auto& entry : std::filesystem::directory_iterator(selPath)) {
+                    if (entry.is_regular_file() && isRawFile(entry.path())) {
+                        impRawCheck = true;
+                        return;
+                    }
+                }
+            } else if (std::filesystem::is_regular_file(selPath) && isRawFile(selPath)) {
+                impRawCheck = true;
+                return;
+            }
+        } catch (const std::exception& e) {
+            // Log error but continue checking other files
+            continue;
+        }
+    }
+}
+
+void mainWindow::testFirstRawFile() {
+    if (!importFiles.empty()) {
+        std::filesystem::path firstPath(importFiles[0]);
+        long fileSize;
+        if (std::filesystem::is_directory(firstPath)) {
+            // Rolls/directories selected, look at first file
+            const std::filesystem::path sandbox{firstPath};
+            for (auto const& dir_entry : std::filesystem::directory_iterator{sandbox}) {
+                if (dir_entry.is_regular_file()) {
+                    //Found an image in root of selection
+                    if (dir_entry.path().extension().string() == ".raw" ||
+                        dir_entry.path().extension().string() == ".RAW")
+                        fileSize = std::filesystem::file_size(dir_entry.path());
+                }
+            }
+
+        } else {
+            fileSize = std::filesystem::file_size(firstPath);
+
+        }
+        switch (fileSize) {
+            case 36000000:
+                // 3000x2000 Base 16
+                rawSet.width = 3000;
+                rawSet.height = 2000;
+                rawSet.channels = 3;
+                rawSet.bitDepth = 16;
+                rawSet.littleE = true;
+                break;
+            case 36000016:
+                // 3000x2000 Base 16 w/header
+                rawSet.width = 3000;
+                rawSet.height = 2000;
+                rawSet.channels = 3;
+                rawSet.bitDepth = 16;
+                rawSet.littleE = true;
+                rawSet.pakonHeader = true;
+                break;
+            case 20250000:
+                // 2250x1500 Base 8
+                rawSet.width = 2250;
+                rawSet.height = 1500;
+                rawSet.channels = 3;
+                rawSet.bitDepth = 16;
+                rawSet.littleE = true;
+                break;
+            case 20250016:
+                // 2250x1500 Base 8 w/header
+                rawSet.width = 2250;
+                rawSet.height = 1500;
+                rawSet.channels = 3;
+                rawSet.bitDepth = 16;
+                rawSet.littleE = true;
+                rawSet.pakonHeader = true;
+                break;
+            case 18000000:
+                // 1500x2000 Half-frame Base 16
+                rawSet.width = 1500;
+                rawSet.height = 2000;
+                rawSet.channels = 3;
+                rawSet.bitDepth = 16;
+                rawSet.littleE = true;
+                break;
+            case 18000016:
+                // 1500x2000 Half-frame Base 16 w/header
+                rawSet.width = 1500;
+                rawSet.height = 2000;
+                rawSet.channels = 3;
+                rawSet.bitDepth = 16;
+                rawSet.littleE = true;
+                rawSet.pakonHeader = true;
+                break;
+            case 9000000:
+                // 1500x1000 Base 4
+                rawSet.width = 1500;
+                rawSet.height = 1000;
+                rawSet.channels = 3;
+                rawSet.bitDepth = 16;
+                rawSet.littleE = true;
+                break;
+            case 9000016:
+                // 1500x1000 Base 4 w/header
+                rawSet.width = 1500;
+                rawSet.height = 1000;
+                rawSet.channels = 3;
+                rawSet.bitDepth = 16;
+                rawSet.littleE = true;
+                rawSet.pakonHeader = true;
+                break;
+            default:
+                // We don't know!
+                break;
+        }
     }
 }
 

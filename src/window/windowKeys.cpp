@@ -51,8 +51,8 @@ void mainWindow::checkHotkeys() {
     if (ImGui::IsKeyChordPressed(ImGuiKey_Comma | ImGuiMod_Ctrl)) {
         // Preferences
         badOcioText = false;
-        std::strcpy(ocioPath, preferences.ocioPath.c_str());
-        if (preferences.ocioExt)
+        std::strcpy(ocioPath, appPrefs.ocioPath.c_str());
+        if (appPrefs.ocioExt)
             ocioSel = 1;
         preferencesPopTrig = true;
     }

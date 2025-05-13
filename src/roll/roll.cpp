@@ -1,5 +1,5 @@
 #include "roll.h"
-#include "imageIO.h"
+#include "image.h"
 #include "imageMeta.h"
 #include "nlohmann/json_fwd.hpp"
 #include "threadPool.h"
@@ -104,7 +104,7 @@ bool filmRoll::exportRollCSV() {
     csvFile << "FrameNumber,FileName,CameraMake,CameraModel,Lens,FilmStock,";
     csvFile << "FocalLength,fNumber,ExposureTime,RollName,Date/Time,Location,";
     csvFile << "GPS,Notes,DevelopmentProcess,ChemicalManufacturer,";
-    csvFile << "DevelopmentNotes\n";
+    csvFile << "DevelopmentNotes,Scanner,ScanNotes\n";
 
     for (int i = 0; i < images.size(); i++) {
         csvFile << images[i].imMeta.frameNumber << ",";
@@ -123,7 +123,9 @@ bool filmRoll::exportRollCSV() {
         csvFile << images[i].imMeta.notes << ",";
         csvFile << images[i].imMeta.devProcess << ",";
         csvFile << images[i].imMeta.chemMfg << ",";
-        csvFile << images[i].imMeta.devNotes << "\n";
+        csvFile << images[i].imMeta.devNotes << ",";
+        csvFile << images[i].imMeta.scanner << ",";
+        csvFile << images[i].imMeta.scanNotes << "\n";
     }
 
     csvFile.close();
@@ -258,6 +260,20 @@ void filmRoll::rollMetaPreEdit(metaBuff *meta) {
     if (!meta->dif_devnotes)
         std::strcpy(meta->devnotes, images[0].imMeta.devNotes.c_str());
     //------
+    meta->dif_scanner = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.scanner == images.front().imMeta.scanner;
+        });
+    if (!meta->dif_scanner)
+        std::strcpy(meta->scanner, images[0].imMeta.scanner.c_str());
+    //------
+    meta->dif_scannotes = !std::all_of(images.begin() + 1, images.end(),
+        [&](const image& obj) {
+            return obj.imMeta.scanNotes == images.front().imMeta.scanNotes;
+        });
+    if (!meta->dif_scannotes)
+        std::strcpy(meta->scannotes, images[0].imMeta.scanNotes.c_str());
+    //------
 }
 
 void filmRoll::rollMetaPostEdit(metaBuff *meta) {
@@ -347,6 +363,18 @@ void filmRoll::rollMetaPostEdit(metaBuff *meta) {
     if (meta->a_devnotes)
         for (auto &img : images) {
             img.imMeta.devNotes = meta->devnotes;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_scanner)
+        for (auto &img : images) {
+            img.imMeta.scanner = meta->scanner;
+            img.needMetaWrite = true;
+        }
+    //------
+    if (meta->a_scannotes)
+        for (auto &img : images) {
+            img.imMeta.scanNotes = meta->scannotes;
             img.needMetaWrite = true;
         }
     //------

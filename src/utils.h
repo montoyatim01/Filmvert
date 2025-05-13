@@ -1,6 +1,6 @@
 #ifndef _utils_h
 #define _utils_h
-
+#include <stdint.h>
 struct xyPoint {
     float x;
     float y;
@@ -17,4 +17,8 @@ float Luma(float R, float G, float B);
 
 
 void ap0_to_ap1(float* in, float* out);
+void srgb_to_ap1(float* in, float* out);
+
+uint16_t swapBytes16(uint16_t value);
+uint32_t swapBytes32(uint32_t value);
 #endif

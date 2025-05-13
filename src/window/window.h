@@ -18,7 +18,6 @@
 #include <thread>
 
 //ImGui
-#include "grainParams.h"
 #include "imageMeta.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -29,11 +28,12 @@
 //Logging
 #include "logger.h"
 
-#include "imageIO.h"
+#include "image.h"
 #include "metalGPU.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "roll.h"
+#include "structs.h"
 #include "threadPool.h"
 #include "windowUtils.h"
 
@@ -42,8 +42,6 @@ std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canC
 std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true);
 
 std::string find_key_by_value(const std::map<std::string, int>& my_map, int value);
-
-
 
 
 // For mult-threadded imports
@@ -81,18 +79,16 @@ class mainWindow
 
         // Program state
         bool done = false;
-        userPreferences preferences;
 
         std::deque<filmRoll> activeRolls;
         std::vector<char*>rollNames;
         int selRoll = 0;
-        //std::vector<image> activeImages;
 
+        ocioSetting dispOCIO;
 
 
         //int selIm = -1;
         ImGuiSelectionBasicStorage selection;
-        grainParams grain;
         unsigned int cpColorspace;
 
         // UI Toggles
@@ -107,7 +103,7 @@ class mainWindow
         bool pasteTrigger = false;
         metaBuff metaEdit;
 
-
+        // Popup flags
         bool unsavedPopTrigger = false;
         bool globalMetaPopTrig = false;
         bool localMetaPopTrig = false;
@@ -140,11 +136,16 @@ class mainWindow
         size_t totalTasks = 0;
         bool dispImportPop = false;
         bool dispImpRollPop = false;
+        bool impRawCheck = false;
         std::vector<std::string> importFiles;
         int impRoll = 0;
         bool newRollPopup = false;
         char rollNameBuf[64];
         char rollPath[1024];
+        rawSetting rawSet;
+        // Import OCIO Struct
+        ocioSetting importOCIO;
+        int ocioCS_Disp = 1;
 
 
         // Export
@@ -153,14 +154,13 @@ class mainWindow
         bool exportPopup = false;
         bool expRolls = false;
         std::chrono::time_point<std::chrono::steady_clock> expStart;
-        //bool overwrite = false;
-        //int quality = 85;
-        //std::string outPath = "";
         std::vector<char*> fileTypes;
         std::vector<char*> bitDepths;
         std::vector<char*> colorspaceSet;
-        //int outType = 4;
-        //int outDepth = 1;
+        // Export OCIO Struct
+        ocioSetting exportOCIO;
+        int ocioEXPCS_Disp = 1;
+
         bool isExporting = false;
         int exportImgCount = 0;
         int exportProcCount = 0;
@@ -181,6 +181,8 @@ class mainWindow
         int activeRollSize();
         void paramUpdate();
         void removeRoll();
+        void checkForRaw();
+        void testFirstRawFile();
 
         // windowMeta.cpp
         void checkMeta();
@@ -219,6 +221,8 @@ class mainWindow
         void updateSDLTexture(image* actImage);
 
         // windowPopups.cpp
+        void importRawSettings();
+        void importIDTSetting();
         void importImagePopup();
         void importRollPopup();
         void batchRenderPopup();
