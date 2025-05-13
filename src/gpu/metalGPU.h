@@ -8,6 +8,8 @@
 #include <chrono>
 #include <deque>
 #include <queue>
+#include "Metal/MTLSampler.hpp"
+#include "Metal/MTLTexture.hpp"
 #include "image.h"
 #include "structs.h"
 
@@ -41,7 +43,7 @@ class metalGPU {
 
         void addToRender(image* _image, renderType type, ocioSetting ocioSet);
 
-        bool initOCIOKernels(ocioSetting ocioSet);
+        bool initOCIOKernels(ocioSetting& ocioSet);
         bool isInQueue(image* _image);
         gpuTimer rdTimer;
         bool rendering = false;
@@ -57,7 +59,9 @@ class metalGPU {
         ocioSetting prevOCIO;
         std::string ocioKernelText1;
         std::string ocioKernelText2;
+        std::string ocioKernelText2a;
         std::string ocioKernelText3;
+        std::string ocioKernelText3a;
 
         MTL::Device *m_device;
         MTL::CommandQueue *m_command_queue;
@@ -81,6 +85,10 @@ class metalGPU {
 
         MTL::Buffer *renderParamBuf;
 
+        // OCIO
+        MTL::Texture *ocioTex;
+        MTL::SamplerState *ocioSample;
+
         void initPipelineState();
 
 
@@ -90,6 +98,8 @@ class metalGPU {
         void processQueue();
 
         void bufferCheck(unsigned int width, unsigned int height);
+
+        void loadOCIOTex(ocioSetting ocioSet);
 
         void computeKernels(float strength, float* kernels);
 

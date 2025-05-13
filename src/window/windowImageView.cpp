@@ -6,7 +6,13 @@ void mainWindow::imageView() {
     bool calcBaseColor = false;
     ImGui::SetNextWindowPos(ImVec2(0,25));
     ImGui::SetNextWindowSize(ImVec2(winWidth * 0.65,winHeight - (25 + thumbHeight)), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Image Display", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGuiWindowFlags winFlags = 0;
+    winFlags |= ImGuiWindowFlags_NoTitleBar;
+    winFlags |= ImGuiWindowFlags_HorizontalScrollbar;
+    winFlags |= ImGuiWindowFlags_NoScrollWithMouse;
+    if (unsavedChanges()) winFlags |= ImGuiWindowFlags_UnsavedDocument;
+
+    ImGui::Begin("Image Display", 0, winFlags);
     imageWinSize = ImGui::GetWindowSize();
     if (validIm()) {
         // Pre-calc

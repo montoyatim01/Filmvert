@@ -40,6 +40,7 @@
 // Declared functions from macOSFile.mm
 std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canChooseDirectories = false);
 std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true);
+void setSDLWindowModified(SDL_Window* window, bool modified);
 
 std::string find_key_by_value(const std::map<std::string, int>& my_map, int value);
 
@@ -105,6 +106,7 @@ class mainWindow
 
         // Popup flags
         bool unsavedPopTrigger = false;
+        bool unsavedForClose = false;
         bool globalMetaPopTrig = false;
         bool localMetaPopTrig = false;
         bool preferencesPopTrig = false;
@@ -183,6 +185,7 @@ class mainWindow
         void removeRoll();
         void checkForRaw();
         void testFirstRawFile();
+        bool unsavedChanges();
 
         // windowMeta.cpp
         void checkMeta();
@@ -217,8 +220,10 @@ class mainWindow
 
         void analyzeImage();
 
+        // windowSDL.cpp
         void createSDLTexture(image* actImage);
         void updateSDLTexture(image* actImage);
+        void updateSDLHistogram(image* img);
 
         // windowPopups.cpp
         void importRawSettings();

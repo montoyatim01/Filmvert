@@ -61,6 +61,7 @@ struct image {
     unsigned int workWidth;
     unsigned int workHeight;
     bool isRawImage = false;
+    bool isDataRaw = false;
 
     std::string srcFilename;
     std::string srcPath;
@@ -70,6 +71,7 @@ struct image {
     // Analysis/Grade parameters
     imageParams imgParam;
     ocioSetting intOCIOSet;
+    rawSetting intRawSet;
 
 
     // Status flags
@@ -87,6 +89,7 @@ struct image {
 
     // SDL Display
     void* texture = nullptr;
+    void* histTex = nullptr;
     int sdlRotation;
     bool sdlUpdate = false;
 
@@ -116,6 +119,8 @@ struct image {
     void exportPostProcess();
     bool writeImg(const exportParam param, ocioSetting ocioSet);
     bool debayerImage(bool fullRes, int quality);
+    bool oiioReload();
+    bool dataReload();
 
     // imageMeta.cpp
     void readMetaFromFile();

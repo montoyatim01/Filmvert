@@ -82,7 +82,13 @@ void mainWindow::menuBar() {
 
             ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {
-                done = true;
+                if (unsavedChanges()) {
+                    unsavedPopTrigger = true;
+                    unsavedForClose = true;
+                } else {
+                    done = true;
+                }
+
             }
 
             ImGui::EndMenu();

@@ -234,7 +234,7 @@ void ocioProcessor::processImage(float *img, unsigned int width,
   }
 }
 
-std::string ocioProcessor::getMetalKernel(ocioSetting ocioSet) {
+std::string ocioProcessor::getMetalKernel(ocioSetting& ocioSet) {
 
 
     try {
@@ -246,14 +246,21 @@ std::string ocioProcessor::getMetalKernel(ocioSetting ocioSet) {
         OCIO::ConstProcessorRcPtr processor;
         if (!ocioSet.useDisplay){
             OCIO::ColorSpaceTransformRcPtr transform = OCIO::ColorSpaceTransform::Create();
-            transform->setSrc("ACEScg");
-            transform->setDst(colorspace);
+            if (ocioSet.inverse) {
+                transform->setSrc(colorspace);
+                transform->setDst("ACEScg");
+            } else {
+                transform->setSrc("ACEScg");
+                transform->setDst(colorspace);
+            }
             processor = !useExt ? OCIOconfig->getProcessor(transform) : extOCIOconfig->getProcessor(transform);
         } else {
             OCIO::DisplayViewTransformRcPtr transform = OCIO::DisplayViewTransform::Create();
             transform->setSrc("ACEScg");
             transform->setDisplay(display);
             transform->setView(view);
+            if (ocioSet.inverse)
+              transform->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
             processor = !useExt ? OCIOconfig->getProcessor(transform) : extOCIOconfig->getProcessor(transform);
         }
         // Step 5: Create GPU shader description
@@ -264,8 +271,26 @@ std::string ocioProcessor::getMetalKernel(ocioSetting ocioSet) {
         // Step 6: Get the shader program info
         OCIO::ConstGPUProcessorRcPtr gpu = processor->getOptimizedGPUProcessor(flags);
         gpu->extractGpuShaderInfo(shaderDesc);
-        LOG_INFO("Texture Needed! {}", shaderDesc->getNumTextures());
-        //LOG_INFO("GPU Shader: {}", shaderDesc->getShaderText());
+
+        if (shaderDesc->getNumTextures() == 1) {
+            ocioSet.texCount = shaderDesc->getNumTextures();
+            //LOG_INFO("Texture Needed! {}", shaderDesc->getNumTextures());
+            const char* name;
+            const char* sampleName;
+            OCIO::GpuShaderCreator::TextureType texType;
+            OCIO::GpuShaderCreator::TextureDimensions texDim;
+            OCIO::Interpolation interp = OCIO::Interpolation::INTERP_LINEAR;
+
+            shaderDesc->getTexture(0, name, sampleName, ocioSet.texWidth, ocioSet.texHeight, texType, texDim, interp);
+
+            // Get the actual texture data
+            shaderDesc->getTextureValues(0, ocioSet.texture);
+        } else if (shaderDesc->getNumTextures() > 1) {
+            // 3D/3D+1D LUT not currently supported!
+            LOG_WARN("OCIO Setting with incompatible LUT format!");
+        }
+
+
         return shaderDesc->getShaderText();
     } catch (OCIO::Exception& e) {
         LOG_ERROR("OCIO processing error: {}", e.what());
@@ -544,3 +569,121 @@ void ocioProcessor::processImageGPU(float *img, unsigned int width, unsigned int
             //glutDestroyWindow(glutGetWindow());
         }
 }
+/*
+
+#include <metal_math>
+ #include <metal_common>
+ #include <metal_compute>
+ #include <metal_stdlib>
+ using namespace metal;
+
+
+// Declaration of class wrapper
+
+struct ocioOCIOMain
+{
+ocioOCIOMain(
+  texture2d<float> ocio_lut1d_0
+  , sampler ocio_lut1d_0Sampler
+)
+{
+  this->ocio_lut1d_0 = ocio_lut1d_0;
+  this->ocio_lut1d_0Sampler = ocio_lut1d_0Sampler;
+}
+
+
+// Declaration of all variables
+
+texture2d<float> ocio_lut1d_0;
+sampler ocio_lut1d_0Sampler;
+
+// Declaration of all helper methods
+
+float2 ocio_lut1d_0_computePos(float f)
+{
+  float dep;
+  float abs_f = abs(f);
+  if (abs_f > 6.10351562e-05)
+  {
+    float3 fComp = float3(15., 15., 15.);
+    float absarr = min( abs_f, 65504.);
+    fComp.x = floor( log2( absarr ) );
+    float lower = pow( 2.0, fComp.x );
+    fComp.y = ( absarr - lower ) / lower;
+    float3 scale = float3(1024., 1024., 1024.);
+    dep = dot( fComp, scale );
+  }
+  else
+  {
+    dep = abs_f * 16777216.;
+  }
+  dep += (f < 0.) ? 32768.0 : 0.0;
+  float2 retVal;
+  retVal.y = floor(dep / 4095.);
+  retVal.x = dep - retVal.y * 4095.;
+  retVal.x = (retVal.x + 0.5) / 4096.;
+  retVal.y = (retVal.y + 0.5) / 17.;
+  return retVal;
+}
+
+// Declaration of the OCIO shader function
+
+float4 OCIOMain(float4 inPixel)
+{
+  float4 outColor = inPixel;
+
+  // Add Matrix processing
+
+  {
+    float4 res = float4(outColor.rgb.r, outColor.rgb.g, outColor.rgb.b, outColor.a);
+    float4 tmp = res;
+    res = float4x4(0.98098885651333156, -0.092424463103292664, -0.013207065578288116, 0., 0.016565338289531818, 1.1375089483408081, -0.099198515918329705, 0., 0.0024437046414083619, -0.045085870242599385, 1.1124168075232428, 0., 0., 0., 0., 1.) * tmp;
+    outColor.rgb = float3(res.x, res.y, res.z);
+    outColor.a = res.w;
+  }
+
+  // Add Log processing
+
+  {
+    outColor.rgb = max( float3(1.17549435e-38, 1.17549435e-38, 1.17549435e-38), outColor.rgb);
+    outColor.rgb = log(outColor.rgb) * float3(0.434294462, 0.434294462, 0.434294462);
+  }
+
+  // Add LUT 1D processing for ocio_lut1d_0
+
+  {
+    outColor.r = ocio_lut1d_0.sample(ocio_lut1d_0Sampler, ocio_lut1d_0_computePos(outColor.r)).r;
+    outColor.g = ocio_lut1d_0.sample(ocio_lut1d_0Sampler, ocio_lut1d_0_computePos(outColor.g)).r;
+    outColor.b = ocio_lut1d_0.sample(ocio_lut1d_0Sampler, ocio_lut1d_0_computePos(outColor.b)).r;
+  }
+
+  // Add Matrix processing
+
+  {
+    float4 res = float4(outColor.rgb.r, outColor.rgb.g, outColor.rgb.b, outColor.a);
+    float4 tmp = res;
+    res = float4x4(0.66377638658953075, -0.04437344282932907, -0.13576691739002722, 0., -0.15010458188599504, 0.51286205708992816, -0.018002472804856964, 0., -0.024913251428853436, 0.020269939014083319, 0.64252794346956654, 0., 0., 0., 0., 1.) * tmp;
+    res = float4(0.092864126, 0.092864126, 0.092864126, 0.) + res;
+    outColor.rgb = float3(res.x, res.y, res.z);
+    outColor.a = res.w;
+  }
+
+  return outColor;
+}
+
+// Close class wrapper
+
+
+};
+float4 OCIOMain(
+  texture2d<float> ocio_lut1d_0
+  , sampler ocio_lut1d_0Sampler
+  , float4 inPixel)
+{
+  return ocioOCIOMain(
+    ocio_lut1d_0
+    , ocio_lut1d_0Sampler
+  ).OCIOMain(inPixel);
+}
+kernel void ocioProcess(device float4 *imgIn [[buffer(0)]], device uchar4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = (uchar4)(clamp(OCIOMain(imgIn[index]) * 255.0f, 0.0f, 255.0f));}kernel void ocioProcessFull(device float4 *imgIn [[buffer(0)]], device float4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = OCIOMain(imgIn[index]);}
+*/

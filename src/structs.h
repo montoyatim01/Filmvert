@@ -2,6 +2,7 @@
 #define _structs_h_
 
 #include <string>
+#include <array>
 
 struct copyPaste {
 
@@ -77,9 +78,6 @@ struct exportParam {
   int compression = 8;
   bool overwrite = false;
   int colorspaceOpt = 1;
-  int colorspace = 0;
-  int display = 0;
-  int view = 0;
 };
 
 struct minMaxPoint {
@@ -108,9 +106,14 @@ struct ocioSetting {
     int colorspace = 0;
     int display = 0;
     int view = 0;
-    bool inverse = true;
+    bool inverse = false;
     bool useDisplay = true;
     bool ext = false;
+
+    int texCount = 0;
+    const float* texture;
+    unsigned int texWidth = 0;
+    unsigned int texHeight = 0;
 
     bool operator==(const ocioSetting& other) const {
         return colorspace == other.colorspace &&
@@ -118,12 +121,31 @@ struct ocioSetting {
                  view == other.view &&
                 inverse == other.inverse &&
                 useDisplay == other.useDisplay &&
-                ext == other.ext;
+                ext == other.ext &&
+                texCount == other.texCount &&
+                texture == other.texture &&
+                texWidth == other.texWidth &&
+                texHeight == other.texHeight;
     }
 
 
     bool operator!=(const ocioSetting& other) const {
         return !(*this == other);
+    }
+};
+
+
+struct HistogramData {
+    std::array<int, 256> r_hist;
+    std::array<int, 256> g_hist;
+    std::array<int, 256> b_hist;
+    std::array<int, 256> luminance_hist;
+
+    HistogramData() {
+        r_hist.fill(0);
+        g_hist.fill(0);
+        b_hist.fill(0);
+        luminance_hist.fill(0);
     }
 };
 

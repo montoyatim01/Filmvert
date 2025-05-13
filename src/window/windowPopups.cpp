@@ -1,6 +1,7 @@
 #include "image.h"
 #include "imageMeta.h"
 #include "ocioProcessor.h"
+#include "preferences.h"
 #include "window.h"
 #include <cstring>
 #include <imgui.h>
@@ -57,6 +58,8 @@ void mainWindow::importIDTSetting() {
         ImGui::Combo("##VW", &importOCIO.view, ocioProc.views[importOCIO.display].data(), ocioProc.views[importOCIO.display].size());
         importOCIO.useDisplay = true;
     }
+    importOCIO.inverse = true;
+    importOCIO.ext = appPrefs.ocioExt && ocioProc.validExternal;
 
     ImGui::Separator();
 
@@ -390,14 +393,17 @@ void mainWindow::batchRenderPopup() {
         if (expSetting.colorspaceOpt == 0) {
             // Colorspace
             ImGui::Text("Colorspace:");
-            ImGui::Combo("###CS", &expSetting.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
+            ImGui::Combo("###CS", &exportOCIO.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
+            exportOCIO.useDisplay = false;
         } else {
             ImGui::Text("Display:");
-            ImGui::Combo("###DSP", &expSetting.display, ocioProc.displays.data(), ocioProc.displays.size());
+            ImGui::Combo("###DSP", &exportOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
 
             ImGui::Text("View:");
-            ImGui::Combo("##VW", &expSetting.view, ocioProc.views[expSetting.display].data(), ocioProc.views[expSetting.display].size());
+            ImGui::Combo("##VW", &exportOCIO.view, ocioProc.views[exportOCIO.display].data(), ocioProc.views[exportOCIO.display].size());
+            exportOCIO.useDisplay = true;
         }
+        exportOCIO.inverse = false;
         ImGui::Separator();
         ImGui::Spacing();
 
@@ -590,26 +596,37 @@ void mainWindow::unsavedRollPopup() {
         }
         ImGui::SameLine();
         if (ImGui::Button("Discard")) {
-            // TODO: Program in selector for wanting to close as well
-            // How does it interact with the macOS window state?
-            // Figure out the dotted red circle
-            removeRoll();
-            unsavedPopTrigger = false;
-            ImGui::CloseCurrentPopup();
+            if (unsavedForClose) {
+                done = true;
+                unsavedPopTrigger = false;
+                ImGui::CloseCurrentPopup();
+            } else {
+                removeRoll();
+                unsavedPopTrigger = false;
+                ImGui::CloseCurrentPopup();
+            }
+
         }
         ImGui::SameLine();
         if (ImGui::Button("Save")) {
-            // TODO: Program in selector for wanting to close as well
-            // How does it interact with the macOS window state?
-            // Figure out the dotted red circle
-            // In Close mode this would save all rolls
-            if (validRoll()) {
-                activeRolls[selRoll].saveAll();
-                removeRoll();
+
+            if (unsavedForClose) {
+                for (int r = 0; r < activeRolls.size(); r++) {
+                    activeRolls[r].saveAll();
+                }
+                done = true;
+                unsavedPopTrigger = false;
+                unsavedForClose = false;
+                ImGui::CloseCurrentPopup();
+            } else {
+                if (validRoll()) {
+                    activeRolls[selRoll].saveAll();
+                    removeRoll();
+                }
+                unsavedPopTrigger = false;
+                ImGui::CloseCurrentPopup();
             }
 
-            unsavedPopTrigger = false;
-            ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     }

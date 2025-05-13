@@ -10,12 +10,12 @@ void imguistyle()
 
     ImGuiStyle * style = &ImGui::GetStyle();
 
-	style->WindowPadding = ImVec2(8, 8);
+	style->WindowPadding = ImVec2(8, 4);
 	style->WindowRounding = 4.0f;
-	style->FramePadding = ImVec2(6, 4);
+	style->FramePadding = ImVec2(6, 2);
 	style->FrameRounding = 4.0f;
-	style->ItemSpacing = ImVec2(6, 6);
-	style->ItemInnerSpacing = ImVec2(6, 6);
+	style->ItemSpacing = ImVec2(6, 4);
+	style->ItemInnerSpacing = ImVec2(4, 4);
 	style->IndentSpacing = 25.0f;
 	style->ScrollbarSize = 15.0f;
 	style->ScrollbarRounding = 9.0f;
@@ -195,7 +195,7 @@ void mainWindow::removeRoll() {
     if (validRoll()) {
         int delRoll = selRoll;
         selRoll = activeRolls.size() > 1 ? selRoll == 0 ? 0 : selRoll-1 : selRoll-1;
-        activeRolls[delRoll].clearBuffers();
+        activeRolls[delRoll].clearBuffers(true);
         activeRolls.erase(activeRolls.begin() + delRoll);
     }
 }
@@ -326,6 +326,14 @@ void mainWindow::testFirstRawFile() {
                 break;
         }
     }
+}
+
+bool mainWindow::unsavedChanges() {
+    bool unsaved = false;
+    for (int r = 0; r < activeRolls.size(); r++) {
+        unsaved |= activeRolls[r].unsavedImages();
+    }
+    return unsaved;
 }
 
 // Helper function to transform coordinates based on rotation

@@ -2,6 +2,7 @@
 #include "image.h"
 #include "imageMeta.h"
 #include "nlohmann/json_fwd.hpp"
+#include "preferences.h"
 #include "threadPool.h"
 #include "logger.h"
 #include <cstring>
@@ -21,9 +22,11 @@ image* filmRoll::getImage(int index) {
     return nullptr;
 }
 
-void filmRoll::clearBuffers() {
+void filmRoll::clearBuffers(bool remove) {
     if (imagesLoading)
         return; // User is jumping back and forth between rolls
+    if (!appPrefs.perfMode && !remove)
+        return; // User does not have performance mode enabled
     for (int i = 0; i < images.size(); i++) {
         images[i].clearBuffers();
     }

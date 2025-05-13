@@ -30,7 +30,10 @@ metalGPU::metalGPU() {
 
   ocioKernelText1 = "#include <metal_math>\n #include <metal_common>\n #include <metal_compute>\n #include <metal_stdlib>\n using namespace metal;\n\n";
   ocioKernelText2 = "kernel void ocioProcess(device float4 *imgIn [[buffer(0)]], device uchar4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = (uchar4)(clamp(OCIOMain(imgIn[index]) * 255.0f, 0.0f, 255.0f));}";
+  ocioKernelText2a = "kernel void ocioProcess(device float4 *imgIn [[buffer(0)]], device uchar4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], texture2d<float, access::sample> ocio_lut1d_0 [[texture(0)]], sampler ocio_lut1d_0Sampler [[sampler(0)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = (uchar4)(clamp(OCIOMain(ocio_lut1d_0, ocio_lut1d_0Sampler, imgIn[index]) * 255.0f, 0.0f, 255.0f));}";
+
   ocioKernelText3 = "kernel void ocioProcessFull(device float4 *imgIn [[buffer(0)]], device float4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = OCIOMain(imgIn[index]);}";
+  ocioKernelText3a = "kernel void ocioProcessFull(device float4 *imgIn [[buffer(0)]], device float4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], texture2d<float, access::sample> ocio_lut1d_0 [[texture(0)]], sampler ocio_lut1d_0Sampler [[sampler(0)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = OCIOMain(ocio_lut1d_0, ocio_lut1d_0Sampler, imgIn[index]);}";
 
   auto fs = cmrc::assets::get_filesystem();
   auto mtllib = fs.open("assets/default.metallib");
@@ -114,14 +117,22 @@ void metalGPU::initPipelineState() {
 
 }
 
-bool metalGPU::initOCIOKernels(ocioSetting ocioSet) {
+bool metalGPU::initOCIOKernels(ocioSetting& ocioSet) {
 
     std::string ocioKernel;
 
     ocioKernel = ocioKernelText1;
     ocioKernel += ocioProc.getMetalKernel(ocioSet);
-    ocioKernel += ocioKernelText2;
-    ocioKernel += ocioKernelText3;
+    if (ocioSet.texCount == 1) {
+        // Use version with textures
+        ocioKernel += ocioKernelText2a;
+        ocioKernel += ocioKernelText3a;
+    } else {
+        // Use version without textures
+        ocioKernel += ocioKernelText2;
+        ocioKernel += ocioKernelText3;
+    }
+
 
     MTL::Library    *metalLibrary;     // Metal library
     MTL::Function   *kernelFunction;   // Compute kernel
@@ -196,6 +207,40 @@ void metalGPU::bufferCheck(unsigned int width, unsigned int height) {
         workingA = m_device->newBuffer(bufferSize, MTL::ResourceStorageModeManaged);
         workingB = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
     }
+}
+
+void metalGPU::loadOCIOTex(ocioSetting ocioSet) {
+
+    // Create Metal texture descriptor
+    MTL::TextureDescriptor* textureDesc = MTL::TextureDescriptor::alloc()->init();
+    textureDesc->setTextureType(MTL::TextureType2D);
+    textureDesc->setPixelFormat(MTL::PixelFormatR32Float); // Note: R32Float, not RGBA
+    textureDesc->setWidth(ocioSet.texWidth);
+    textureDesc->setHeight(ocioSet.texHeight);
+    textureDesc->setUsage(MTL::TextureUsageShaderRead);
+    textureDesc->setStorageMode(MTL::StorageModeShared);
+
+    // Create the texture
+    ocioTex = m_device->newTexture(textureDesc);
+    textureDesc->release();
+
+    // Copy data to texture
+    size_t bytesPerRow = ocioSet.texWidth * sizeof(float);
+    MTL::Region region = MTL::Region::Make2D(0, 0, ocioSet.texWidth, ocioSet.texHeight);
+
+    ocioTex->replaceRegion(region,
+                                 0,  // mipmap level
+                                 ocioSet.texture,
+                                 bytesPerRow);
+
+    // Create sampler descriptor
+    MTL::SamplerDescriptor* samplerDesc = MTL::SamplerDescriptor::alloc()->init();
+    samplerDesc->setMinFilter(MTL::SamplerMinMagFilterLinear);
+    samplerDesc->setMagFilter(MTL::SamplerMinMagFilterLinear);
+    samplerDesc->setMipFilter(MTL::SamplerMipFilterNotMipmapped);
+
+    ocioSample = m_device->newSamplerState(samplerDesc);
+    samplerDesc->release();
 }
 
 void metalGPU::computeKernels(float strength, float* kernels)
@@ -315,17 +360,16 @@ auto start = std::chrono::steady_clock::now();
     bufferCheck(_renderParams.width, _renderParams.height);
 
     // OCIO Kernels
-    if (_image->fullIm){}
-    else if (prevOCIO != ocioSet || !_ocioProcess || !_ocioProcessFull) {
+    if (prevOCIO != ocioSet || !_ocioProcess || !_ocioProcessFull) {
         // Compile new kernels
         if (!initOCIOKernels(ocioSet)) {
             LOG_ERROR("Failure to build OCIO kernels, exiting render");
             return;
         }
         prevOCIO = ocioSet;
+        if (ocioSet.texCount == 1)
+            loadOCIOTex(ocioSet);
     }
-
-
 
     // Src img
     unsigned int imgSize = _renderParams.width * _renderParams.height * 4 * sizeof(float);
@@ -351,18 +395,22 @@ auto start = std::chrono::steady_clock::now();
         computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
 
         if (_image->fullIm) {
-            /*computeEncoder->setComputePipelineState(_ocioProcessFull);
+            computeEncoder->setComputePipelineState(_ocioProcessFull);
             computeEncoder->setBuffer(workingA, 0, 0);
             computeEncoder->setBuffer(m_dst, 0, 1);
-            computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
-            computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);*/
+
         } else {
             computeEncoder->setComputePipelineState(_ocioProcess);
             computeEncoder->setBuffer(workingA, 0, 0);
             computeEncoder->setBuffer(m_disp, 0, 1);
-            computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
-            computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
         }
+        computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
+        if (ocioSet.texCount == 1) {
+            computeEncoder->setTexture(ocioTex, 0);
+            computeEncoder->setSamplerState(ocioSample, 0);
+        }
+
+        computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
 
 
         computeEncoder->endEncoding();
@@ -372,7 +420,7 @@ auto start = std::chrono::steady_clock::now();
         // Copy completed image
         if (_image->fullIm) {
             _image->allocProcBuf();
-            memcpy(_image->procImgData, workingA->contents(), imgSize);
+            memcpy(_image->procImgData, m_dst->contents(), imgSize);
             _image->renderReady = true;
         } else {
             _image->allocDispBuf();

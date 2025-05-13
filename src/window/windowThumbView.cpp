@@ -27,8 +27,8 @@ void mainWindow::thumbView() {
 
                         float maxAvailable = thumbWinSize.y - ImGui::CalcTextSize("ABCD").y;
                         float padding = ImGui::GetStyle().FramePadding.y * 4;
-                        float spacing = ImGui::GetStyle().ItemSpacing.y * 2;
-                        float spacingB = ImGui::GetStyle().ItemInnerSpacing.y * 2;
+                        float spacing = ImGui::GetStyle().ItemSpacing.y * 4;
+                        float spacingB = ImGui::GetStyle().ItemInnerSpacing.y * 4;
                         maxAvailable -= padding;
                         maxAvailable -= spacing;
                         maxAvailable -= spacingB;

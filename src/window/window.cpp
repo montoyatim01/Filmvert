@@ -4,6 +4,7 @@
 #include <SDL_pixels.h>
 #include <SDL_render.h>
 #include <SDL_video.h>
+#include <SDL2/SDL_syswm.h>
 #include <chrono>
 #include <cstring>
 #include <imgui.h>
@@ -27,6 +28,7 @@ std::string find_key_by_value(const std::map<std::string, int>& my_map, int valu
     }
     return ""; // return an empty string if the value is not found in the map
 }
+
 
 
 
@@ -140,6 +142,7 @@ int mainWindow::openWindow()
     // Main loop
     ImVec4 windowCL = ImVec4(22.0f/255.0f, 22.0f/255.0f, 29.0f/255.0f, 1.00f);
     int returnValue = -1;
+    int loopCounter = 0;
     while (!done)
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -151,11 +154,35 @@ int mainWindow::openWindow()
         while (SDL_PollEvent(&event))
         {
             ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT)
-                done = true;
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
-                done = true;
+            if (event.type == SDL_QUIT) {
+                if (unsavedChanges()) {
+                    // Don't quit immediately
+                    unsavedPopTrigger = true;
+                    unsavedForClose = true;
+                } else {
+                    done = true;
+                }
+            }
+            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)){
+                if (unsavedChanges()) {
+                    // Don't quit immediately
+                    unsavedPopTrigger = true;
+                    unsavedForClose = true;
+                } else {
+                    done = true;
+                }
+            }
         }
+        if (loopCounter % 120 == 0) {
+            // Only check periodically
+            if (unsavedChanges()) {
+                setSDLWindowModified(window, true);
+            } else {
+                setSDLWindowModified(window, false);
+            }
+            loopCounter = 0;
+        }
+
 
         SDL_GetWindowSize(window, &winWidth, &winHeight);
 
@@ -201,6 +228,8 @@ int mainWindow::openWindow()
         preferencesPopup();
         shortcutsPopup();
         ackPopup();
+
+        loopCounter++;
 
         // Rendering
         ImGui::Render();

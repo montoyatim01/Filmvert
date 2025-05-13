@@ -1,5 +1,8 @@
 #include <vector>
 #include <string>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
+
 #import <Cocoa/Cocoa.h>
 
 std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canChooseDirectories = false) {
@@ -48,4 +51,16 @@ std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true) {
     }
 
     return result;
+}
+
+void setSDLWindowModified(SDL_Window* window, bool modified) {
+    SDL_SysWMinfo wmInfo;
+    SDL_VERSION(&wmInfo.version);
+
+    if (SDL_GetWindowWMInfo(window, &wmInfo)) {
+        // macOS implementation
+        NSWindow* nswindow = wmInfo.info.cocoa.window;
+        [nswindow setDocumentEdited:modified];
+
+    }
 }

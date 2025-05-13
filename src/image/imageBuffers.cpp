@@ -1,5 +1,6 @@
 #include "image.h"
 #include "logger.h"
+#include "preferences.h"
 
 
 
@@ -96,13 +97,23 @@ void image::loadBuffers() {
     allocProcBuf();
     allocDispBuf();
     if (isRawImage) {
-        if(debayerImage(false, 2)) {
+        if(debayerImage(!appPrefs.perfMode, appPrefs.perfMode ? 2 : 11)) {
             imageLoaded = true;
         }
         else
             LOG_WARN("Unable to re-debayer image: {}", fullPath);
+    } else if (isDataRaw) {
+        if (dataReload()) {
+            imageLoaded = true;
+        } else {
+            LOG_WARN("Unable to re-load image: {}", fullPath);
+        }
     } else {
-
+        if (oiioReload()) {
+            imageLoaded = true;
+        } else {
+            LOG_WARN("Unable to re-load image: {}", fullPath);
+        }
     }
 }
 

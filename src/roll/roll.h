@@ -17,7 +17,7 @@ class filmRoll {
     image* selImage();
     image* getImage(int index);
 
-    void clearBuffers();
+    void clearBuffers(bool remove = false);
     void loadBuffers();
 
     void saveAll();

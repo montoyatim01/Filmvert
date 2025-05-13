@@ -28,7 +28,7 @@ bool image::exportPreProcess(std::string outPath) {
     workWidth = width;
     workHeight = height;
     fullIm = true;
-    expFullPath = outPath + "/";
+    expFullPath = outPath;
     if (isRawImage) {
         if (imageLoaded){
             clearBuffers();
@@ -163,7 +163,7 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
     //TODO FIX TO TAKE OCIO SET FROM EXPORT
-    ocioProc.processImage(procImgData, width, height, ocioSet);
+    //ocioProc.processImage(procImgData, width, height, ocioSet);
     trimForSave();
     // Write the image data
     if (!out->write_image(format, tmpOutData)) {
@@ -289,7 +289,165 @@ bool image::debayerImage(bool fullRes, int quality) {
     return false;
 }
 
+//---OpenImageIO Reload---//
+/*
+    Reload the image from disk into the raw buffer
+    This needs to occur if performance mode is enabled
+    and the image has been unloaded for memory savings.
+*/
+bool image::oiioReload() {
+    OIIO::ImageInput::unique_ptr inputImage;
+    inputImage = OIIO::ImageInput::open(fullPath);
 
+    if (!inputImage)
+    {
+        LOG_ERROR("[oiio] Could not read the image file: {}", srcFilename);
+        LOG_ERROR("[oiio] Error: {}", OIIO::geterror());
+        return false;
+    }
+
+    const OIIO::ImageSpec &inputSpec = inputImage->spec();
+    // We don't want to overwrite if image from disk changed
+    //width = inputSpec.width;
+    //height = inputSpec.height;
+    //nChannels = inputSpec.nchannels;
+    if (rawImgData)
+        delete [] rawImgData;
+    rawImgData = new float[width * height * 4];
+    if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)rawImgData))
+    {
+        LOG_ERROR("[oiio] Failed to read image: {}", srcFilename);
+        LOG_ERROR("[oiio] Error: {}", inputImage->geterror());
+        delete [] rawImgData;
+        rawImgData = nullptr;
+        return false;
+    }
+
+    inputImage->close();
+
+    // Pad to RGBA
+    padToRGBA();
+
+    ocioProc.processImage(rawImgData, width, height, intOCIOSet);
+    imageLoaded = true;
+    return true;
+
+}
+
+bool image::dataReload() {
+
+    std::ifstream file(fullPath, std::ios::binary | std::ios::ate);
+    if (!file) {
+        return false;
+    }
+    // Get total file size
+    file.seekg(0, std::ios::end);
+    size_t totalSize = file.tellg();
+    // Calculate data size (excluding header if present)
+    size_t dataSize = intRawSet.pakonHeader ? totalSize - 16 : totalSize;
+
+    // Seek to start of data (skip header if present)
+    if (intRawSet.pakonHeader)
+        file.seekg(16, std::ios::beg);
+    else
+        file.seekg(0, std::ios::beg);
+
+    // Allocate buffer for data only
+    std::unique_ptr<char[]> buffer(new char[dataSize]);
+
+    // Read the data
+    file.read(buffer.get(), dataSize);
+    file.close();
+
+    char* raw_ptr = buffer.get();
+
+    float maxValue = static_cast<float>((1 << intRawSet.bitDepth) - 1);
+    int bytesPerChannel = (intRawSet.bitDepth > 8) ? (intRawSet.bitDepth > 16 ? 4 : 2) : 1;
+    int planeSize = width * height * bytesPerChannel;
+
+    if (rawImgData)
+        delete [] rawImgData;
+    rawImgData = new float[width * height * 4];
+
+    // Load in the image and pre-process to Linear AP1
+    unsigned int numThreads = std::thread::hardware_concurrency();
+    numThreads = numThreads == 0 ? 2 : numThreads;
+    // Create a vector of threads
+    std::vector<std::thread> threads(numThreads);
+    // Divide the workload into equal parts for each thread
+    int rowsPerThread = height / numThreads;
+    auto processRows = [&](int startRow, int endRow) {
+        float pIn[3] = {0};
+        float pOut[3] = {0};
+
+        for (int y = startRow; y < endRow; y++) {
+            for (int x = 0; x < width; x++) {
+                // Calculate the starting byte position for this pixel
+                // Calculate pixel position
+                int pixelIndex = y * width + x;
+
+                // For interleaved data, calculate the byte offset
+                int pixelByteOffset = pixelIndex * nChannels * bytesPerChannel;
+
+                // For float output array
+                int floatIndex = pixelIndex * nChannels;
+
+
+                for (int c = 0; c < nChannels && c < 3; c++) {
+                    // Calculate the byte offset for this specific channel
+                    int channelByteOffset;
+                    channelByteOffset = intRawSet.planar ? (c * planeSize) + (pixelIndex * bytesPerChannel) : pixelByteOffset + (c * bytesPerChannel);
+
+                    if (intRawSet.bitDepth <= 8) {
+                        pIn[c] = static_cast<float>(static_cast<unsigned char>(raw_ptr[channelByteOffset])) / maxValue;
+                    } else if (intRawSet.bitDepth <= 16) {
+                        // For 16-bit, we read from the correct channel offset
+                        uint16_t value = *reinterpret_cast<uint16_t*>(&raw_ptr[channelByteOffset]);
+                        value = !intRawSet.littleE ? swapBytes16(value) : value;
+                        pIn[c] = static_cast<float>(value) / maxValue;
+                    } else if (intRawSet.bitDepth <= 32) {
+                        // For 32-bit, we read from the correct channel offset
+                        uint32_t value = *reinterpret_cast<uint32_t*>(&raw_ptr[channelByteOffset]);
+                        value = !intRawSet.littleE ? swapBytes32(value) : value;
+                        pIn[c] = static_cast<float>(value) / maxValue;
+                    }
+                }
+
+                // Apply 2.2 gamma correction
+                for (int c = 0; c < nChannels; c++) {
+                    pOut[c] = std::pow(pIn[c], 1.0f/2.2f);
+                }
+
+
+                // Write to output
+                for (int c = 0; c < nChannels; c++) {
+                    rawImgData[floatIndex + c] = pOut[c];
+                }
+
+                // Set alpha channel if it exists
+                if (nChannels == 4) {
+                    rawImgData[floatIndex + 3] = 1.0f;
+                }
+            }
+        }
+    };
+    // Launch the threads
+    for (int i=0; i<numThreads; ++i) {
+        int startRow = i * rowsPerThread;
+        int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
+        threads[i] = std::thread(processRows, startRow, endRow);
+    }
+
+    // Wait for all threads to finish
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    padToRGBA();
+    ocioProc.processImage(rawImgData, width, height, intOCIOSet);
+    imageLoaded = true;
+    return true;
+}
 
 
 
@@ -498,6 +656,8 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
             img.intOCIOSet = ocioSet;
             ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
             img.imageLoaded = true;
+            img.isDataRaw = true;
+            img.isRawImage = false;
             return img;
 
 
@@ -650,6 +810,7 @@ auto f1 = std::chrono::steady_clock::now();
     // Clean up
     LibRaw::dcraw_clear_mem(processedImage);
     rawProcessor->recycle();
+    img.isDataRaw = false;
     img.isRawImage = true;
 auto end = std::chrono::steady_clock::now();
 
@@ -699,6 +860,7 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
     std::filesystem::path imgP = imagePath;
     img.srcFilename = imgP.stem().string();
     img.srcPath = imgP.parent_path().string();
+    img.fullPath = imagePath;
     if (img.srcFilename == "" || img.srcPath == "") {
         LOG_ERROR("Unable to parse image: {}, empty paths", imagePath);
         return "Could not parse image path";
@@ -745,6 +907,8 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
     img.intOCIOSet = ocioSet;
     ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
     img.imageLoaded = true;
+    img.isDataRaw = false;
+    img.isRawImage = false;
 
     return img;
 }
