@@ -13,26 +13,7 @@
 #include "imageMeta.h"
 #include "structs.h"
 #include <exiv2/exiv2.hpp>
-/*
-#include "OpenColorIO/OpenColorTransforms.h"
-#include "OpenColorIO/OpenColorTypes.h"
-#include "imageMeta.h"
-#include <math.h>
-#include <chrono>
-#include <thread>
-#include <variant>
-#include "ocioProcessor.h"
-#include <OpenImageIO/imageio.h>
-#include <OpenImageIO/typedesc.h>
-#include <libraw/libraw.h>
 
-#include <cstdlib>
-#include <cstring>
-#include <csignal>
-#include <filesystem>
-#include <stdexcept>
-#include <string>
-*/
 
 
 struct image {
@@ -60,6 +41,8 @@ struct image {
     unsigned int height;
     unsigned int workWidth;
     unsigned int workHeight;
+    unsigned int rawWidth;
+    unsigned int rawHeight;
     bool isRawImage = false;
     bool isDataRaw = false;
 
@@ -133,11 +116,13 @@ struct image {
     // image.cpp
     void rotLeft();
     void rotRight();
+    void setCrop();
 
 
     // imageProcessing.cpp
     void processBaseColor();
     void processMinMax();
+    void resizeProxy();
 
 };
 

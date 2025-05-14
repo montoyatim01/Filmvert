@@ -35,7 +35,7 @@ bool mainWindow::openJSON() {
 
     if (selection.size() > 0) {
         if (validRoll()) {
-            if(activeRolls[selRoll].importRollMetaJSON(selection[0])) {
+            if(activeRoll()->importRollMetaJSON(selection[0])) {
                 rollRender();
                 return true;
             } else {

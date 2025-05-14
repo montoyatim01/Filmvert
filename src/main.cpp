@@ -96,9 +96,19 @@ int main(void)
 // -* Rework entire OCIO system (try and get rid of the global variable nonsense)
 // -* How does the Metal GPU know what CS settings to use (image based?)
 // -* Metadata for scanning methods/variables? (Two fields?)
-// -- Add in import from image (import the metadata or inversion settings)
+// -- Add in import from image? (import the metadata or inversion settings)
 // -- How does performance mode affect OIIO opened images and their IDTs?
 // --- Someone opens a bunch of images, changes their config, and then it can't re-read?
-// -- Program in OIIO/Raw-data dump and reload.
+// -* Program in OIIO/Raw-data dump and reload.
 // -- Test OIIO/Raw dump and reload
 // -- Re-arrange images based on import metadata?
+// -* Resize all images down to max res for performance mode?
+// -* Auto-size the image to fit on first import
+// -* Disable the histogram checkbox
+// -* Tooltips
+// -* Block import while importing
+// -* Crop points need to move to a coordinate system
+// -* Same with min/max points
+// -* Reset analysis button
+// -* If user selects auto-save, but doesn't actually save the auto-save kicks in (make a temp variable saved on exit)
+//git filter-repo --invert-paths --path path/to/file

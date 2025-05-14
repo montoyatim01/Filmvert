@@ -1,6 +1,21 @@
 #include "imageParams.h"
 #include <algorithm>
 
+
+
+void imageParams::rstANA() {
+    rstBC();
+    rstBP();
+    rstWP();
+    minX = 0.0f;
+    minY = 0.0f;
+    maxX = 0.0f;
+    maxY = 0.0f;
+}
+
+void imageParams::rstBLR() {
+    blurAmount = 2.5f;
+}
 void imageParams::rstBP() {
     std::fill(std::begin(blackPoint), std::end(blackPoint), 0.0f);
 }

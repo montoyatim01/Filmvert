@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>English</string>
     <key>CFBundleExecutable</key>
-    <string>tGrain</string>
+    <string>Filmvert</string>
     <key>CFBundleIdentifier</key>
     <string>${MACOSX_BUNDLE_IDENTIFIER}</string>
     <key>CFBundleName</key>
@@ -17,7 +17,7 @@
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleVersion</key>
-    <string>0.0.1</string>
+    <string>1.0.0</string>
     <key>CFBundleLongVersionString</key>
     <string>${MACOSX_BUNDLE_LONG_VERSION_STRING}</string>
     <key>CFBundleShortVersionString</key>

@@ -49,23 +49,23 @@ void mainWindow::thumbView() {
                             ImGui::SetNextItemSelectionUserData(i);
                             if (ImGui::Selectable("###", getImage(i)->selected, 0, displaySize)) {
                                 if (!ImGui::GetIO().KeySuper) {
-                                    activeRolls[selRoll].selIm = i;
+                                    activeRoll()->selIm = i;
                                 }
                             }
                             ImGui::SetItemAllowOverlap();
                             ImGui::SetCursorPos(ImVec2(pos.x, pos.y));
                             ImGui::Image(reinterpret_cast<ImTextureID>(getImage(i)->texture), displaySize);
 
-                            // Draw red circle if image is not loaded
+                            // Draw orange circle if image is not loaded
                             if (getImage(i) && !getImage(i)->imageLoaded) {
                                 ImDrawList* drawList = ImGui::GetWindowDrawList();
                                 // Get the absolute screen position for the circle (top-left corner of the image)
                                 ImVec2 screenPos = ImGui::GetCursorScreenPos();
-                                screenPos.x = screenPos.x - displaySize.x; // Move back to the image's left edge
+                                //screenPos.x = screenPos.x - displaySize.x; // Move back to the image's left edge
                                 ImU32 handleColor = IM_COL32(255, 127, 0, 255);
-                                float pointRadius = 8.0f;
+                                float pointRadius = 6.0f;
                                 // Use absolute screen coordinates for the circle
-                                drawList->AddCircleFilled(ImVec2(screenPos.x + pointRadius + 20, screenPos.y + pointRadius),
+                                drawList->AddCircleFilled(ImVec2(screenPos.x + pointRadius + 12, screenPos.y + pointRadius),
                                                         pointRadius, handleColor);
                             }
 

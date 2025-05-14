@@ -25,7 +25,13 @@
 CMRC_DECLARE(assets);
 
 
-
+//--- Metal Class Constructor ---//
+/*
+    Fill out the strings containing the kernels for OCIO processing
+    Load in the pre-compiled metal library, set up the default device,
+    initialize the pipeline states from the library, and fill out the
+    initial buffers with a pre-determined size
+*/
 metalGPU::metalGPU() {
 
   ocioKernelText1 = "#include <metal_math>\n #include <metal_common>\n #include <metal_compute>\n #include <metal_stdlib>\n using namespace metal;\n\n";
@@ -75,11 +81,22 @@ metalGPU::metalGPU() {
   queueThread = std::thread(&metalGPU::processQueue, this);
 }
 
+//--- Metal Class Destructor ---//
+/*
+    Disable the render queue, and join
+    the thread for exit
+*/
 metalGPU::~metalGPU() {
     enableQueue = false;
     queueThread.join();
 }
 
+//--- Initialize Pipeline States ---//
+/*
+    From the loaded metal library, create
+    the pipeline state from the pre-compiled
+    functions in the library
+*/
 void metalGPU::initPipelineState() {
 
   auto m_recursiveGaussian_rgba = NS::String::string("m_recursiveGaussian_rgba", NS::ASCIIStringEncoding);
@@ -116,7 +133,12 @@ void metalGPU::initPipelineState() {
     LOG_ERROR("[metal] Failed to init main Pipeline State");
 
 }
-
+//--- Initialize OCIO Kernels ---//
+/*
+    Using the provided OCIO Setting Set,
+    get the std::string kernels from the OCIO Processor
+    and attempt to compile them into the OCIO pipeline states
+*/
 bool metalGPU::initOCIOKernels(ocioSetting& ocioSet) {
 
     std::string ocioKernel;
@@ -172,6 +194,11 @@ bool metalGPU::initOCIOKernels(ocioSetting& ocioSet) {
 
 }
 
+//--- Initialize Buffers ---//
+/*
+    Initialize the internal buffers with a standard image
+    size
+*/
 void metalGPU::initBuffers() {
     // Set intial buffer size to something reasonable for image processing
 
@@ -183,12 +210,15 @@ void metalGPU::initBuffers() {
     workingB = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
 
     // Render Parameters
-        renderParamBuf = m_device->newBuffer(sizeof(renderParams), MTL::ResourceStorageModeManaged);
-        //memcpy(renderParamBuf.contents, &_renderParams, sizeof(_renderParams));
-        //[renderParamBuf didModifyRange:NSMakeRange(0, sizeof(_renderParams))];
+    renderParamBuf = m_device->newBuffer(sizeof(renderParams), MTL::ResourceStorageModeManaged);
 
 }
 
+//--- Buffer Check---//
+/*
+    Double check that the buffers are large enough for the image
+    to be processed, otherwise resize them to accommodate
+*/
 void metalGPU::bufferCheck(unsigned int width, unsigned int height) {
     if ((width * height * 4 * sizeof(float)) > bufferSize) {
         // Image to be processed is larger than the previous buffer size, resize the buffers to fit
@@ -208,7 +238,12 @@ void metalGPU::bufferCheck(unsigned int width, unsigned int height) {
         workingB = m_device->newBuffer(bufferSize, MTL::ResourceStorageModePrivate);
     }
 }
-
+//--- Load OCIO Texture ---//
+/*
+    For transforms that have a separate 1D LUT
+    required in order to process. Copy into
+    Metal texture and sampler
+*/
 void metalGPU::loadOCIOTex(ocioSetting ocioSet) {
 
     // Create Metal texture descriptor
@@ -243,35 +278,19 @@ void metalGPU::loadOCIOTex(ocioSetting ocioSet) {
     samplerDesc->release();
 }
 
-void metalGPU::computeKernels(float strength, float* kernels)
-{
-  int kernelSize = (int)(strength * KERNELSIZE) + 1;
-  kernelSize = kernelSize > 1 ? kernelSize : 2;
-  int posI = 0;
-  float kernelSum = 0.0f;
-//safetyMutex.lock();
-  // Loop through the kernel and apply the Gaussian blur
-  for (int i = -kernelSize / 2; i <= kernelSize / 2; i++)
-  {
-          float weight = exp(-0.5f * pow(i / strength, 2)) / (strength * sqrt(2 * M_PI));
-          kernels[posI] = weight;
-          kernelSum += weight;
-          posI++;
-  }
-
-  // Normalize the kernel
-  for (int i = 0; i < posI; i++)
-  {
-      kernels[i] /= kernelSum;
-  }
-  //safetyMutex.unlock();
-}
-
+//--- Add To Render Queue ---//
+/*
+    Add an image to the queue to be rendered
+*/
 void metalGPU::addToRender(image *_image, renderType type, ocioSetting ocioSet) {
 
     renderQueue.push(gpuQueue(_image, type, ocioSet));
 }
 
+//--- Is In Queue ---//
+/*
+    Determine whether a given image is in the render queue
+*/
 bool metalGPU::isInQueue(image* _image) {
     if (!_image)
         return false;
@@ -286,6 +305,19 @@ bool metalGPU::isInQueue(image* _image) {
     return false;
 }
 
+//--- Process Queue ---//
+/*
+    Runs in it's own thread. Loop through
+    checking to see if there is a new item in the
+    queue to be rendered. If a single image/type/OCIO Set
+    is sent to the queue multiple times in a row, ignore
+    all but the last instance (before a new image). This
+    prevents the rendering of the same image multiple times
+    when unneccessary.
+
+    Will sleep for a period of time to prevent hammering
+    the thread
+*/
 void metalGPU::processQueue() {
 
     while (enableQueue) {
@@ -295,17 +327,18 @@ void metalGPU::processQueue() {
             // If there are items in the queue
             queueLock.lock();
             image* img = renderQueue.front()._img;
-            renderType _type = renderQueue.front()._type;
+            renderType type = renderQueue.front()._type;
             ocioSetting ocioSet = renderQueue.front()._ocioSet;
             while (renderQueue.size() > 0 &&
                 renderQueue.front()._img == img &&
+                renderQueue.front()._type == type &&
                 renderQueue.front()._ocioSet == ocioSet) {
                 // Removing duplicates to only run a single
                 // instance of this image through the render
                 renderQueue.pop();
             }
             queueLock.unlock();
-            switch (_type) {
+            switch (type) {
                 case r_sdt:
                 case r_full:
                     renderImage(img, ocioSet);
@@ -328,18 +361,22 @@ void metalGPU::processQueue() {
 
 }
 
-
+//--- Render Image ---//
+/*
+    Responsible for sending off an image to be rendered
+    by the GPU
+*/
 void metalGPU::renderImage(image* _image, ocioSetting ocioSet) {
-if (!_image)
-    return;
-if (!_image->imageLoaded)
-    return; //We don't have our buffers yet
-auto start = std::chrono::steady_clock::now();
+    if (!_image)
+        return;
+    if (!_image->imageLoaded)
+        return; //We don't have our buffers yet
+    auto start = std::chrono::steady_clock::now();
+
     // Generate RenderParams struct
     renderParams _renderParams = img_to_param(_image);
 
     MTL::CommandBuffer *commandBuffer = m_command_queue->commandBuffer();
-    //commandBuffer->label = NsSt"tGrainKernel";
 
     MTL::ComputeCommandEncoder *computeEncoder = commandBuffer->computeCommandEncoder();
     computeEncoder->setComputePipelineState(_mainProcess);
@@ -347,14 +384,7 @@ auto start = std::chrono::steady_clock::now();
     // Execution Sizes
     int exeWidth = _mainProcess->threadExecutionWidth();
     MTL::Size threadGroupCount = MTL::Size(exeWidth, 1, 1);
-    MTL::Size threadGroups = MTL::Size((_renderParams.width + exeWidth - 1)/exeWidth, _renderParams.height, 1);
-
-    MTL::Size transposeGrid = MTL::Size(iDivUp(_renderParams.width, BLOCK_DIM), iDivUp(_renderParams.height, BLOCK_DIM), 1);
-    MTL::Size transposeGrid2 = MTL::Size(iDivUp(_renderParams.height, BLOCK_DIM), iDivUp(_renderParams.width, BLOCK_DIM), 1);
-    MTL::Size transposeThreads = MTL::Size(BLOCK_DIM, BLOCK_DIM, 1);
-
-    MTL::Size blurGridH = MTL::Size(iDivUp(_renderParams.width, exeWidth), 1, 1);
-    MTL::Size blurGridV = MTL::Size(iDivUp(_renderParams.height, exeWidth), 1, 1);
+    MTL::Size threadGroups = MTL::Size(_renderParams.width, _renderParams.height, 1);
 
     // Buffers
     bufferCheck(_renderParams.width, _renderParams.height);
@@ -386,185 +416,179 @@ auto start = std::chrono::steady_clock::now();
     renderParamBuf->didModifyRange(NS::Range(0, sizeof(_renderParams)));
 
 
-        // Main process
-        computeEncoder->setComputePipelineState(_mainProcess);
-        computeEncoder->setBuffer(m_src, 0, 0);
-        computeEncoder->setBuffer(workingA, 0, 1);
-        //computeEncoder->setBuffer(m_disp, 0, 2);
-        computeEncoder->setBuffer(renderParamBuf, 0, 2);
-        computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
+    // Main process
+    computeEncoder->setComputePipelineState(_mainProcess);
+    computeEncoder->setBuffer(m_src, 0, 0);
+    computeEncoder->setBuffer(workingA, 0, 1);
+    computeEncoder->setBuffer(renderParamBuf, 0, 2);
+    computeEncoder->dispatchThreads(threadGroups, threadGroupCount);
 
-        if (_image->fullIm) {
-            computeEncoder->setComputePipelineState(_ocioProcessFull);
-            computeEncoder->setBuffer(workingA, 0, 0);
-            computeEncoder->setBuffer(m_dst, 0, 1);
+    // OCIO Processing
+    if (_image->fullIm) {
+        computeEncoder->setComputePipelineState(_ocioProcessFull);
+        computeEncoder->setBuffer(workingA, 0, 0);
+        computeEncoder->setBuffer(m_dst, 0, 1);
 
-        } else {
-            computeEncoder->setComputePipelineState(_ocioProcess);
-            computeEncoder->setBuffer(workingA, 0, 0);
-            computeEncoder->setBuffer(m_disp, 0, 1);
-        }
-        computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
-        if (ocioSet.texCount == 1) {
-            computeEncoder->setTexture(ocioTex, 0);
-            computeEncoder->setSamplerState(ocioSample, 0);
-        }
-
-        computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
-
-
-        computeEncoder->endEncoding();
-        commandBuffer->commit();
-        commandBuffer->waitUntilCompleted();
-
-        // Copy completed image
-        if (_image->fullIm) {
-            _image->allocProcBuf();
-            memcpy(_image->procImgData, m_dst->contents(), imgSize);
-            _image->renderReady = true;
-        } else {
-            _image->allocDispBuf();
-            memcpy(_image->dispImgData, m_disp->contents(), dispSize);
-            _image->sdlUpdate = true;
-        }
+    } else {
+        computeEncoder->setComputePipelineState(_ocioProcess);
+        computeEncoder->setBuffer(workingA, 0, 0);
+        computeEncoder->setBuffer(m_disp, 0, 1);
+    }
+    computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
+    if (ocioSet.texCount == 1) {
+        computeEncoder->setTexture(ocioTex, 0);
+        computeEncoder->setSamplerState(ocioSample, 0);
+    }
+    computeEncoder->dispatchThreads(threadGroups, threadGroupCount);
 
 
-        auto end = std::chrono::steady_clock::now();
-        auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    computeEncoder->endEncoding();
+    commandBuffer->commit();
+    commandBuffer->waitUntilCompleted();
 
-        rdTimer.renderTime = dur.count();
-        rdTimer.fps = 1000.0f / (float)dur.count();
+    // Copy completed image
+    if (_image->fullIm) {
+        _image->allocProcBuf();
+        memcpy(_image->procImgData, m_dst->contents(), imgSize);
+        _image->renderReady = true;
+    } else {
+        _image->allocDispBuf();
+        memcpy(_image->dispImgData, m_disp->contents(), dispSize);
+        _image->sdlUpdate = true;
+    }
+
+
+    auto end = std::chrono::steady_clock::now();
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    rdTimer.renderTime = dur.count();
+    rdTimer.fps = 1000.0f / (float)dur.count();
 
 }
 
+//--- Render Blur Pass ---//
+/*
+    Render the blur pass used to analyze the
+    min/max points in the image
+*/
 void metalGPU::renderBlurPass(image* _image) {
     auto start = std::chrono::steady_clock::now();
-        // Generate RenderParams struct
-        renderParams _renderParams = img_to_param(_image);
+    // Generate RenderParams struct
+    renderParams _renderParams = img_to_param(_image);
 
-        MTL::CommandBuffer *commandBuffer = m_command_queue->commandBuffer();
-        //commandBuffer->label = NsSt"tGrainKernel";
+    MTL::CommandBuffer *commandBuffer = m_command_queue->commandBuffer();
 
-        MTL::ComputeCommandEncoder *computeEncoder = commandBuffer->computeCommandEncoder();
-        computeEncoder->setComputePipelineState(_mainProcess);
+    MTL::ComputeCommandEncoder *computeEncoder = commandBuffer->computeCommandEncoder();
+    computeEncoder->setComputePipelineState(_mainProcess);
 
-        // Execution Sizes
-        int exeWidth = _mainProcess->threadExecutionWidth();
-        MTL::Size threadGroupCount = MTL::Size(exeWidth, 1, 1);
-        MTL::Size threadGroups = MTL::Size((_renderParams.width + exeWidth - 1)/exeWidth, _renderParams.height, 1);
+    // Execution Sizes
+    int exeWidth = _mainProcess->threadExecutionWidth();
+    MTL::Size threadGroupCount = MTL::Size(exeWidth, 1, 1);
+    MTL::Size threadGroups = MTL::Size((_renderParams.width + exeWidth - 1)/exeWidth, _renderParams.height, 1);
 
-        MTL::Size transposeGrid = MTL::Size(iDivUp(_renderParams.width, BLOCK_DIM), iDivUp(_renderParams.height, BLOCK_DIM), 1);
-        MTL::Size transposeGrid2 = MTL::Size(iDivUp(_renderParams.height, BLOCK_DIM), iDivUp(_renderParams.width, BLOCK_DIM), 1);
-        MTL::Size transposeThreads = MTL::Size(BLOCK_DIM, BLOCK_DIM, 1);
+    MTL::Size transposeGrid = MTL::Size(iDivUp(_renderParams.width, BLOCK_DIM), iDivUp(_renderParams.height, BLOCK_DIM), 1);
+    MTL::Size transposeGrid2 = MTL::Size(iDivUp(_renderParams.height, BLOCK_DIM), iDivUp(_renderParams.width, BLOCK_DIM), 1);
+    MTL::Size transposeThreads = MTL::Size(BLOCK_DIM, BLOCK_DIM, 1);
 
-        MTL::Size blurGridH = MTL::Size(iDivUp(_renderParams.width, exeWidth), 1, 1);
-        MTL::Size blurGridV = MTL::Size(iDivUp(_renderParams.height, exeWidth), 1, 1);
+    MTL::Size blurGridH = MTL::Size(iDivUp(_renderParams.width, exeWidth), 1, 1);
+    MTL::Size blurGridV = MTL::Size(iDivUp(_renderParams.height, exeWidth), 1, 1);
 
-        // Buffers
-        bufferCheck(_renderParams.width, _renderParams.height);
+    // Buffers
+    bufferCheck(_renderParams.width, _renderParams.height);
 
-        memcpy(renderParamBuf->contents(), &_renderParams, sizeof(_renderParams));
-        renderParamBuf->didModifyRange(NS::Range(0, sizeof(_renderParams)));
-
-
-        // Src img
-        unsigned int imgSize = _renderParams.width * _renderParams.height * 4 * sizeof(float);
-        if (prevIm != _image)
-        {
-            prevIm = _image;
-            memcpy(m_src->contents(), _image->rawImgData, imgSize);
-            m_src->didModifyRange(NS::Range(0, imgSize));
-        }
+    memcpy(renderParamBuf->contents(), &_renderParams, sizeof(_renderParams));
+    renderParamBuf->didModifyRange(NS::Range(0, sizeof(_renderParams)));
 
 
-        //---RENDER---//
+    // Src img
+    unsigned int imgSize = _renderParams.width * _renderParams.height * 4 * sizeof(float);
+    if (prevIm != _image)
+    {
+        prevIm = _image;
+        memcpy(m_src->contents(), _image->rawImgData, imgSize);
+        m_src->didModifyRange(NS::Range(0, imgSize));
+    }
 
-        // Process Base Color
-        /*computeEncoder->setComputePipelineState(_baseColor);
-        computeEncoder->setBuffer(m_src, 0, 0);
-        computeEncoder->setBuffer(m_src, 0, 1);
-        computeEncoder->setBuffer(renderParamBuf, 0, 2);
-        computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
-*/
-             float sigma = _renderParams.sigmaFilter;
-            //Recursive Paramaters
-            const float nsigma = sigma < 0.1f ? 0.1f : sigma, alpha = 1.695f / nsigma,
-                    ema = (float)std::exp(-alpha), ema2 = (float)std::exp(-2 * alpha),
-                    b1 = -2 * ema, b2 = ema2;
 
-            float a0 = 0, a1 = 0, a2 = 0, a3 = 0, coefp = 0, coefn = 0;
-            const float k = (1 - ema) * (1 - ema) / (1 + 2 * alpha * ema - ema2);
-            a0 = k;
-            a1 = k * (alpha - 1) * ema;
-            a2 = k * (alpha + 1) * ema;
-            a3 = -k * ema2;
-            coefp = (a0 + a1) / (1 + b1 + b2);
-            coefn = (a2 + a3) / (1 + b1 + b2);
+    float sigma = _renderParams.sigmaFilter;
+    //Recursive Paramaters
+    const float nsigma = sigma < 0.1f ? 0.1f : sigma, alpha = 1.695f / nsigma,
+            ema = (float)std::exp(-alpha), ema2 = (float)std::exp(-2 * alpha),
+            b1 = -2 * ema, b2 = ema2;
 
-            // Blur H
-            computeEncoder->setComputePipelineState(_recursive);
-            computeEncoder->setBuffer(m_src, 0, 0);
-            computeEncoder->setBuffer(workingA, 0, 1);
-            computeEncoder->setBytes(&_renderParams.width, sizeof(int), 2);
-            computeEncoder->setBytes(&_renderParams.height, sizeof(int), 3);
-            computeEncoder->setBytes(&a0, sizeof(float), 4);
-            computeEncoder->setBytes(&a1, sizeof(float), 5);
-            computeEncoder->setBytes(&a2, sizeof(float), 6);
-            computeEncoder->setBytes(&a3, sizeof(float), 7);
-            computeEncoder->setBytes(&b1, sizeof(float), 8);
-            computeEncoder->setBytes(&b2, sizeof(float), 9);
-            computeEncoder->setBytes(&coefp, sizeof(float), 10);
-            computeEncoder->setBytes(&coefn, sizeof(float), 11);
-            computeEncoder->dispatchThreadgroups(blurGridH, threadGroupCount);
+    float a0 = 0, a1 = 0, a2 = 0, a3 = 0, coefp = 0, coefn = 0;
+    const float k = (1 - ema) * (1 - ema) / (1 + 2 * alpha * ema - ema2);
+    a0 = k;
+    a1 = k * (alpha - 1) * ema;
+    a2 = k * (alpha + 1) * ema;
+    a3 = -k * ema2;
+    coefp = (a0 + a1) / (1 + b1 + b2);
+    coefn = (a2 + a3) / (1 + b1 + b2);
 
-            // Transpose
-            computeEncoder->setComputePipelineState(_transpose);
-            computeEncoder->setBuffer(workingB, 0, 0);
-            computeEncoder->setBuffer(workingA, 0, 1);
-            computeEncoder->setBytes(&_renderParams.width, sizeof(int), 2);
-            computeEncoder->setBytes(&_renderParams.height, sizeof(int), 3);
-            computeEncoder->dispatchThreadgroups(transposeGrid, transposeThreads);
+    // Blur H
+    computeEncoder->setComputePipelineState(_recursive);
+    computeEncoder->setBuffer(m_src, 0, 0);
+    computeEncoder->setBuffer(workingA, 0, 1);
+    computeEncoder->setBytes(&_renderParams.width, sizeof(int), 2);
+    computeEncoder->setBytes(&_renderParams.height, sizeof(int), 3);
+    computeEncoder->setBytes(&a0, sizeof(float), 4);
+    computeEncoder->setBytes(&a1, sizeof(float), 5);
+    computeEncoder->setBytes(&a2, sizeof(float), 6);
+    computeEncoder->setBytes(&a3, sizeof(float), 7);
+    computeEncoder->setBytes(&b1, sizeof(float), 8);
+    computeEncoder->setBytes(&b2, sizeof(float), 9);
+    computeEncoder->setBytes(&coefp, sizeof(float), 10);
+    computeEncoder->setBytes(&coefn, sizeof(float), 11);
+    computeEncoder->dispatchThreadgroups(blurGridH, threadGroupCount);
 
-            // Blur V
-            computeEncoder->setComputePipelineState(_recursive);
-            computeEncoder->setBuffer(workingB, 0, 0);
-            computeEncoder->setBuffer(workingA, 0, 1);
-            computeEncoder->setBytes(&_renderParams.height, sizeof(int), 2);
-            computeEncoder->setBytes(&_renderParams.width, sizeof(int), 3);
-            computeEncoder->setBytes(&a0, sizeof(float), 4);
-            computeEncoder->setBytes(&a1, sizeof(float), 5);
-            computeEncoder->setBytes(&a2, sizeof(float), 6);
-            computeEncoder->setBytes(&a3, sizeof(float), 7);
-            computeEncoder->setBytes(&b1, sizeof(float), 8);
-            computeEncoder->setBytes(&b2, sizeof(float), 9);
-            computeEncoder->setBytes(&coefp, sizeof(float), 10);
-            computeEncoder->setBytes(&coefn, sizeof(float), 11);
-            computeEncoder->dispatchThreadgroups(blurGridV, threadGroupCount);
+    // Transpose
+    computeEncoder->setComputePipelineState(_transpose);
+    computeEncoder->setBuffer(workingB, 0, 0);
+    computeEncoder->setBuffer(workingA, 0, 1);
+    computeEncoder->setBytes(&_renderParams.width, sizeof(int), 2);
+    computeEncoder->setBytes(&_renderParams.height, sizeof(int), 3);
+    computeEncoder->dispatchThreadgroups(transposeGrid, transposeThreads);
 
-            // Transpose
-            computeEncoder->setComputePipelineState(_transpose);
-            computeEncoder->setBuffer(workingB, 0, 0);
-            computeEncoder->setBuffer(workingA, 0, 1);
-            computeEncoder->setBytes(&_renderParams.height, sizeof(int), 2);
-            computeEncoder->setBytes(&_renderParams.width, sizeof(int), 3);
-            computeEncoder->dispatchThreadgroups(transposeGrid2, transposeThreads);
+    // Blur V
+    computeEncoder->setComputePipelineState(_recursive);
+    computeEncoder->setBuffer(workingB, 0, 0);
+    computeEncoder->setBuffer(workingA, 0, 1);
+    computeEncoder->setBytes(&_renderParams.height, sizeof(int), 2);
+    computeEncoder->setBytes(&_renderParams.width, sizeof(int), 3);
+    computeEncoder->setBytes(&a0, sizeof(float), 4);
+    computeEncoder->setBytes(&a1, sizeof(float), 5);
+    computeEncoder->setBytes(&a2, sizeof(float), 6);
+    computeEncoder->setBytes(&a3, sizeof(float), 7);
+    computeEncoder->setBytes(&b1, sizeof(float), 8);
+    computeEncoder->setBytes(&b2, sizeof(float), 9);
+    computeEncoder->setBytes(&coefp, sizeof(float), 10);
+    computeEncoder->setBytes(&coefn, sizeof(float), 11);
+    computeEncoder->dispatchThreadgroups(blurGridV, threadGroupCount);
 
-            computeEncoder->setComputePipelineState(_baseColor);
-            computeEncoder->setBuffer(workingB, 0, 0);
-            computeEncoder->setBuffer(m_dst, 0, 1);
-            computeEncoder->setBuffer(renderParamBuf, 0, 2);
-            computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
+    // Transpose
+    computeEncoder->setComputePipelineState(_transpose);
+    computeEncoder->setBuffer(workingB, 0, 0);
+    computeEncoder->setBuffer(workingA, 0, 1);
+    computeEncoder->setBytes(&_renderParams.height, sizeof(int), 2);
+    computeEncoder->setBytes(&_renderParams.width, sizeof(int), 3);
+    computeEncoder->dispatchThreadgroups(transposeGrid2, transposeThreads);
 
-            computeEncoder->endEncoding();
-            commandBuffer->commit();
-            commandBuffer->waitUntilCompleted();
+    computeEncoder->setComputePipelineState(_baseColor);
+    computeEncoder->setBuffer(workingB, 0, 0);
+    computeEncoder->setBuffer(m_dst, 0, 1);
+    computeEncoder->setBuffer(renderParamBuf, 0, 2);
+    computeEncoder->dispatchThreadgroups(threadGroups, threadGroupCount);
 
-            // Copy completed image
-            memcpy(_image->blurImgData, m_dst->contents(), imgSize);
-            _image->blurReady = true;
-            auto end = std::chrono::steady_clock::now();
-            auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    computeEncoder->endEncoding();
+    commandBuffer->commit();
+    commandBuffer->waitUntilCompleted();
 
-            rdTimer.renderTime = dur.count();
-            rdTimer.fps = 1000.0f / (float)dur.count();
+    // Copy completed image
+    memcpy(_image->blurImgData, m_dst->contents(), imgSize);
+    _image->blurReady = true;
+    auto end = std::chrono::steady_clock::now();
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    rdTimer.renderTime = dur.count();
+    rdTimer.fps = 1000.0f / (float)dur.count();
 }

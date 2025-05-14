@@ -41,7 +41,19 @@ void image::rotLeft() {
     }
 }
 
+void image::setCrop() {
+    imgParam.cropBoxX[0] = 0.1;
+    imgParam.cropBoxY[0] = 0.1;
 
+    imgParam.cropBoxX[1] = 0.9;
+    imgParam.cropBoxY[1] = 0.1;
+
+    imgParam.cropBoxX[2] = 0.9;
+    imgParam.cropBoxY[2] = 0.9;
+
+    imgParam.cropBoxX[3] = 0.1;
+    imgParam.cropBoxY[3] = 0.9;
+}
 
 //---Image to Param---//
 /*

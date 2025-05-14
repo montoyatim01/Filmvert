@@ -13,7 +13,11 @@ class userPreferences {
     void saveToFile();
 
     bool autoSave = false;
+    bool tmpAutoSave = false;
     int autoSFreq = 5;
+
+    float histInt = 0.75;
+    int maxRes = 3000;
 
     bool perfMode = true;
     std::string ocioPath;

@@ -38,6 +38,8 @@ struct copyPaste {
     bool dev = false;
     bool chem = false;
     bool devnote = false;
+    bool scanner = false;
+    bool scannotes = false;
 
     void analysisGlobal(){
         if (baseColor && cropPoints &&
@@ -58,14 +60,14 @@ struct copyPaste {
     void metaGlobal() {
         if (make && model && lens && stock && focal &&
             fstop && exposure && date && location &&
-            gps && notes && dev && chem && devnote)
+            gps && notes && dev && chem && devnote && scanner && scannotes)
                 make = model = lens = stock = focal =
                 fstop = exposure = date = location =
-                gps = notes = dev = chem = devnote = !devnote;
+                gps = notes = dev = chem = devnote = scanner = scannotes = !devnote;
         else
             make = model = lens = stock = focal =
             fstop = exposure = date = location =
-            gps = notes = dev = chem = devnote = true;
+            gps = notes = dev = chem = devnote = scanner = scanner = true;
     }
 };
 
@@ -136,10 +138,10 @@ struct ocioSetting {
 
 
 struct HistogramData {
-    std::array<int, 256> r_hist;
-    std::array<int, 256> g_hist;
-    std::array<int, 256> b_hist;
-    std::array<int, 256> luminance_hist;
+    std::array<int, 512> r_hist;
+    std::array<int, 512> g_hist;
+    std::array<int, 512> b_hist;
+    std::array<int, 512> luminance_hist;
 
     HistogramData() {
         r_hist.fill(0);

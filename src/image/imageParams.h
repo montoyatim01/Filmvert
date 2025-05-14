@@ -4,17 +4,17 @@
 struct imageParams {
 
     // Analysis
-    unsigned int sampleX[2];
-    unsigned int sampleY[2];
+    float sampleX[2];
+    float sampleY[2];
 
     float blurAmount = 2.5f;
     float baseColor[3] = {0.5f, 0.5f, 0.5f};
     float whitePoint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     float blackPoint[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-    unsigned int minX = 0;
-    unsigned int minY = 0;
-    unsigned int maxX = 0;
-    unsigned int maxY = 0;
+    float minX = 0;
+    float minY = 0;
+    float maxX = 0;
+    float maxY = 0;
 
     // Correction
     float temp = 0.0f;
@@ -27,13 +27,15 @@ struct imageParams {
     float g_offset[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     float g_gamma[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-    unsigned int cropBoxX[4];
-    unsigned int cropBoxY[4];
+    float cropBoxX[4];
+    float cropBoxY[4];
 
+    void rstANA();
 
     void rstBP();
     void rstWP();
     void rstBC();
+    void rstBLR();
 
     void rstTmp();
     void rstTnt();

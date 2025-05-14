@@ -50,7 +50,7 @@ void mainWindow::imgRender(image *img) {
 }
 void mainWindow::rollRender() {
     if (validRoll()) {
-        for (int i = 0; i < activeRolls[selRoll].images.size(); i++) {
+        for (int i = 0; i < activeRollSize(); i++) {
             imgRender(getImage(selRoll, i));
         }
     }

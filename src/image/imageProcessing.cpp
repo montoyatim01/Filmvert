@@ -1,6 +1,9 @@
 #include "image.h"
 #include "logger.h"
+#include "preferences.h"
 #include "utils.h"
+#include "lancir.h"
+#include <strings.h>
 
 //---Process Base Color---//
 /*
@@ -12,6 +15,12 @@
 void image::processBaseColor() {
 
     unsigned int x0, x1, y0, y1;
+    unsigned int sampleX[2];
+    unsigned int sampleY[2];
+    for (int i = 0; i < 2; i++) {
+        sampleX[i] = imgParam.sampleX[i] * width;
+        sampleY[i] = imgParam.sampleY[i] * height;
+    }
     x0 = imgParam.sampleX[0] < imgParam.sampleX[1] ? imgParam.sampleX[0] : imgParam.sampleX[1];
     x1 = imgParam.sampleX[0] > imgParam.sampleX[1] ? imgParam.sampleX[0] : imgParam.sampleX[1];
 
@@ -68,23 +77,30 @@ void image::processMinMax() {
 
     float maxLuma = -100.0f;
     float minLuma = 100.0f;
+    unsigned int minX, minY, maxX, maxY;
+    unsigned int cropBoxX[4];
+    unsigned int cropBoxY[4];
+    for (int i = 0; i < 4; i++) {
+        cropBoxX[i] = imgParam.cropBoxX[i] * width;
+        cropBoxY[i] = imgParam.cropBoxY[i] * height;
+    }
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            if (isPointInBox(x, y, imgParam.cropBoxX, imgParam.cropBoxY)) {
+            if (isPointInBox(x, y, cropBoxX, cropBoxY)) {
                 unsigned int index = (y * width) + x;
                 float luma = Luma(buffer[4 * index + 0], buffer[4 * index + 1], buffer[4 * index + 2]);
                 if (luma < minLuma) {
                     minLuma = luma;
-                    imgParam.minX = x;
-                    imgParam.minY = y;
+                    minX = x;
+                    minY = y;
                     imgParam.blackPoint[0] = buffer[4 * index + 0];
                     imgParam.blackPoint[1] = buffer[4 * index + 1];
                     imgParam.blackPoint[2] = buffer[4 * index + 2];
                 }
                 if (luma > maxLuma) {
                     maxLuma = luma;
-                    imgParam.maxX = x;
-                    imgParam.maxY = y;
+                    maxX = x;
+                    maxY = y;
                     imgParam.whitePoint[0] = buffer[4 * index + 0];
                     imgParam.whitePoint[1] = buffer[4 * index + 1];
                     imgParam.whitePoint[2] = buffer[4 * index + 2];
@@ -93,9 +109,46 @@ void image::processMinMax() {
         }
     }
 
+    imgParam.minX = (float)minX / width;
+    imgParam.minY = (float)minY / height;
+    imgParam.maxX = (float)maxX / width;
+    imgParam.maxY = (float)maxY / height;
+
     LOG_INFO("Analysis finished for {}!", srcFilename);
     LOG_INFO("Min Pixel: {},{}", imgParam.minX, imgParam.minY);
     LOG_INFO("Min Values: {}, {}, {}", imgParam.blackPoint[0], imgParam.blackPoint[1], imgParam.blackPoint[2]);
     LOG_INFO("Max Pixel: {},{}", imgParam.maxX, imgParam.maxY);
     LOG_INFO("Max Values: {}, {}, {}", imgParam.whitePoint[0], imgParam.whitePoint[1], imgParam.whitePoint[2]);
+}
+
+void image::resizeProxy() {
+
+    // Calculate the dimensions based on the max side
+    // Allocate temp buffer
+    // Resize from raw to tmp
+    // Copy back
+    //
+    if (std::max(rawWidth, rawHeight) < appPrefs.maxRes)
+        return; // Our image is small enough, don't resize
+    unsigned int newWidth, newHeight;
+    float ratio = rawWidth > rawHeight ? (float)appPrefs.maxRes / (float)rawWidth : (float)appPrefs.maxRes / (float)rawHeight;
+
+    newWidth = rawWidth * ratio;
+    newHeight = rawHeight * ratio;
+
+    allocateTmpBuf();
+
+    avir::CLancIR imageResizer;
+    imageResizer.resizeImage<float, float>(
+        rawImgData, rawWidth, rawHeight, 0,
+        tmpOutData, newWidth, newHeight, 0, 4, 0, 0, 0, 0);
+
+    if (rawImgData)
+        delete [] rawImgData;
+    rawImgData = new float[newWidth * newHeight * 4];
+
+    memcpy(rawImgData, tmpOutData, newWidth * newHeight * 4 * sizeof(float));
+    width = newWidth;
+    height = newHeight;
+    clearTmpBuf();
 }

@@ -18,12 +18,16 @@ void userPreferences::loadFromFile() {
 
         if (prefObj.contains("autoSave")) {
             autoSave = prefObj["autoSave"].get<bool>();
+            tmpAutoSave = autoSave;
         }
         if (prefObj.contains("saveFreq")) {
             autoSFreq = prefObj["saveFreq"].get<int>();
         }
         if (prefObj.contains("perfMode")) {
             perfMode = prefObj["perfMode"].get<bool>();
+        }
+        if (prefObj.contains("maxRes")) {
+            maxRes = prefObj["maxRes"].get<int>();
         }
         if (prefObj.contains("ocioPath")) {
             ocioPath = prefObj["ocioPath"].get<std::string>();
@@ -45,6 +49,7 @@ void userPreferences::saveToFile() {
         j["autoSave"] = autoSave;
         j["saveFreq"] = autoSFreq;
         j["perfMode"] = perfMode;
+        j["maxRes"] = maxRes;
         j["ocioPath"] = ocioPath;
         j["ocioExt"] = ocioExt;
 

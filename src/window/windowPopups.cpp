@@ -3,6 +3,7 @@
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "window.h"
+#include <algorithm>
 #include <cstring>
 #include <imgui.h>
 
@@ -18,6 +19,7 @@ void mainWindow::importRawSettings() {
     ImGui::InputScalar("###03a", ImGuiDataType_U16, &rawSet.channels,  NULL, NULL, "%d", ImGuiInputFlags_None);
     ImGui::Text("Byte Order IBM PC");
     ImGui::Checkbox("###05a", &rawSet.littleE);
+    ImGui::SetItemTooltip("Little/Big Endian. IBM PC being Little Endian:\nthe format Pakon raw saves as.");
     ImGui::EndGroup();
     ImGui::SameLine();
     ImGui::BeginGroup();
@@ -27,6 +29,7 @@ void mainWindow::importRawSettings() {
     ImGui::InputScalar("###04a", ImGuiDataType_U16, &rawSet.bitDepth,  NULL, NULL, "%d", ImGuiInputFlags_None);
     ImGui::Text("Planar Data");
     ImGui::Checkbox("###06a", &rawSet.planar);
+    ImGui::SetItemTooltip("The color channels are Planar (RRGGBB)\nor Interleaved (RGBRGB)");
     ImGui::EndGroup();
     rawSet.bitDepth = rawSet.bitDepth < 13 ? 8 :
         rawSet.bitDepth > 12 && rawSet.bitDepth < 25 ? 16 : 32;
@@ -35,6 +38,7 @@ void mainWindow::importRawSettings() {
     if (ImGui::Button("Auto-detect")) {
         testFirstRawFile();
     }
+    ImGui::SetItemTooltip("Attempt to set the settings based on\nsome preset Pakon values.");
 
     ImGui::Separator();
 
@@ -123,6 +127,7 @@ void mainWindow::importImagePopup() {
             if (createDisabled) {
                 ImGui::EndDisabled();
             }
+            ImGui::Spacing();
             ImGui::EndPopup();
         }
 
@@ -145,9 +150,13 @@ void mainWindow::importImagePopup() {
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
-        if (activeRolls.size() < 1)
+        bool impDisabled = false;
+        if (activeRolls.size() < 1 || totalTasks > 0) {
             ImGui::BeginDisabled();
-        if (ImGui::Button("Open")) {
+            impDisabled = true;
+        }
+
+        if (ImGui::Button("Import")) {
             // Here's all the juicy bits
 
             std::thread impThread = std::thread{[this]() {
@@ -206,7 +215,8 @@ void mainWindow::importImagePopup() {
             }};
             impThread.detach();
         }
-        if (activeRolls.size() < 1)
+        ImGui::Spacing();
+        if (impDisabled)
             ImGui::EndDisabled();
         if (!dispImportPop)
             ImGui::CloseCurrentPopup();
@@ -239,6 +249,12 @@ void mainWindow::importRollPopup() {
             dispImpRollPop = false;
             impRawCheck = false;
             ImGui::CloseCurrentPopup();
+        }
+        bool impDisable = false;
+        if(totalTasks > 0) {
+            // We are importing, disallow further imports
+            ImGui::BeginDisabled();
+            impDisable = true;
         }
         ImGui::SameLine();
         if (ImGui::Button("Import")) {
@@ -335,6 +351,9 @@ void mainWindow::importRollPopup() {
             }};
             impThread.detach();
         }
+        if (impDisable)
+            ImGui::EndDisabled();
+        ImGui::Spacing();
         if (!dispImpRollPop)
             ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
@@ -453,6 +472,7 @@ void mainWindow::batchRenderPopup() {
             exportPopup = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::Spacing();
         if (isExporting) {
             ImGui::Separator();
             float progress = (float)exportProcCount / ((float)(exportImgCount-1) + 0.5f);
@@ -514,6 +534,7 @@ void mainWindow::pastePopup() {
         ImGui::Checkbox("Lens", &pasteOptions.lens);
         ImGui::Checkbox("Film Stock", &pasteOptions.stock);
         ImGui::Checkbox("Focal Length", &pasteOptions.focal);
+        ImGui::Checkbox("f Number", &pasteOptions.fstop);
         ImGui::EndGroup();
 
         ImGui::SameLine();
@@ -537,11 +558,12 @@ void mainWindow::pastePopup() {
         if (ImGui::Button("All Metadata")) {
             pasteOptions.metaGlobal();
         }
-        ImGui::Checkbox("f Number", &pasteOptions.fstop);
+
         ImGui::Checkbox("Exposure", &pasteOptions.exposure);
         ImGui::Checkbox("Date/Time", &pasteOptions.date);
         ImGui::Checkbox("Location", &pasteOptions.location);
         ImGui::Checkbox("GPS", &pasteOptions.gps);
+        ImGui::Checkbox("Notes", &pasteOptions.notes);
         ImGui::EndGroup();
 
         ImGui::SameLine();
@@ -559,10 +581,12 @@ void mainWindow::pastePopup() {
         ImGui::Spacing();
 
         ImGui::InvisibleButton("##08", btnSize);
-        ImGui::Checkbox("Notes", &pasteOptions.notes);
+
         ImGui::Checkbox("Development Process", &pasteOptions.dev);
         ImGui::Checkbox("Chemistry Manufacturer", &pasteOptions.chem);
         ImGui::Checkbox("Development Notes", &pasteOptions.devnote);
+        ImGui::Checkbox("Scanner", &pasteOptions.scanner);
+        ImGui::Checkbox("Scanner Notes", &pasteOptions.scannotes);
         ImGui::InvisibleButton("##09", btnSize);
         ImGui::EndGroup();
 
@@ -579,6 +603,7 @@ void mainWindow::pastePopup() {
             pasteTrigger = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::Spacing();
         ImGui::EndPopup();
     }
 }
@@ -620,7 +645,7 @@ void mainWindow::unsavedRollPopup() {
                 ImGui::CloseCurrentPopup();
             } else {
                 if (validRoll()) {
-                    activeRolls[selRoll].saveAll();
+                    activeRoll()->saveAll();
                     removeRoll();
                 }
                 unsavedPopTrigger = false;
@@ -628,6 +653,7 @@ void mainWindow::unsavedRollPopup() {
             }
 
         }
+        ImGui::Spacing();
         ImGui::EndPopup();
     }
 
@@ -788,13 +814,14 @@ void mainWindow::globalMetaPopup() {
         if (ImGui::Button("Apply")) {
             // Save the metadata
             if (validRoll()) {
-                activeRolls[selRoll].rollMetaPostEdit(&metaEdit);
+                activeRoll()->rollMetaPostEdit(&metaEdit);
                 std::memset(&metaEdit, 0, sizeof(metaBuff));
             }
 
             globalMetaPopTrig = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::Spacing();
         ImGui::EndPopup();
     }
 }
@@ -950,6 +977,7 @@ void mainWindow::localMetaPopup() {
             localMetaPopTrig = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::Spacing();
         ImGui::EndPopup();
     }
 }
@@ -963,14 +991,18 @@ void mainWindow::preferencesPopup() {
         ImGui::Separator();
 
         ImGui::Text("Auto-save");
-        ImGui::Checkbox("###01", &appPrefs.autoSave);
-        if (appPrefs.autoSave) {
+        ImGui::Checkbox("###01", &appPrefs.tmpAutoSave);
+        if (appPrefs.tmpAutoSave) {
             ImGui::SameLine();
             ImGui::InputInt("Frequency (seconds)", &appPrefs.autoSFreq);
         }
 
         ImGui::Text("Roll Performance Mode");
         ImGui::Checkbox("###02", &appPrefs.perfMode);
+        ImGui::SetItemTooltip("Scale resolution down for optimal interaction speed.\nWill also unload non-active rolls to save memory usage.\nUnloaded rolls are re-loaded when active.");
+        ImGui::SameLine();
+        ImGui::DragInt("Max Res", &appPrefs.maxRes, 10.0f, 1000, 5000, "%d", 0);
+        ImGui::SetItemTooltip("Set the maximum resolution on the long side for images\non import. Exported images are rendered in full resolution.");
 
         ImGui::Separator();
 
@@ -1018,11 +1050,13 @@ void mainWindow::preferencesPopup() {
                 ocioProc.setExtActive();
                 appPrefs.ocioExt = true;
             }
+            appPrefs.autoSave = appPrefs.tmpAutoSave;
             std::memset(ocioPath, 0, sizeof(ocioPath));
             appPrefs.saveToFile();
             preferencesPopTrig = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::Spacing();
         ImGui::EndPopup();
     }
 }
@@ -1041,7 +1075,7 @@ void mainWindow::ackPopup() {
             std::memset(ackError, 0, sizeof(ackError));
             ImGui::CloseCurrentPopup();
         }
-
+        ImGui::Spacing();
         ImGui::EndPopup();
     }
 }
@@ -1061,6 +1095,10 @@ void mainWindow::shortcutsPopup() {
         ImGui::Separator();
         ImGui::Text("⌘ + E ");
         ImGui::Text("⌘ + G ");
+        ImGui::Separator();
+        ImGui::Text("Z");
+        ImGui::Text("⌥ + Scroll");
+        ImGui::Text("Shift + Scroll");
         ImGui::Separator();
         ImGui::Text("⌘ + [ ");
         ImGui::Text("⌘ + ] ");
@@ -1084,6 +1122,10 @@ void mainWindow::shortcutsPopup() {
         ImGui::Text("Edit Image Metadata");
         ImGui::Text("Edit Roll Metadata");
         ImGui::Spacing();
+        ImGui::Text("Reset view to fit image");
+        ImGui::Text("Zoom in/out of image");
+        ImGui::Text("");
+        ImGui::Spacing();
         ImGui::Text("Rotate Left");
         ImGui::Text("Rotate Right");
         ImGui::Spacing();
@@ -1099,7 +1141,7 @@ void mainWindow::shortcutsPopup() {
 
             ImGui::CloseCurrentPopup();
         }
-
+        ImGui::Spacing();
         ImGui::EndPopup();
     }
 }

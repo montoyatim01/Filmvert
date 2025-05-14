@@ -4,12 +4,14 @@
 
 void mainWindow::imageView() {
     bool calcBaseColor = false;
-    ImGui::SetNextWindowPos(ImVec2(0,25));
+    ImGui::SetNextWindowPos(ImVec2(0,25), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(winWidth * 0.65,winHeight - (25 + thumbHeight)), ImGuiCond_FirstUseEver);
     ImGuiWindowFlags winFlags = 0;
     winFlags |= ImGuiWindowFlags_NoTitleBar;
     winFlags |= ImGuiWindowFlags_HorizontalScrollbar;
     winFlags |= ImGuiWindowFlags_NoScrollWithMouse;
+    winFlags |= ImGuiWindowFlags_NoMove;
+    winFlags |= ImGuiWindowFlags_NoCollapse;
     if (unsavedChanges()) winFlags |= ImGuiWindowFlags_UnsavedDocument;
 
     ImGui::Begin("Image Display", 0, winFlags);
@@ -63,8 +65,8 @@ void mainWindow::imageView() {
         // Convert crop box coordinates to screen space, accounting for rotation
         ImVec2 cropBoxScreen[4];
         for (int i = 0; i < 4; i++) {
-            int x = activeImage()->imgParam.cropBoxX[i];
-            int y = activeImage()->imgParam.cropBoxY[i];
+            int x = activeImage()->imgParam.cropBoxX[i] * activeImage()->width;
+            int y = activeImage()->imgParam.cropBoxY[i] * activeImage()->height;
 
             // Transform coordinates based on rotation
             int transformedX = x;
@@ -138,16 +140,16 @@ void mainWindow::imageView() {
         // Draw min/max positions if available
         if (minMaxDisp) {
             if (validIm()){
-                if (activeImage()->imgParam.minX != 0 && activeImage()->imgParam.maxY != 0) {
+                if (activeImage()->imgParam.minX > 0.001 && activeImage()->imgParam.maxY > 0.001) {
                     // Transform coordinates for minPoint
-                    int minX = activeImage()->imgParam.minX;
-                    int minY = activeImage()->imgParam.minY;
+                    int minX = activeImage()->imgParam.minX * activeImage()->width;
+                    int minY = activeImage()->imgParam.minY * activeImage()->height;
                     transformCoordinates(minX, minY, activeImage()->imRot,
                                          activeImage()->width, activeImage()->height);
 
                     // Transform coordinates for maxPoint
-                    int maxX = activeImage()->imgParam.maxX;
-                    int maxY = activeImage()->imgParam.maxY;
+                    int maxX = activeImage()->imgParam.maxX * activeImage()->width;
+                    int maxY = activeImage()->imgParam.maxY * activeImage()->height;
                     transformCoordinates(maxX, maxY, activeImage()->imRot,
                                          activeImage()->width, activeImage()->height);
 
@@ -196,8 +198,8 @@ void mainWindow::imageView() {
                                             activeImage()->width, activeImage()->height);
 
                 // Update the corner position
-                activeImage()->imgParam.cropBoxX[draggedCorner] = origX;
-                activeImage()->imgParam.cropBoxY[draggedCorner] = origY;
+                activeImage()->imgParam.cropBoxX[draggedCorner] = (float)origX / activeImage()->width;
+                activeImage()->imgParam.cropBoxY[draggedCorner] = (float)origY / activeImage()->height;
 
                 currentlyInteracting = true;
             } else {
@@ -248,10 +250,10 @@ void mainWindow::imageView() {
                 selectionEnd = selectionStart;     // Initialize end position as same as start
 
                 // Store in sample arrays (in original image coordinates)
-                activeImage()->imgParam.sampleX[0] = selectionStart.x;
-                activeImage()->imgParam.sampleY[0] = selectionStart.y;
-                activeImage()->imgParam.sampleX[1] = selectionEnd.x;
-                activeImage()->imgParam.sampleY[1] = selectionEnd.y;
+                activeImage()->imgParam.sampleX[0] = (float)selectionStart.x / activeImage()->width;
+                activeImage()->imgParam.sampleY[0] = (float)selectionStart.y / activeImage()->height;
+                activeImage()->imgParam.sampleX[1] = (float)selectionEnd.x / activeImage()->width;
+                activeImage()->imgParam.sampleY[1] = (float)selectionEnd.y / activeImage()->height;
 
                 currentlyInteracting = true;
             }
@@ -261,8 +263,8 @@ void mainWindow::imageView() {
                 selectionEnd = mousePosInImage;  // This is in original image coordinates
 
                 // Store in sample arrays (in original image coordinates)
-                activeImage()->imgParam.sampleX[1] = selectionEnd.x;
-                activeImage()->imgParam.sampleY[1] = selectionEnd.y;
+                activeImage()->imgParam.sampleX[1] = (float)selectionEnd.x / activeImage()->width;
+                activeImage()->imgParam.sampleY[1] = (float)selectionEnd.y / activeImage()->height;
 
                 currentlyInteracting = true;
             }
@@ -273,10 +275,10 @@ void mainWindow::imageView() {
 
                 // Coordinates are already in original image space
                 // Final update of sample arrays
-                activeImage()->imgParam.sampleX[0] = selectionStart.x;
-                activeImage()->imgParam.sampleY[0] = selectionStart.y;
-                activeImage()->imgParam.sampleX[1] = selectionEnd.x;
-                activeImage()->imgParam.sampleY[1] = selectionEnd.y;
+                activeImage()->imgParam.sampleX[0] = (float)selectionStart.x / activeImage()->width;
+                activeImage()->imgParam.sampleY[0] = (float)selectionStart.y / activeImage()->height;
+                activeImage()->imgParam.sampleX[1] = (float)selectionEnd.x / activeImage()->width;
+                activeImage()->imgParam.sampleY[1] = (float)selectionEnd.y / activeImage()->height;
 
                 calcBaseColor = true;
                 currentlyInteracting = true;
@@ -287,10 +289,10 @@ void mainWindow::imageView() {
         if (validIm()){
             if ((isSelecting && ctrlShiftPressed) || sampleVisible) {
                 // Get selection coordinates in original image space
-                int stX = activeImage()->imgParam.sampleX[0];
-                int stY = activeImage()->imgParam.sampleY[0];
-                int edX = activeImage()->imgParam.sampleX[1];
-                int edY = activeImage()->imgParam.sampleY[1];
+                int stX = activeImage()->imgParam.sampleX[0] * activeImage()->width;
+                int stY = activeImage()->imgParam.sampleY[0] * activeImage()->height;
+                int edX = activeImage()->imgParam.sampleX[1] * activeImage()->width;
+                int edY = activeImage()->imgParam.sampleY[1] * activeImage()->height;
 
                 // Transform to rotated image coordinates
                 int rotStX = stX;
@@ -342,7 +344,7 @@ void mainWindow::imageView() {
                 dispScale;
 
             // Inside the mouse wheel condition:
-            if (ImGui::GetIO().MouseWheel != 0 && ImGui::GetIO().KeyShift) {
+            if (ImGui::GetIO().MouseWheel != 0 && (ImGui::GetIO().KeyShift || ImGui::GetIO().KeyAlt)) {
                 // Store the mouse position relative to the image before zooming
                 float mouseXRatio = mousePosInImage.x / activeImage()->width;
                 float mouseYRatio = mousePosInImage.y / activeImage()->height;
@@ -378,7 +380,7 @@ void mainWindow::imageView() {
                 currentlyInteracting = true;
             }
 
-            if ((ImGui::GetIO().MouseWheel != 0 || ImGui::GetIO().MouseWheelH != 0) && !ImGui::GetIO().KeyShift) {
+            if ((ImGui::GetIO().MouseWheel != 0 || ImGui::GetIO().MouseWheelH != 0) && !ImGui::GetIO().KeyShift && !ImGui::GetIO().KeyAlt) {
                 scroll.x = ImGui::GetScrollX() - (ImGui::GetIO().MouseWheelH * 12);
                 scroll.y = ImGui::GetScrollY() - (ImGui::GetIO().MouseWheel * 12);
                 ImGui::SetScrollX(scroll.x);
@@ -386,7 +388,7 @@ void mainWindow::imageView() {
                 currentlyInteracting = true;
             }
 
-            if (ImGui::IsKeyPressed(ImGuiKey_Z)) {
+            if (ImGui::IsKeyPressed(ImGuiKey_Z) || firstImage) {
                 int iWidth = activeImage()->imRot == 6 || activeImage()->imRot == 8 ? activeImage()->height : activeImage()->width;
                 int iHeight = activeImage()->imRot == 6 || activeImage()->imRot == 8 ? activeImage()->width : activeImage()->height;
                 // Pressed the z key, reset zoom
@@ -395,6 +397,7 @@ void mainWindow::imageView() {
 
                 dispScale = scaleX > scaleY ? scaleY : scaleX;
                 currentlyInteracting = true;
+                firstImage = false;
             }
 
             // Only allow panning if we're not dragging a corner and not making a selection

@@ -23,8 +23,8 @@ void mainWindow::menuBar() {
             }
             if (ImGui::MenuItem("Save Roll")) {
                 if (validRoll()) {
-                    activeRolls[selRoll].saveAll();
-                    activeRolls[selRoll].exportRollMetaJSON();
+                    activeRoll()->saveAll();
+                    activeRoll()->exportRollMetaJSON();
                 }
 
             }
@@ -59,7 +59,7 @@ void mainWindow::menuBar() {
                 //Actions needed to close a roll
                 //Check if unsaved, prompt
                 if (validRoll()) {
-                    if (activeRolls[selRoll].unsavedImages()) {
+                    if (activeRoll()->unsavedImages()) {
                         // We have unsaved images, prompt user
                         unsavedPopTrigger = true;
 
@@ -97,7 +97,7 @@ void mainWindow::menuBar() {
             if (ImGui::MenuItem("Select All")) {
                 // Select All
                 if(validRoll()) {
-                    int itemCount = activeRolls[selRoll].images.size();
+                    int itemCount = activeRollSize();
                     for (int i = 0; i < itemCount; i++) {
                             selection.SetItemSelected(selection.GetStorageIdFromIndex(i), true);
                         }
@@ -136,7 +136,7 @@ void mainWindow::menuBar() {
             // Export Metadata
             if (ImGui::MenuItem("Export Roll Metadata")) {
                 if (validRoll()) {
-                    if(activeRolls[selRoll].exportRollMetaJSON()) {
+                    if(activeRoll()->exportRollMetaJSON()) {
                         std::strcpy(ackMsg, "Roll Export Successful!");
                         ackPopTrig = true;
                     } else {
@@ -149,7 +149,7 @@ void mainWindow::menuBar() {
             // Export CSV
             if (ImGui::MenuItem("Export Roll CSV")) {
                 if (validRoll()) {
-                    if (activeRolls[selRoll].exportRollCSV()) {
+                    if (activeRoll()->exportRollCSV()) {
                         std::strcpy(ackMsg, "CSV Exported to Roll directory.");
                         ackPopTrig = true;
                     } else {
@@ -165,7 +165,7 @@ void mainWindow::menuBar() {
                 if (validRoll()) {
                     std::memset(&metaEdit, 0, sizeof(metaBuff));
                     globalMetaPopTrig = true;
-                    activeRolls[selRoll].rollMetaPreEdit(&metaEdit);
+                    activeRoll()->rollMetaPreEdit(&metaEdit);
                 }
 
             }
@@ -220,6 +220,7 @@ void mainWindow::menuBar() {
                         }
                     }
                 }
+                ImGui::SetItemTooltip("Roll selection");
 
         //--- OCIO Settings
 

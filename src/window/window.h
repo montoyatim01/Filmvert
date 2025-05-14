@@ -77,9 +77,11 @@ class mainWindow
         float dispScale = 1.0f;
         ImVec2 dispSize;
         ImVec2 scroll;
+        bool histEnable = true;
 
         // Program state
         bool done = false;
+        bool firstImage = false;
 
         std::deque<filmRoll> activeRolls;
         std::vector<char*>rollNames;
@@ -178,6 +180,7 @@ class mainWindow
         bool validRoll();
         bool validIm();
         image* activeImage();
+        filmRoll* activeRoll();
         image* getImage(int index);
         image* getImage(int roll, int index);
         int activeRollSize();
@@ -223,7 +226,7 @@ class mainWindow
         // windowSDL.cpp
         void createSDLTexture(image* actImage);
         void updateSDLTexture(image* actImage);
-        void updateSDLHistogram(image* img);
+        void updateSDLHistogram(image* img, void* pixels, int pitch, float intensityMultiplier);
 
         // windowPopups.cpp
         void importRawSettings();

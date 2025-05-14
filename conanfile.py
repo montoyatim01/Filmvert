@@ -34,7 +34,7 @@ else:
     "openimageio*:with_hdf5": False,
     "openimageio*:with_tbb": False,
     "openimageio*:with_ptex": False,
-    "openimageio*:shared": True,
+    "openimageio*:shared": False,
     "openimageio*:with_libjpeg" : "libjpeg",
     "openimageio*:with_openjpeg" : False,
     "openimageio*:with_raw" : True
@@ -46,7 +46,7 @@ libraw_options = {
     "libraw*:build_thread_safe" : True
 }
 
-class tGrainConan(ConanFile):
+class FilmvertConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = ["CMakeDeps", "CMakeToolchain", "cmake_find_package",
                   "VCVars", "virtualenv", "scons", "txt"]

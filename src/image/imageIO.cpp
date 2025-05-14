@@ -2,6 +2,7 @@
 #include "structs.h"
 #include "utils.h"
 #include "preferences.h"
+#include "lancir.h"
 
 #include <variant>
 #include <filesystem>
@@ -278,6 +279,9 @@ bool image::debayerImage(bool fullRes, int quality) {
             thread.join();
         }
         padToRGBA();
+        if (appPrefs.perfMode)
+            resizeProxy();
+
         imageLoaded = true;
         // Clean up
         LibRaw::dcraw_clear_mem(processedImage);
@@ -327,6 +331,9 @@ bool image::oiioReload() {
 
     // Pad to RGBA
     padToRGBA();
+    if (appPrefs.perfMode)
+        resizeProxy();
+
 
     ocioProc.processImage(rawImgData, width, height, intOCIOSet);
     imageLoaded = true;
@@ -363,11 +370,11 @@ bool image::dataReload() {
 
     float maxValue = static_cast<float>((1 << intRawSet.bitDepth) - 1);
     int bytesPerChannel = (intRawSet.bitDepth > 8) ? (intRawSet.bitDepth > 16 ? 4 : 2) : 1;
-    int planeSize = width * height * bytesPerChannel;
+    int planeSize = rawWidth * rawHeight * bytesPerChannel;
 
     if (rawImgData)
         delete [] rawImgData;
-    rawImgData = new float[width * height * 4];
+    rawImgData = new float[rawWidth * rawHeight * 4];
 
     // Load in the image and pre-process to Linear AP1
     unsigned int numThreads = std::thread::hardware_concurrency();
@@ -375,16 +382,16 @@ bool image::dataReload() {
     // Create a vector of threads
     std::vector<std::thread> threads(numThreads);
     // Divide the workload into equal parts for each thread
-    int rowsPerThread = height / numThreads;
+    int rowsPerThread = rawHeight / numThreads;
     auto processRows = [&](int startRow, int endRow) {
         float pIn[3] = {0};
         float pOut[3] = {0};
 
         for (int y = startRow; y < endRow; y++) {
-            for (int x = 0; x < width; x++) {
+            for (int x = 0; x < rawWidth; x++) {
                 // Calculate the starting byte position for this pixel
                 // Calculate pixel position
-                int pixelIndex = y * width + x;
+                int pixelIndex = y * rawWidth + x;
 
                 // For interleaved data, calculate the byte offset
                 int pixelByteOffset = pixelIndex * nChannels * bytesPerChannel;
@@ -444,6 +451,9 @@ bool image::dataReload() {
     }
 
     padToRGBA();
+    if (appPrefs.perfMode)
+        resizeProxy();
+
     ocioProc.processImage(rawImgData, width, height, intOCIOSet);
     imageLoaded = true;
     return true;
@@ -504,6 +514,8 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
         try {
             img.width = rawSet.width;
             img.height = rawSet.height;
+            img.rawWidth = rawSet.width;
+            img.rawHeight = rawSet.height;
             img.nChannels = rawSet.channels;
             long expByteCount = img.width * img.height * img.nChannels;
             expByteCount *= (rawSet.bitDepth / 8);
@@ -639,20 +651,12 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
             }
 
             // Image is good
-            img.imgParam.cropBoxX[0] = img.width * 0.1;
-            img.imgParam.cropBoxY[0] = img.height * 0.1;
-
-            img.imgParam.cropBoxX[1] = img.width * 0.9;
-            img.imgParam.cropBoxY[1] = img.height * 0.1;
-
-            img.imgParam.cropBoxX[2] = img.width * 0.9;
-            img.imgParam.cropBoxY[2] = img.height * 0.9;
-
-            img.imgParam.cropBoxX[3] = img.width * 0.1;
-            img.imgParam.cropBoxY[3] = img.height * 0.9;
             img.renderBypass = true;
             img.imageLoaded = true;
             img.padToRGBA();
+            if (appPrefs.perfMode)
+                img.resizeProxy();
+            img.setCrop();
             img.intOCIOSet = ocioSet;
             ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
             img.imageLoaded = true;
@@ -736,6 +740,8 @@ auto c1 = std::chrono::steady_clock::now();
 
     img.width = processedImage->width;
     img.height = processedImage->height;
+    img.rawWidth = processedImage->width;
+    img.rawHeight = processedImage->height;
     img.nChannels = processedImage->colors;
     img.rawImgData = new float[img.width * img.height * 4];
 
@@ -799,6 +805,9 @@ auto d1 = std::chrono::steady_clock::now();
 
     // Pad to RGBA
     img.padToRGBA();
+    if (appPrefs.perfMode)
+        img.resizeProxy();
+    img.setCrop();
 auto e1 = std::chrono::steady_clock::now();
 
 auto f1 = std::chrono::steady_clock::now();
@@ -869,6 +878,8 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
     const OIIO::ImageSpec &inputSpec = inputImage->spec();
     img.width = inputSpec.width;
     img.height = inputSpec.height;
+    img.rawWidth = inputSpec.width;
+    img.rawHeight = inputSpec.height;
     img.nChannels = inputSpec.nchannels;
 
     img.imgParam.cropBoxX[0] = img.width * 0.1;
@@ -899,6 +910,9 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
 
     // Pad to RGBA
     img.padToRGBA();
+    if (appPrefs.perfMode)
+        img.resizeProxy();
+    img.setCrop();
 
     // Read metadata
     img.readMetaFromFile();

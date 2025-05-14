@@ -1,3 +1,4 @@
+#include "roll.h"
 #include "window.h"
 #include <filesystem>
 
@@ -156,6 +157,12 @@ bool mainWindow::validIm() {
 image* mainWindow::activeImage() {
     if (validIm())
         return activeRolls[selRoll].selImage();
+    return nullptr;
+}
+filmRoll* mainWindow::activeRoll() {
+    if (validRoll()) {
+        return &activeRolls[selRoll];
+    }
     return nullptr;
 }
 image* mainWindow::getImage(int index) {

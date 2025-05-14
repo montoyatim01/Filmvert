@@ -356,7 +356,7 @@ bool image::loadMetaFromStr(const std::string& j) {
                 if (imgJson.contains("sampleX") && imgJson["sampleX"].is_array()) {
                     const auto& arr = imgJson["sampleX"];
                     for (size_t i = 0; i < std::min(arr.size(), size_t(2)); ++i) {
-                        tmpParam.sampleX[i] = arr[i].get<unsigned int>();
+                        tmpParam.sampleX[i] = arr[i].get<float>();
                     }
                 } else {
                     goodImgParm = false;
@@ -365,7 +365,7 @@ bool image::loadMetaFromStr(const std::string& j) {
                 if (imgJson.contains("sampleY") && imgJson["sampleY"].is_array()) {
                     const auto& arr = imgJson["sampleY"];
                     for (size_t i = 0; i < std::min(arr.size(), size_t(2)); ++i) {
-                        tmpParam.sampleY[i] = arr[i].get<unsigned int>();
+                        tmpParam.sampleY[i] = arr[i].get<float>();
                     }
                 } else {
                     goodImgParm = false;
@@ -464,7 +464,7 @@ bool image::loadMetaFromStr(const std::string& j) {
                 if (imgJson.contains("cropBoxX") && imgJson["cropBoxX"].is_array()) {
                     const auto& arr = imgJson["cropBoxX"];
                     for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.cropBoxX[i] = arr[i].get<unsigned int>();
+                        tmpParam.cropBoxX[i] = arr[i].get<float>();
                     }
                 } else {
                     goodImgParm = false;
@@ -473,7 +473,7 @@ bool image::loadMetaFromStr(const std::string& j) {
                 if (imgJson.contains("cropBoxY") && imgJson["cropBoxY"].is_array()) {
                     const auto& arr = imgJson["cropBoxY"];
                     for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.cropBoxY[i] = arr[i].get<unsigned int>();
+                        tmpParam.cropBoxY[i] = arr[i].get<float>();
                     }
                 } else {
                     goodImgParm = false;
@@ -486,25 +486,25 @@ bool image::loadMetaFromStr(const std::string& j) {
                 }
 
                 if (imgJson.contains("minX")){
-                    tmpParam.minX = imgJson["minX"].get<unsigned int>();
+                    tmpParam.minX = imgJson["minX"].get<float>();
                 } else {
                     goodImgParm = false;
                 }
 
                 if (imgJson.contains("minY")){
-                    tmpParam.minY = imgJson["minY"].get<unsigned int>();
+                    tmpParam.minY = imgJson["minY"].get<float>();
                 } else {
                     goodImgParm = false;
                 }
 
                 if (imgJson.contains("maxX")){
-                    tmpParam.maxX = imgJson["maxX"].get<unsigned int>();
+                    tmpParam.maxX = imgJson["maxX"].get<float>();
                 } else {
                     goodImgParm = false;
                 }
 
                 if (imgJson.contains("maxY")){
-                    tmpParam.maxY = imgJson["maxY"].get<unsigned int>();
+                    tmpParam.maxY = imgJson["maxY"].get<float>();
                 } else {
                     goodImgParm = false;
                 }

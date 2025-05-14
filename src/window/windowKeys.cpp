@@ -37,7 +37,7 @@ void mainWindow::checkHotkeys() {
     // Save Roll (Cmd + Shift + S)
     if (ImGui::IsKeyChordPressed(ImGuiKey_V | ImGuiMod_Ctrl | ImGuiMod_Shift)) {
         if (validRoll())
-            activeRolls[selRoll].saveAll();
+            activeRoll()->saveAll();
     }
 
     // Save All (Opt + Shift + S)
@@ -102,7 +102,7 @@ void mainWindow::checkHotkeys() {
         if (validRoll()) {
             std::memset(&metaEdit, 0, sizeof(metaBuff));
             globalMetaPopTrig = true;
-            activeRolls[selRoll].rollMetaPreEdit(&metaEdit);
+            activeRoll()->rollMetaPreEdit(&metaEdit);
         }
     }
 

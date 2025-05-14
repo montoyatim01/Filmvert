@@ -38,6 +38,8 @@ void mainWindow::copyIntoParams() {
         copyMeta.devProcess = activeImage()->imMeta.devProcess;
         copyMeta.chemMfg = activeImage()->imMeta.chemMfg;
         copyMeta.devNotes = activeImage()->imMeta.devNotes;
+        copyMeta.scanner = activeImage()->imMeta.scanner;
+        copyMeta.scanNotes = activeImage()->imMeta.scanNotes;
 
 
     }
@@ -149,6 +151,12 @@ void mainWindow::pasteIntoParams() {
             }
             if (pasteOptions.devnote) {
                 getImage(i)->imMeta.devNotes = copyMeta.devNotes;
+            }
+            if (pasteOptions.scanner) {
+                getImage(i)->imMeta.scanner = copyMeta.scanner;
+            }
+            if (pasteOptions.scannotes) {
+                getImage(i)->imMeta.scanNotes = copyMeta.scanNotes;
             }
 
 

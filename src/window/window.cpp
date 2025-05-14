@@ -143,6 +143,7 @@ int mainWindow::openWindow()
     ImVec4 windowCL = ImVec4(22.0f/255.0f, 22.0f/255.0f, 29.0f/255.0f, 1.00f);
     int returnValue = -1;
     int loopCounter = 0;
+    firstImage = true;
     while (!done)
     {
         // Poll and handle events (inputs, window resize, etc.)

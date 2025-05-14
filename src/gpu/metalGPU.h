@@ -101,7 +101,6 @@ class metalGPU {
 
         void loadOCIOTex(ocioSetting ocioSet);
 
-        void computeKernels(float strength, float* kernels);
 
         void renderImage(image* _image, ocioSetting ocioSet);
         void renderBlurPass(image* _image);

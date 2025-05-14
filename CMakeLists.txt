@@ -10,7 +10,7 @@ else()
     set(LANGUAGES ${LANGUAGES} OBJC)
 endif()
 
-project(tgrain ${LANGUAGES})
+project(filmvert ${LANGUAGES})
 
 set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
@@ -58,12 +58,7 @@ include_directories(src/ocio)
 include_directories(src/roll)
 include_directories(src/window)
 include_directories("${CMAKE_BINARY_DIR}/bindings")
-#INCLUDE_DIRECTORIES("/Users/timothymontoya/Downloads/exiv2-0.28.5-Darwin-arm64/include")
-#add_library(LibRaw STATIC IMPORTED)
-#set_target_properties(LibRaw PROPERTIES
-#    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/LibRaw/lib/libraw_r.dylib"
-#    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/LibRaw"
-#)
+
 
 if (APPLE)
     include_directories("/usr/local/include/metal-cpp")
@@ -171,7 +166,7 @@ file(GLOB_RECURSE ROLL_SRCS src/roll/*.cpp)
 file(GLOB_RECURSE WINDOW_SRCS src/window/*.cpp)
 
 
-set(TGRAIN_SRCS
+set(FILMVERT_SRCS
     src/main.cpp
     src/logger.cpp
     ${WINDOW_SRCS}
@@ -188,11 +183,11 @@ set(TGRAIN_SRCS
     ${IMGUI_SRCS}
 )
 set(CMAKE_MACOSX_RPATH ON)
-add_executable(tGrain MACOSX_BUNDLE ${TGRAIN_SRCS})
-set_target_properties(tGrain PROPERTIES
+add_executable(Filmvert MACOSX_BUNDLE ${FILMVERT_SRCS})
+set_target_properties(Filmvert PROPERTIES
     BUNDLE True
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.timothymontoya.tGrain"
-    MACOSX_BUNDLE_BUNDLE_NAME "tGrain"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.timothymontoya.Filmvert"
+    MACOSX_BUNDLE_BUNDLE_NAME "Filmvert"
     MACOSX_BUNDLE_BUNDLE_VERSION "3.1.0"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "3.1.0"
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in
@@ -202,8 +197,8 @@ if (APPLE)
     #set_source_files_properties(HaloLab/HaloLabPlugin.cpp
     #                           COMPILE_FLAGS "-x objective-c++")
 
-    #target_link_directories(tGrain PUBLIC "/Users/timothymontoya/Downloads/exiv2-0.28.5/build/lib")
-    target_link_libraries(tGrain
+    #target_link_directories(Filmvert PUBLIC "/Users/timothymontoya/Downloads/exiv2-0.28.5/build/lib")
+    target_link_libraries(Filmvert
                   "-framework MetalKit"
                   "-framework IOKit"
                   "-framework CoreVideo"
@@ -227,7 +222,7 @@ if (APPLE)
     )
 elseif (WIN32)
 
-    target_link_libraries(tGrain wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
+    target_link_libraries(Filmvert wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
                           SDL2::SDL2-static
                           imgui::imgui
                           spdlog::spdlog_header_only
@@ -236,8 +231,8 @@ elseif (WIN32)
                           OpenImageIO::OpenImageIO
                           cuda)
 elseif (UNIX)
-    target_link_libraries(tGrain -lOpenCL -lcurl -lcrypto -lz)
-    target_link_libraries(tGrain
+    target_link_libraries(Filmvert -lOpenCL -lcurl -lcrypto -lz)
+    target_link_libraries(Filmvert
                           SDL2::SDL2-static
                           imgui::imgui
                           spdlog::spdlog_header_only
@@ -256,7 +251,7 @@ elseif (UNIX)
               "/usr/lib/x86_64-linux-gnu/glib-2.0/include")
 endif()
 
-target_compile_definitions(tGrain PRIVATE
+target_compile_definitions(Filmvert PRIVATE
     TG_PROJECT_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\"
     BUILD_DATE="${BUILD_DATE}"
     GIT_COMMIT_HASH="${GIT_COMMIT_HASH}"
@@ -264,18 +259,18 @@ target_compile_definitions(tGrain PRIVATE
 
 
 if (APPLE)
-    add_dependencies(tGrain make-metallib)
+    add_dependencies(Filmvert make-metallib)
 
-    #add_custom_command(TARGET tGrain POST_BUILD
+    #add_custom_command(TARGET Filmvert POST_BUILD
     #  COMMAND ${CMAKE_COMMAND} -E copy_if_different
     #          "${CMAKE_SOURCE_DIR}/LibRaw/lib/libraw_r.24.dylib"
-    #          "$<TARGET_BUNDLE_DIR:tGrain>/Contents/Frameworks/libraw_r.24.dylib"
+    #          "$<TARGET_BUNDLE_DIR:Filmvert>/Contents/Frameworks/libraw_r.24.dylib"
     #  COMMAND install_name_tool -id "@rpath/libraw_r.24.dylib"
-    #          "$<TARGET_BUNDLE_DIR:tGrain>/Contents/Frameworks/libraw_r.24.dylib"
+    #          "$<TARGET_BUNDLE_DIR:Filmvert>/Contents/Frameworks/libraw_r.24.dylib"
     #  COMMAND install_name_tool -add_rpath "@executable_path/../Frameworks"
-    #          $<TARGET_FILE:tGrain>
+    #          $<TARGET_FILE:Filmvert>
     #  COMMAND install_name_tool -change "/usr/local/lib/libraw_r.24.dylib"
     #          "@rpath/libraw_r.24.dylib"
-    #          $<TARGET_FILE:tGrain>)
+    #          $<TARGET_FILE:Filmvert>)
 
 endif()
