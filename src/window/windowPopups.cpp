@@ -2,12 +2,19 @@
 #include "imageMeta.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
+#include "structs.h"
 #include "window.h"
 #include <algorithm>
 #include <cstring>
 #include <imgui.h>
 
-
+//--- Import Raw Settings ---//
+/*
+    Section of the import popup window
+    that appears when a "raw" file has been
+    detected, to set the import settings for
+    the batch of images
+*/
 void mainWindow::importRawSettings() {
     //ImGui::Separator();
     ImGui::Text("RAW Image Settings");
@@ -44,7 +51,11 @@ void mainWindow::importRawSettings() {
 
 
 }
-
+//--- Import IDT Setting ---//
+/*
+    Section of the import popup for
+    selecting the image's IDT settings
+*/
 void mainWindow::importIDTSetting() {
     //ImGui::Separator();
     ImGui::Text("Image Colorspace Setting:");
@@ -63,13 +74,26 @@ void mainWindow::importIDTSetting() {
         importOCIO.useDisplay = true;
     }
     importOCIO.inverse = true;
-    importOCIO.ext = appPrefs.ocioExt && ocioProc.validExternal;
+    importOCIO.ext = appPrefs.prefs.ocioExt && ocioProc.validExternal;
 
     ImGui::Separator();
 
 }
 
+//--- Import Image Popup ---//
+/*
+    The popup for individual/multiple image importing.
+    Contains a dropdown to select which roll the images should
+    go into. Allows a second popup that enables the user to
+    create a new roll to add the images into.
+*/
 void mainWindow::importImagePopup() {
+    std::vector<const char*> rollPointers;
+    for (const auto& item : activeRolls) {
+        rollPointers.push_back(item.rollName.c_str());
+    }
+    if (validRoll())
+        impRoll = selRoll;
     if (dispImportPop)
         ImGui::OpenPopup("Import Images");
     if (ImGui::BeginPopupModal("Import Images", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
@@ -79,7 +103,7 @@ void mainWindow::importImagePopup() {
             importRawSettings();
         importIDTSetting();
         ImGui::Text("Roll to insert images to:");
-        ImGui::Combo("###", &impRoll, rollNames.data(), activeRolls.size());
+        ImGui::Combo("###", &impRoll, rollPointers.data(), activeRolls.size());
         ImGui::SameLine();
         if (ImGui::Button("New Roll")) {
             newRollPopup = true;
@@ -113,9 +137,6 @@ void mainWindow::importImagePopup() {
             }
             if (ImGui::Button("Create Roll")) {
                 activeRolls.emplace_back(filmRoll(rollNameBuf));
-                rollNames.resize(rollNames.size() + 1);
-                rollNames[rollNames.size() - 1] = new char[activeRolls.back().rollName.length() + 1];
-                std::strcpy(rollNames[rollNames.size() - 1], activeRolls.back().rollName.c_str());
                 activeRolls.back().rollPath = rollPath;
                 std::memset(rollPath, 0, sizeof(rollPath));
                 std::memset(rollNameBuf, 0, sizeof(rollNameBuf));
@@ -160,7 +181,7 @@ void mainWindow::importImagePopup() {
             // Here's all the juicy bits
 
             std::thread impThread = std::thread{[this]() {
-                size_t baseIndex = activeRolls[impRoll].images.size();
+                size_t baseIndex = activeRolls[impRoll].rollSize();
                 completedTasks = 0;
                 totalTasks = importFiles.size();
                 activeRolls[impRoll].imagesLoading = true;
@@ -191,7 +212,7 @@ void mainWindow::importImagePopup() {
                         LOG_ERROR("Error: {}", std::get<std::string>(res.result));
                     }
                 }
-                for (int i = baseIndex; i < activeRolls[impRoll].images.size(); i++) {
+                for (int i = baseIndex; i < activeRolls[impRoll].rollSize(); i++) {
                     image *img = getImage(impRoll, i);
 
                     if (img) {
@@ -202,6 +223,7 @@ void mainWindow::importImagePopup() {
 
 
                 }
+                activeRolls[impRoll].rollLoaded = true;
                 activeRolls[impRoll].imagesLoading = false;
                 selRoll = impRoll;
                 dispImportPop = false;
@@ -224,6 +246,13 @@ void mainWindow::importImagePopup() {
     }
 }
 
+//--- Import Roll Popup ---//
+/*
+    Import popup for importing rolls. Shows
+    the IDT selection for the images and
+    displays the progress as the images are
+    imported.
+*/
 void mainWindow::importRollPopup() {
 
     if (dispImpRollPop)
@@ -271,7 +300,8 @@ void mainWindow::importRollPopup() {
                     for (auto const& dir_entry : std::filesystem::directory_iterator{sandbox}) {
                         if (dir_entry.is_regular_file()) {
                             //Found an image in root of selection
-                            images.push_back(dir_entry.path().string());
+                            if (dir_entry.path().extension().string() != ".xmp")
+                                images.push_back(dir_entry.path().string());
                         }
                     }
                     // Sort the images
@@ -281,9 +311,6 @@ void mainWindow::importRollPopup() {
                     // Add the roll to the library
                     std::string newRollName = std::filesystem::path(importFiles[r]).stem().string();
                     activeRolls.emplace_back(filmRoll(newRollName));
-                    rollNames.resize(rollNames.size() + 1);
-                    rollNames[rollNames.size() - 1] = new char[activeRolls.back().rollName.length() + 1];
-                    std::strcpy(rollNames[rollNames.size() - 1], activeRolls.back().rollName.c_str());
                     //impRoll = activeRolls.size() - 1;
                     activeRolls[thisRoll].imagesLoading = true;
                     // Launch the thread pool
@@ -315,7 +342,7 @@ void mainWindow::importRollPopup() {
                             LOG_ERROR("Error: {}", std::get<std::string>(res.result));
                         }
                     }
-                    for (int i = 0; i < activeRolls[thisRoll].images.size(); i++) {
+                    for (int i = 0; i < activeRolls[thisRoll].rollSize(); i++) {
                         image* thisIm = getImage(thisRoll, i);
                         //LOG_INFO("Queueing Image: {} from Roll: {}, with iterator: {}, with pointer: {}", thisIm->srcFilename, thisRoll, i, fmt::ptr(thisIm));
 
@@ -334,6 +361,7 @@ void mainWindow::importRollPopup() {
                         totalTasks = importFiles.size();
                         completedTasks = 1;
                     }
+                    activeRolls[thisRoll].selIm = activeRolls[thisRoll].rollSize() > 0 ? 0 : -1;
                     activeRolls[thisRoll].rollLoaded = true;
                     activeRolls[thisRoll].imagesLoading = false;
                     activeRolls[thisRoll].rollPath = importFiles[r];
@@ -362,7 +390,17 @@ void mainWindow::importRollPopup() {
 
 }
 
+//--- Batch Render Popup ---//
+/*
+    The popup window for rendering out images.
+    Both individual/multiple, and rolls. If
+    rolls are selected, a basket with checkboxes
+    is displayed for the user to select the rolls
+    to export.
 
+    Contains output format settings, as well as the
+    ODT setting.
+*/
 void mainWindow::batchRenderPopup() {
     if (exportPopup)
         ImGui::OpenPopup("Export Image(s)");
@@ -443,12 +481,18 @@ void mainWindow::batchRenderPopup() {
             ImGui::Text("(Rolls will save in sub-directories)");
 
 
+        if (ImGui::Button("Cancel")) {
+            isExporting = false;
+            exportPopup = false;
+            ImGui::CloseCurrentPopup();
+        }
+
         bool disableSet = false;
         if (isExporting) {
             ImGui::BeginDisabled();
             disableSet = true;
         }
-
+        ImGui::SameLine();
         if(ImGui::Button("Save")) {
             isExporting = true;
             exportParam params;
@@ -466,12 +510,8 @@ void mainWindow::batchRenderPopup() {
 
         if (disableSet)
             ImGui::EndDisabled();
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            isExporting = false;
-            exportPopup = false;
-            ImGui::CloseCurrentPopup();
-        }
+
+
         ImGui::Spacing();
         if (isExporting) {
             ImGui::Separator();
@@ -499,6 +539,11 @@ void mainWindow::batchRenderPopup() {
     }
 }
 
+//--- Paste Popup ---//
+/*
+    Popup for the user to select which values
+    to paste to the selected images
+*/
 void mainWindow::pastePopup() {
     if (pasteTrigger)
         ImGui::OpenPopup("Paste");
@@ -608,7 +653,15 @@ void mainWindow::pastePopup() {
     }
 }
 
+//--- Unsaved Roll Popup ---//
+/*
+    Popup to notify the user that there
+    are images with unsaved changes. Allows
+    saving the changes before closing.
 
+    Responsible for both roll closing,
+    and application closing.
+*/
 void mainWindow::unsavedRollPopup() {
     if (unsavedPopTrigger)
         ImGui::OpenPopup("Unsaved Changes");
@@ -621,35 +674,53 @@ void mainWindow::unsavedRollPopup() {
         }
         ImGui::SameLine();
         if (ImGui::Button("Discard")) {
-            if (unsavedForClose) {
-                done = true;
-                unsavedPopTrigger = false;
-                ImGui::CloseCurrentPopup();
-            } else {
-                removeRoll();
-                unsavedPopTrigger = false;
-                ImGui::CloseCurrentPopup();
+            switch (closeMd) {
+                case c_app:
+                    done = true;
+                    unsavedPopTrigger = false;
+                    ImGui::CloseCurrentPopup();
+                    break;
+                case c_roll:
+                    removeRoll();
+                    unsavedPopTrigger = false;
+                    ImGui::CloseCurrentPopup();
+                    break;
+                case c_selIm:
+                    if (validRoll())
+                        activeRoll()->closeSelected();
+                    unsavedPopTrigger = false;
+                    ImGui::CloseCurrentPopup();
+                    break;
             }
 
         }
         ImGui::SameLine();
         if (ImGui::Button("Save")) {
-
-            if (unsavedForClose) {
-                for (int r = 0; r < activeRolls.size(); r++) {
-                    activeRolls[r].saveAll();
-                }
-                done = true;
-                unsavedPopTrigger = false;
-                unsavedForClose = false;
-                ImGui::CloseCurrentPopup();
-            } else {
-                if (validRoll()) {
-                    activeRoll()->saveAll();
-                    removeRoll();
-                }
-                unsavedPopTrigger = false;
-                ImGui::CloseCurrentPopup();
+            switch (closeMd) {
+                case c_app:
+                    for (int r = 0; r < activeRolls.size(); r++) {
+                        activeRolls[r].saveAll();
+                    }
+                    done = true;
+                    unsavedPopTrigger = false;
+                    ImGui::CloseCurrentPopup();
+                    break;
+                case c_roll:
+                    if (validRoll()) {
+                        activeRoll()->saveAll();
+                        removeRoll();
+                    }
+                    unsavedPopTrigger = false;
+                    ImGui::CloseCurrentPopup();
+                    break;
+                case c_selIm:
+                    if (validRoll()) {
+                        activeRoll()->saveSelected();
+                        activeRoll()->closeSelected();
+                    }
+                    unsavedPopTrigger = false;
+                    ImGui::CloseCurrentPopup();
+                    break;
             }
 
         }
@@ -660,6 +731,13 @@ void mainWindow::unsavedRollPopup() {
 
 }
 
+//--- Global Metadata Popup ---//
+/*
+    Popup for editing the roll-wide metadata
+    Will flag to user when there are images
+    with varying metadata values for any
+    given field.
+*/
 void mainWindow::globalMetaPopup() {
     if (globalMetaPopTrig)
         ImGui::OpenPopup("Roll Metadata");
@@ -826,6 +904,11 @@ void mainWindow::globalMetaPopup() {
     }
 }
 
+//--- Local Metadata Popup ---//
+/*
+    Popup for editing the individual image
+    metadata.
+*/
 void mainWindow::localMetaPopup() {
     if (localMetaPopTrig)
         ImGui::OpenPopup("Image Metadata");
@@ -982,6 +1065,10 @@ void mainWindow::localMetaPopup() {
     }
 }
 
+//--- Preferences Popup ---//
+/*
+    Popup for editing user preferences
+*/
 void mainWindow::preferencesPopup() {
     if (preferencesPopTrig)
         ImGui::OpenPopup("Preferences");
@@ -994,14 +1081,14 @@ void mainWindow::preferencesPopup() {
         ImGui::Checkbox("###01", &appPrefs.tmpAutoSave);
         if (appPrefs.tmpAutoSave) {
             ImGui::SameLine();
-            ImGui::InputInt("Frequency (seconds)", &appPrefs.autoSFreq);
+            ImGui::InputInt("Frequency (seconds)", &appPrefs.prefs.autoSFreq);
         }
 
         ImGui::Text("Roll Performance Mode");
-        ImGui::Checkbox("###02", &appPrefs.perfMode);
+        ImGui::Checkbox("###02", &appPrefs.prefs.perfMode);
         ImGui::SetItemTooltip("Scale resolution down for optimal interaction speed.\nWill also unload non-active rolls to save memory usage.\nUnloaded rolls are re-loaded when active.");
         ImGui::SameLine();
-        ImGui::DragInt("Max Res", &appPrefs.maxRes, 10.0f, 1000, 5000, "%d", 0);
+        ImGui::DragInt("Max Res", &appPrefs.prefs.maxRes, 10.0f, 1000, 5000, "%d", 0);
         ImGui::SetItemTooltip("Set the maximum resolution on the long side for images\non import. Exported images are rendered in full resolution.");
 
         ImGui::Separator();
@@ -1018,8 +1105,8 @@ void mainWindow::preferencesPopup() {
                     badOcioText = true;
                 } else {
                     badOcioText = false;
-                    appPrefs.ocioPath = selection[0];
-                    std::strcpy(ocioPath, appPrefs.ocioPath.c_str());
+                    appPrefs.prefs.ocioPath = selection[0];
+                    std::strcpy(ocioPath, appPrefs.prefs.ocioPath.c_str());
                 }
             }
         }
@@ -1045,12 +1132,12 @@ void mainWindow::preferencesPopup() {
         if (ImGui::Button("Save")) {
             if (ocioSel == 0) {
                 ocioProc.setIntActive();
-                appPrefs.ocioExt = false;
+                appPrefs.prefs.ocioExt = false;
             } else {
                 ocioProc.setExtActive();
-                appPrefs.ocioExt = true;
+                appPrefs.prefs.ocioExt = true;
             }
-            appPrefs.autoSave = appPrefs.tmpAutoSave;
+            appPrefs.prefs.autoSave = appPrefs.tmpAutoSave;
             std::memset(ocioPath, 0, sizeof(ocioPath));
             appPrefs.saveToFile();
             preferencesPopTrig = false;
@@ -1061,6 +1148,11 @@ void mainWindow::preferencesPopup() {
     }
 }
 
+//--- Acknowledge Popup ---//
+/*
+    Simple message popup with an error field
+    and an okay button
+*/
 void mainWindow::ackPopup() {
     if (ackPopTrig)
         ImGui::OpenPopup("Alert!");
@@ -1080,6 +1172,11 @@ void mainWindow::ackPopup() {
     }
 }
 
+//--- Shortcuts Popup ---//
+/*
+    Popup for displaying all available
+    hotkeys in the application.
+*/
 void mainWindow::shortcutsPopup() {
     if (shortPopTrig)
         ImGui::OpenPopup("Keyboard Shortcuts");

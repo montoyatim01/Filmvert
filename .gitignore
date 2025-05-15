@@ -1,3 +1,5 @@
 Build-*
 hooks*
 *.metallib
+compile_commands.json
+CMakeUserPresets.json

@@ -121,6 +121,11 @@ void image::processMinMax() {
     LOG_INFO("Max Values: {}, {}, {}", imgParam.whitePoint[0], imgParam.whitePoint[1], imgParam.whitePoint[2]);
 }
 
+//--- Resize Proxy ---//
+/*
+    Resize the input image to the maximum
+    long-side dimension as set in the preferences.
+*/
 void image::resizeProxy() {
 
     // Calculate the dimensions based on the max side
@@ -128,10 +133,10 @@ void image::resizeProxy() {
     // Resize from raw to tmp
     // Copy back
     //
-    if (std::max(rawWidth, rawHeight) < appPrefs.maxRes)
+    if (std::max(rawWidth, rawHeight) < appPrefs.prefs.maxRes)
         return; // Our image is small enough, don't resize
     unsigned int newWidth, newHeight;
-    float ratio = rawWidth > rawHeight ? (float)appPrefs.maxRes / (float)rawWidth : (float)appPrefs.maxRes / (float)rawHeight;
+    float ratio = rawWidth > rawHeight ? (float)appPrefs.prefs.maxRes / (float)rawWidth : (float)appPrefs.prefs.maxRes / (float)rawHeight;
 
     newWidth = rawWidth * ratio;
     newHeight = rawHeight * ratio;

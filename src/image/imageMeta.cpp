@@ -158,15 +158,35 @@ bool image::writeExpMeta(std::string filename) {
         // Read existing metadata (this is important to preserve any other metadata)
         image->readMetadata();
 
+        Exiv2::ExifData destExif = image->exifData();
+        // List of problematic Exif tags to skip
+        std::set<std::string> skipExifTags = {
+            "Exif.Thumbnail.JPEGInterchangeFormat",
+            "Exif.Thumbnail.JPEGInterchangeFormatLength",
+            "Exif.Image.ImageWidth",
+            "Exif.Image.ImageLength",
+            "Exif.Photo.PixelXDimension",
+            "Exif.Photo.PixelYDimension"
+
+        };
+
+        // Selective copy of Exif data
+        for (Exiv2::ExifData::const_iterator i = exifData.begin(); i != exifData.end(); ++i) {
+            std::string key = i->key();
+            if (skipExifTags.find(key) == skipExifTags.end()) {
+                destExif[key] = i->value();
+            }
+        }
+
         // Set the new Exif data
-        image->setExifData(exifData);
+        image->setExifData(destExif);
 
         // Set the new XMP data
-        if (hasSCXMP) {
+        /*if (hasSCXMP) {
             image->setXmpData(scxmpData);
         } else {
             image->setXmpData(intxmpData);
-        }
+        }*/
 
         // Write the metadata back to the image file
         image->writeMetadata();
@@ -235,25 +255,7 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         fvParams["tint"] = imgParam.tint;
         fvParams["rotation"] = imRot;
 
-        metaParams["fileName"] = imMeta.fileName;
-        metaParams["rollName"] = imMeta.rollName;
-        metaParams["frameNumber"] = imMeta.frameNumber;
-        metaParams["cameraMake"] = imMeta.cameraMake;
-        metaParams["cameraModel"] = imMeta.cameraModel;
-        metaParams["lens"] = imMeta.lens;
-        metaParams["filmStock"] = imMeta.filmStock;
-        metaParams["focalLength"] = imMeta.focalLength;
-        metaParams["fNumber"] = imMeta.fNumber;
-        metaParams["exposureTime"] = imMeta.exposureTime;
-        metaParams["dateTime"] = imMeta.dateTime;
-        metaParams["location"] = imMeta.location;
-        metaParams["gps"] = imMeta.gps;
-        metaParams["notes"] = imMeta.notes;
-        metaParams["devProcess"] = imMeta.devProcess;
-        metaParams["chemMfg"] = imMeta.chemMfg;
-        metaParams["devNotes"] = imMeta.devNotes;
-        metaParams["scanner"] = imMeta.scanner;
-        metaParams["scanNotes"] = imMeta.scanNotes;
+        metaParams = imMeta;
 
         j["filmvert"] = fvParams;
         j["metadata"] = metaParams;
@@ -533,66 +535,7 @@ bool image::loadMetaFromStr(const std::string& j) {
             }
 
             if (jsonObject.contains("metadata")) {
-                nlohmann::json metaJson = jsonObject["metadata"].get<nlohmann::json>();
-
-                if (metaJson.contains("fileName")) {
-                    imMeta.fileName = metaJson["fileName"].get<std::string>();
-                }
-
-                if (metaJson.contains("rollName")) {
-                    imMeta.rollName = metaJson["rollName"].get<std::string>();
-                }
-                if (metaJson.contains("frameNumber") && metaJson["frameNumber"].is_number()) {
-                    imMeta.frameNumber = metaJson["frameNumber"].get<int>();
-                }
-                if (metaJson.contains("cameraMake")) {
-                    imMeta.cameraMake = metaJson["cameraMake"].get<std::string>();
-                }
-                if (metaJson.contains("cameraModel")) {
-                    imMeta.cameraModel = metaJson["cameraModel"].get<std::string>();
-                }
-                if (metaJson.contains("lens")) {
-                    imMeta.lens = metaJson["lens"].get<std::string>();
-                }
-                if (metaJson.contains("filmStock")) {
-                    imMeta.filmStock = metaJson["filmStock"].get<std::string>();
-                }
-                if (metaJson.contains("focalLength")) {
-                    imMeta.focalLength = metaJson["focalLength"].get<std::string>();
-                }
-                if (metaJson.contains("fNumber")) {
-                    imMeta.fNumber = metaJson["fNumber"].get<std::string>();
-                }
-                if (metaJson.contains("exposureTime")) {
-                    imMeta.exposureTime = metaJson["exposureTime"].get<std::string>();
-                }
-                if (metaJson.contains("dateTime")) {
-                    imMeta.dateTime = metaJson["dateTime"].get<std::string>();
-                }
-                if (metaJson.contains("location")) {
-                    imMeta.location = metaJson["location"].get<std::string>();
-                }
-                if (metaJson.contains("gps")) {
-                    imMeta.gps = metaJson["gps"].get<std::string>();
-                }
-                if (metaJson.contains("notes")) {
-                    imMeta.notes = metaJson["notes"].get<std::string>();
-                }
-                if (metaJson.contains("devProcess")) {
-                    imMeta.devProcess = metaJson["devProcess"].get<std::string>();
-                }
-                if (metaJson.contains("chemMfg")) {
-                    imMeta.chemMfg = metaJson["chemMfg"].get<std::string>();
-                }
-                if (metaJson.contains("devNotes")) {
-                    imMeta.devNotes = metaJson["devNotes"].get<std::string>();
-                }
-                if (metaJson.contains("scanner")) {
-                    imMeta.scanner = metaJson["scanner"].get<std::string>();
-                }
-                if (metaJson.contains("scanNotes")) {
-                    imMeta.scanNotes = metaJson["scanNotes"].get<std::string>();
-                }
+                imMeta = jsonObject["metadata"].get<imageMetadata>();
             } else {
                 LOG_WARN("No metadata found!");
             }

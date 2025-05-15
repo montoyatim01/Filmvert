@@ -1,6 +1,7 @@
 #include "window.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
+#include "structs.h"
 #include <SDL_pixels.h>
 #include <SDL_render.h>
 #include <SDL_video.h>
@@ -30,7 +31,7 @@ std::string find_key_by_value(const std::map<std::string, int>& my_map, int valu
 }
 
 
-
+//--- Main Window Routine ---//
 
 int mainWindow::openWindow()
 {
@@ -121,8 +122,8 @@ int mainWindow::openWindow()
     // Load in user preferences
     appPrefs.loadFromFile();
 
-    if (!appPrefs.ocioPath.empty()) {
-        if (ocioProc.initAltConfig(appPrefs.ocioPath) && appPrefs.ocioExt) {
+    if (!appPrefs.prefs.ocioPath.empty()) {
+        if (ocioProc.initAltConfig(appPrefs.prefs.ocioPath) && appPrefs.prefs.ocioExt) {
             ocioProc.setExtActive();
         } else {
             ocioProc.setIntActive();
@@ -159,7 +160,7 @@ int mainWindow::openWindow()
                 if (unsavedChanges()) {
                     // Don't quit immediately
                     unsavedPopTrigger = true;
-                    unsavedForClose = true;
+                    closeMd = c_app;
                 } else {
                     done = true;
                 }
@@ -168,7 +169,7 @@ int mainWindow::openWindow()
                 if (unsavedChanges()) {
                     // Don't quit immediately
                     unsavedPopTrigger = true;
-                    unsavedForClose = true;
+                    closeMd = c_app;
                 } else {
                     done = true;
                 }
@@ -181,6 +182,7 @@ int mainWindow::openWindow()
             } else {
                 setSDLWindowModified(window, false);
             }
+            saveUI();
             loopCounter = 0;
         }
 

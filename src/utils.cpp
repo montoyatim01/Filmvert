@@ -2,17 +2,6 @@
 #include <cmath>
 
 
-// Asset Functions
-bool areEqualRel(float a, float b, float epsilon) {
-    return (fabs(a - b) <= epsilon * std::fmax(fabs(a), fabs(b)));
-}
-
-unsigned int pcg_hash(unsigned int input)
-{
-    unsigned int state = input * 747796405u + 2891336453u;
-    unsigned int word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
-}
 
 int iDivUp(int a, int b) { return (a % b != 0) ? (a / b + 1) : (a / b); }
 
@@ -74,14 +63,6 @@ void ap0_to_ap1(float* in, float* out) {
     return;
 }
 
-void srgb_to_ap1(float* in, float* out) {
-
-    out[0] = in[0] * 0.612494198537 + in[1] * 0.338737251924 + in[2] * 0.048855526065;
-    out[1] = in[0] * 0.070594251611 + in[1] * 0.917671483736 + in[2] * 0.011704306146;
-    out[2] = in[0] * 0.020727335004 + in[1] * 0.106882231793 + in[2] * 0.872338062224;
-
-    return;
-}
 
 // Helper functions for endian conversion
 uint16_t swapBytes16(uint16_t value) {

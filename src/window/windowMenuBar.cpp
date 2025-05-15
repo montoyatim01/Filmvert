@@ -1,10 +1,14 @@
 #include "logger.h"
 #include "ocioProcessor.h"
+#include "structs.h"
 #include "window.h"
 #include <cstring>
 #include <imgui.h>
 
-
+//--- Menu Bar ---//
+/*
+    Main menu bar routine
+*/
 void mainWindow::menuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
@@ -49,9 +53,15 @@ void mainWindow::menuBar() {
                 exportPopup = true;
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Close Image")) {
-                if (validIm()) {
-                    //activeImage()
+            if (ImGui::MenuItem("Close Selected Image(s)")) {
+                if (validRoll()) {
+                    if (activeRoll()->unsavedIndividual()) {
+                        closeMd = c_selIm;
+                        unsavedPopTrigger = true;
+                    } else {
+                        activeRoll()->closeSelected();
+                    }
+
                 }
             }
             if (ImGui::MenuItem("Close Roll")) {
@@ -61,6 +71,7 @@ void mainWindow::menuBar() {
                 if (validRoll()) {
                     if (activeRoll()->unsavedImages()) {
                         // We have unsaved images, prompt user
+                        closeMd = c_roll;
                         unsavedPopTrigger = true;
 
                     } else {
@@ -74,8 +85,8 @@ void mainWindow::menuBar() {
             ImGui::Separator();
             if (ImGui::MenuItem("Preferences")) {
                 badOcioText = false;
-                std::strcpy(ocioPath, appPrefs.ocioPath.c_str());
-                if (appPrefs.ocioExt)
+                std::strcpy(ocioPath, appPrefs.prefs.ocioPath.c_str());
+                if (appPrefs.prefs.ocioExt)
                     ocioSel = 1;
                 preferencesPopTrig = true;
             }
@@ -83,8 +94,8 @@ void mainWindow::menuBar() {
             ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {
                 if (unsavedChanges()) {
+                    closeMd = c_app;
                     unsavedPopTrigger = true;
-                    unsavedForClose = true;
                 } else {
                     done = true;
                 }
@@ -113,6 +124,13 @@ void mainWindow::menuBar() {
             // Paste
             if (ImGui::MenuItem("Paste")) {
                 pasteTrigger = true;
+            }
+
+            // Paste
+            if (ImGui::MenuItem("Refresh Roll")) {
+                for (int i = 0; i < activeRollSize(); i++) {
+                    imgRender(getImage(i));
+                }
             }
             // Undo/Redo?
             ImGui::EndMenu();
@@ -199,20 +217,20 @@ void mainWindow::menuBar() {
             ImGui::EndMenu();
         }
 
-        std::vector<const char*> itemPointers;
+        std::vector<const char*> rollPointers;
         for (const auto& item : activeRolls) {
-            itemPointers.push_back(item.rollName.c_str());
+            rollPointers.push_back(item.rollName.c_str());
         }
         //--- Roll Selector
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetWindowWidth() * 0.05f));
                 ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25f);
-                if (ImGui::Combo("###", &selRoll, itemPointers.data(), itemPointers.size())) {
+                if (ImGui::Combo("###", &selRoll, rollPointers.data(), rollPointers.size())) {
                     // This is where we call the function necessary for dumping
                     // the loaded images and loading the selected images
                     for (int i = 0; i < activeRolls.size(); i++) {
                         if (selRoll != i) {
                             activeRolls[i].selected = false;
-                            if (appPrefs.perfMode)
+                            if (appPrefs.prefs.perfMode)
                                 activeRolls[i].clearBuffers();
                         }
                         if (selRoll == i) {

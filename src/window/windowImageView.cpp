@@ -2,8 +2,13 @@
 #include "windowUtils.h"
 #include <imgui.h>
 
+//--- Image View ---//
+/*
+    The main routine for the image viewer
+*/
 void mainWindow::imageView() {
     bool calcBaseColor = false;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(500,500), ImVec2(winWidth - 128, winHeight - 128));
     ImGui::SetNextWindowPos(ImVec2(0,25), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(winWidth * 0.65,winHeight - (25 + thumbHeight)), ImGuiCond_FirstUseEver);
     ImGuiWindowFlags winFlags = 0;

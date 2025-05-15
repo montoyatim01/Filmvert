@@ -8,12 +8,32 @@
 #include <cstring>
 #include <fstream>
 
+//--- Selected Image ---//
+/*
+    Return the pointer to the current
+    selected image, otherwise a nullptr
+*/
 image* filmRoll::selImage() {
     if (validIm())
         return &images[selIm];
     return nullptr;
 }
 
+//--- Valid Image ---//
+/*
+    Return whether the user has selected a valid image
+*/
+bool filmRoll::validIm() {
+    return images.size() > 0 && selIm >= 0 && selIm < images.size();
+}
+
+
+//--- Get Image ---//
+/*
+    Get image at specified index,
+    otherwise nullptr if no valid image
+    at that index.
+*/
 image* filmRoll::getImage(int index) {
     if (index >= 0 && index < images.size()) {
         return &images[index];
@@ -22,10 +42,46 @@ image* filmRoll::getImage(int index) {
     return nullptr;
 }
 
+//--- Roll Size ---//
+/*
+    Return the number of images
+    in the roll
+*/
+int filmRoll::rollSize() {
+    return images.size();
+}
+
+//--- Select All ---//
+/*
+    Set selection state to all images
+*/
+void filmRoll::selectAll() {
+    for (int i = 0; i < images.size(); i++) {
+        images[i].selected = true;
+    }
+}
+
+//--- Clear Selection ---//
+/*
+    Clear all selected image flags
+*/
+void filmRoll::clearSelection() {
+    for (int i = 0; i < images.size(); i++) {
+        images[i].selected = false;
+    }
+}
+
+//--- Clear Buffers ---//
+/*
+    Loop through all images and unload their buffers.
+    Only happens if the roll is fully loaded, and if
+    the user has performance mode enabled, or is removing
+    the roll
+*/
 void filmRoll::clearBuffers(bool remove) {
     if (imagesLoading)
         return; // User is jumping back and forth between rolls
-    if (!appPrefs.perfMode && !remove)
+    if (!appPrefs.prefs.perfMode && !remove)
         return; // User does not have performance mode enabled
     for (int i = 0; i < images.size(); i++) {
         images[i].clearBuffers();
@@ -33,6 +89,11 @@ void filmRoll::clearBuffers(bool remove) {
     rollLoaded = false;
 }
 
+//--- Load Buffers ---//
+/*
+    Loop through all valid images, and re-load
+    the image data back from disk
+*/
 void filmRoll::loadBuffers() {
     imagesLoading = true;
     std::thread([this]() {
@@ -58,15 +119,78 @@ void filmRoll::loadBuffers() {
     }).detach();
 }
 
+//--- Check Buffers ---//
+/*
+    Check for if any images need to be
+    re-loaded after save
+*/
+void filmRoll::checkBuffers() {
+    std::thread([this]() {
+        ThreadPool pool(std::thread::hardware_concurrency());
+        std::vector<std::future<void>> futures;
+
+        for (image& img : images) {
+            if (!img.imageLoaded) {
+                futures.push_back(pool.submit([&img]() {
+                    img.loadBuffers();
+                }));
+            }
+
+        }
+
+        for (auto& f : futures) {
+            f.get();  // Wait for job to finish
+        }
+        imagesLoading = false; // Set only after all are done
+        rollLoaded = true;
+    }).detach();
+}
+
+//--- Close Selected ---//
+/*
+    Close the selected images and
+    remove them from the roll
+*/
+void filmRoll::closeSelected() {
+    for (auto it = images.begin(); it != images.end();) {
+        if (it->selected) {
+            it->clearBuffers();
+            it = images.erase(it);  // erase() returns iterator to next element
+        } else {
+            ++it;
+        }
+    }
+}
+
+//--- Save All ---//
+/*
+    Loop through all images and save their XMP
+    sidecar files. Also save the full roll JSON.
+*/
 void filmRoll::saveAll() {
     for (int i = 0; i < images.size(); i++) {
         images[i].writeXMPFile();
     }
     exportRollMetaJSON();
 }
-//TODO IMPORT ROLL JSON
-//TODO DEFAULT ROLL SAVE DIRECTORY
-//TODO: Roll name in images not applied from roll
+
+//--- Save Selected ---//
+/*
+    Loop through all images and save their XMP
+    if they are currently selected.
+*/
+void filmRoll::saveSelected() {
+    for (int i = 0; i < images.size(); i++){
+        if (images[i].selected)
+            images[i].writeXMPFile();
+    }
+}
+
+//--- Export Roll Metadata JSON ---//
+/*
+    Export the full JSON file with metadata and params
+    from each image in the roll.
+*/
 bool filmRoll::exportRollMetaJSON() {
     try {
         nlohmann::json j;
@@ -97,6 +221,11 @@ bool filmRoll::exportRollMetaJSON() {
     }
 }
 
+//--- Export Roll CSV ---//
+/*
+    Export an CSV file with the metadata (but not params)
+    for every image in the roll
+*/
 bool filmRoll::exportRollCSV() {
     std::string csvFileName = rollPath + "/" + rollName + ".csv";
     std::ofstream csvFile(csvFileName, std::ios::trunc);
@@ -135,6 +264,12 @@ bool filmRoll::exportRollCSV() {
     return true;
 }
 
+//--- Import Roll Metdata JSON ---//
+/*
+    Import a JSON file, and attempt to match all params
+    and settings to the images in the JSON. Rename
+    the roll based on the JSON roll's name.
+*/
 bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
      try {
         nlohmann::json jIn;
@@ -160,6 +295,11 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
 
 }
 
+//--- Unsaved Images ---//
+/*
+    Determine whether there are any images
+    with unsaved changes
+*/
 bool filmRoll::unsavedImages() {
     for (int i = 0; i < images.size(); i++) {
         if (images[i].needMetaWrite)
@@ -168,6 +308,26 @@ bool filmRoll::unsavedImages() {
     return false;
 }
 
+//--- Unsaved Individual ---//
+/*
+    Deteremine whether there are any images
+    that are selected, and have unsaved changes
+*/
+bool filmRoll::unsavedIndividual() {
+    for (int i = 0; i < images.size(); i++) {
+        if (images[i].selected && images[i].needMetaWrite)
+            return true;
+    }
+    return false;
+}
+
+//--- Roll Metadata Pre-edit ---//
+/*
+    Pre-populate the roll path and roll name in the
+    metadata edit struct. Loop through all fields
+    in all images to determine if there are image-specific
+    differences that need to be flagged.
+*/
 void filmRoll::rollMetaPreEdit(metaBuff *meta) {
     if (!meta)
         return;
@@ -279,6 +439,12 @@ void filmRoll::rollMetaPreEdit(metaBuff *meta) {
     //------
 }
 
+//--- Roll Metadata Post-Edit ---//
+/*
+    For every metadata field, if the apply button
+    was checked, apply the field to all images
+    in the roll
+*/
 void filmRoll::rollMetaPostEdit(metaBuff *meta) {
     if (!meta)
         return;
@@ -384,16 +550,4 @@ void filmRoll::rollMetaPostEdit(metaBuff *meta) {
 
     std::memset(meta, 0, sizeof(metaBuff));
 
-}
-
-bool filmRoll::sdlUpdating() {
-    bool updating = false;
-    for (auto &img : images) {
-        updating |= img.sdlUpdate;
-    }
-    return updating;
-}
-
-bool filmRoll::validIm() {
-    return images.size() > 0 && selIm >= 0 && selIm < images.size();
 }

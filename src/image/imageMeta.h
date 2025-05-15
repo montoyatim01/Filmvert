@@ -1,26 +1,12 @@
 #ifndef _imageMeta_h
 #define _imageMeta_h
 
+#include "nlohmann/json.hpp"
+
 #include <iostream>
 #include <string>
 #include <iomanip>
-// Metadata Fields
-// Roll (inherit/modify internal roll name)
-// Frame number (inherit from image order?)
-// Camera Make
-// Camera Model
-// Lens
-// Film Stock
-// Focal Length
-// F number
-// Exposure time
-// Date/time shot
-// Location
-// GPS Location
-// Notes
-// Development Process
-// Chemistry Manufacturer
-// Development notes
+
 
 struct imageMetadata {
     std::string fileName;
@@ -43,6 +29,11 @@ struct imageMetadata {
 
     std::string scanner;
     std::string scanNotes;
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(imageMetadata, fileName, rollName,
+        frameNumber, cameraMake, cameraModel, lens, filmStock,
+        focalLength, fNumber, exposureTime, dateTime, location,
+        gps, notes, devProcess, chemMfg, devNotes, scanner, scanNotes);
 };
 
 struct metaBuff {

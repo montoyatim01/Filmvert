@@ -16,19 +16,31 @@ class filmRoll {
 
     image* selImage();
     image* getImage(int index);
+    bool validIm();
+
+    int rollSize();
+
+    void selectAll();
+    void clearSelection();
 
     void clearBuffers(bool remove = false);
     void loadBuffers();
+    void checkBuffers();
+    void closeSelected();
 
     void saveAll();
+    void saveSelected();
     bool exportRollMetaJSON();
     bool exportRollCSV();
     bool importRollMetaJSON(const std::string& jsonFile);
 
     bool unsavedImages();
+    bool unsavedIndividual();
 
     void rollMetaPreEdit(metaBuff* meta);
     void rollMetaPostEdit(metaBuff* meta);
+
+
 
     bool imagesLoading = false;
     bool rollLoaded = false;
@@ -36,15 +48,12 @@ class filmRoll {
 
     imageMetadata rollMeta;
 
-    bool sdlUpdating();
 
     std::string rollName;
     std::string rollPath;
 
     std::deque<image> images;
     int selIm = -1;
-
-    bool validIm();
 
     private:
 

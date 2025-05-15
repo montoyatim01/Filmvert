@@ -5,9 +5,7 @@
 #include <stdint.h>
 #endif
 
-#define KERNELSIZE 5
-#define MAX_GREY_LEVEL 65536
-#define EPSILON_GREY_LEVEL 0.1
+
 #define BLOCK_DIM 16
 #define MINLOG 0.0001f
 

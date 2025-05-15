@@ -1,8 +1,11 @@
 #include "imageParams.h"
 #include <algorithm>
 
-
-
+//--- Reset functions ---//
+/*
+    Quick functions to reset the parameters to
+    their default values
+*/
 void imageParams::rstANA() {
     rstBC();
     rstBP();

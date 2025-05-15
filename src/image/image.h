@@ -6,6 +6,7 @@
 #include <optional>
 #include <variant>
 #include <thread>
+#include <mutex>
 #include <OpenImageIO/imageio.h>
 #include "nlohmann/json.hpp"
 #include "renderParams.h"
@@ -39,8 +40,6 @@ struct image {
     unsigned int nChannels;
     unsigned int width;
     unsigned int height;
-    unsigned int workWidth;
-    unsigned int workHeight;
     unsigned int rawWidth;
     unsigned int rawHeight;
     bool isRawImage = false;

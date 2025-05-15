@@ -5,37 +5,25 @@
 #include <cstdlib>
 #include <fstream>
 
+// Global Application Preferences
 userPreferences appPrefs;
 
+//--- Load From File ---//
+/*
+    Attempt to load the preferences in
+    from disk
+*/
 void userPreferences::loadFromFile() {
     try {
         std::ifstream f(getPrefFile().c_str());
-
         if (!f)
             return;
         nlohmann::json prefObj;
         prefObj = nlohmann::json::parse(f);
-
-        if (prefObj.contains("autoSave")) {
-            autoSave = prefObj["autoSave"].get<bool>();
-            tmpAutoSave = autoSave;
+        if (prefObj.contains("Preferences")) {
+            prefs = prefObj["Preferences"].get<preferenceSet>();
+            tmpAutoSave = prefs.autoSave;
         }
-        if (prefObj.contains("saveFreq")) {
-            autoSFreq = prefObj["saveFreq"].get<int>();
-        }
-        if (prefObj.contains("perfMode")) {
-            perfMode = prefObj["perfMode"].get<bool>();
-        }
-        if (prefObj.contains("maxRes")) {
-            maxRes = prefObj["maxRes"].get<int>();
-        }
-        if (prefObj.contains("ocioPath")) {
-            ocioPath = prefObj["ocioPath"].get<std::string>();
-        }
-        if (prefObj.contains("ocioExt")) {
-            ocioExt = prefObj["ocioExt"].get<bool>();
-        }
-
     }  catch (const std::exception& e) {
         LOG_WARN("Unable to import preferences file: {}", e.what());
         return;
@@ -43,15 +31,15 @@ void userPreferences::loadFromFile() {
 
 }
 
+//--- Save To File ---//
+/*
+    Write out the current preference set
+    struct to disk
+*/
 void userPreferences::saveToFile() {
     try {
         nlohmann::json j;
-        j["autoSave"] = autoSave;
-        j["saveFreq"] = autoSFreq;
-        j["perfMode"] = perfMode;
-        j["maxRes"] = maxRes;
-        j["ocioPath"] = ocioPath;
-        j["ocioExt"] = ocioExt;
+       j["Preferences"] = prefs;
 
         std::string jDump = j.dump(4);
         std::ofstream jsonFile(getPrefFile(), std::ios::out | std::ios::trunc);
@@ -69,6 +57,10 @@ void userPreferences::saveToFile() {
     }
 }
 
+//--- Get Preference File ---//
+/*
+    Get the location of the preferences file
+*/
 std::string userPreferences::getPrefFile() {
     #ifdef __APPLE__
     char* homeDir = getenv("HOME");

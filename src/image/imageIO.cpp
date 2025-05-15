@@ -26,8 +26,6 @@
     Allocate necessary buffers for processing
 */
 bool image::exportPreProcess(std::string outPath) {
-    workWidth = width;
-    workHeight = height;
     fullIm = true;
     expFullPath = outPath;
     if (isRawImage) {
@@ -35,20 +33,32 @@ bool image::exportPreProcess(std::string outPath) {
             clearBuffers();
         }
         if(debayerImage(true, 11)) {
-            allocProcBuf();
+            //allocProcBuf();
             imageLoaded = true;
             return true;
         } else {
+            LOG_WARN("Unable to re-debayer image: {}", fullPath);
             return false;
         }
-    } else {
-        // TODO: Reload image if necessary
-        if (!imageLoaded) {
-
+    } else if (isDataRaw) {
+        if (dataReload()) {
+            //allocProcBuf();
+            imageLoaded = true;
+            return true;
+        } else {
+            LOG_WARN("Unable to re-load image: {}", fullPath);
+            return false;
         }
-        allocProcBuf();
+    }  else {
+        if (oiioReload()) {
+            imageLoaded = true;
+            //allocProcBuf();
+            return true;
+        } else {
+            LOG_WARN("Unable to re-load image: {}", fullPath);
+            return false;
+        }
     }
-    return true;
 }
 
 //---Export Post-Process---//
@@ -62,8 +72,6 @@ void image::exportPostProcess() {
     } else {
         delProcBuf();
     }
-    width = workWidth;
-    height = workHeight;
     fullIm = false;
     renderReady = false;
 }
@@ -80,6 +88,22 @@ void image::exportPostProcess() {
     Write metadata to final file after OIIO close
 */
 bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
+    // Wait for the metal render to finish
+    auto start = std::chrono::steady_clock::now();
+    while (!renderReady) {
+        auto end = std::chrono::steady_clock::now();
+        auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+        if (dur.count() > 15000) {
+            // Bailing out after waiting 15 seconds for Metal to finish rendering..
+            // At avg of 20-30fps it should never take this long
+            LOG_ERROR("Stuck waiting for Metal GPU render. Cannot export file: {}!", srcFilename);
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+    renderReady = false;
+
     OIIO::TypeDesc format = OIIO::TypeDesc::FLOAT;
     OIIO::TypeDesc outFormat;
     switch (param.bitDepth) {
@@ -124,7 +148,7 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
         LOG_ERROR("Unable to write image");
             return false;
     }
-    OIIO::ImageSpec spec(width, height, nChannels, outFormat);
+    OIIO::ImageSpec spec(rawWidth, rawHeight, nChannels, outFormat);
 
 
     if (param.format == 2) {
@@ -150,21 +174,8 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
 
     // Trim proc data for save
     allocateTmpBuf();
-    auto start = std::chrono::steady_clock::now();
-    while (!renderReady) {
-        auto end = std::chrono::steady_clock::now();
-        auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-        if (dur.count() > 15000) {
-            // Bailing out after waiting 15 seconds for Metal to finish rendering..
-            // At avg of 20-30fps it should never take this long
-            LOG_ERROR("Stuck waiting for Metal GPU render. Cannot export file: {}!", srcFilename);
-            return false;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    }
-    //TODO FIX TO TAKE OCIO SET FROM EXPORT
-    //ocioProc.processImage(procImgData, width, height, ocioSet);
+
     trimForSave();
     // Write the image data
     if (!out->write_image(format, tmpOutData)) {
@@ -189,6 +200,7 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
     quality settings.
 */
 bool image::debayerImage(bool fullRes, int quality) {
+    imageLoaded = false;
     std::unique_ptr<LibRaw> rawProcessor(new LibRaw);
 
     // Set parameters for linear output
@@ -231,12 +243,12 @@ bool image::debayerImage(bool fullRes, int quality) {
     }
 
     // Fill raw buffer
-    width = processedImage->width;
-    height = processedImage->height;
+    rawWidth = processedImage->width;
+    rawHeight = processedImage->height;
     nChannels = processedImage->colors;
     if (rawImgData)
         delete[] rawImgData;
-    rawImgData = new float[width * height * 4];
+    rawImgData = new float[processedImage->width * processedImage->height * 4];
 
     // Convert to float (assuming 16-bit output)
     if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
@@ -279,7 +291,7 @@ bool image::debayerImage(bool fullRes, int quality) {
             thread.join();
         }
         padToRGBA();
-        if (appPrefs.perfMode)
+        if (appPrefs.prefs.perfMode && !fullIm)
             resizeProxy();
 
         imageLoaded = true;
@@ -317,7 +329,7 @@ bool image::oiioReload() {
     //nChannels = inputSpec.nchannels;
     if (rawImgData)
         delete [] rawImgData;
-    rawImgData = new float[width * height * 4];
+    rawImgData = new float[rawWidth * rawHeight * 4];
     if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)rawImgData))
     {
         LOG_ERROR("[oiio] Failed to read image: {}", srcFilename);
@@ -331,7 +343,7 @@ bool image::oiioReload() {
 
     // Pad to RGBA
     padToRGBA();
-    if (appPrefs.perfMode)
+    if (appPrefs.prefs.perfMode && !fullIm)
         resizeProxy();
 
 
@@ -451,7 +463,7 @@ bool image::dataReload() {
     }
 
     padToRGBA();
-    if (appPrefs.perfMode)
+    if (appPrefs.prefs.perfMode && !fullIm)
         resizeProxy();
 
     ocioProc.processImage(rawImgData, width, height, intOCIOSet);
@@ -654,7 +666,7 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
             img.renderBypass = true;
             img.imageLoaded = true;
             img.padToRGBA();
-            if (appPrefs.perfMode)
+            if (appPrefs.prefs.perfMode)
                 img.resizeProxy();
             img.setCrop();
             img.intOCIOSet = ocioSet;
@@ -706,8 +718,8 @@ std::variant<image, std::string> readRawImage(std::string imagePath) {
     rawProcessor->imgdata.params.no_auto_bright = 1;    // Disable auto-brightening
     rawProcessor->imgdata.params.use_camera_wb = 1;     // Use camera white balance
     rawProcessor->imgdata.params.output_color = 6;      // Output color space: 1 = sRGB
-    rawProcessor->imgdata.params.user_qual = appPrefs.perfMode ? 2 : 11;
-    rawProcessor->imgdata.params.half_size = appPrefs.perfMode ? 1 : 0;
+    rawProcessor->imgdata.params.user_qual = appPrefs.prefs.perfMode ? 2 : 11;
+    rawProcessor->imgdata.params.half_size = appPrefs.prefs.perfMode ? 1 : 0;
 
     // Open the raw file
     int result = rawProcessor->open_file(imagePath.c_str());
@@ -805,7 +817,7 @@ auto d1 = std::chrono::steady_clock::now();
 
     // Pad to RGBA
     img.padToRGBA();
-    if (appPrefs.perfMode)
+    if (appPrefs.prefs.perfMode)
         img.resizeProxy();
     img.setCrop();
 auto e1 = std::chrono::steady_clock::now();
@@ -832,15 +844,15 @@ auto durF = std::chrono::duration_cast<std::chrono::microseconds>(f1 - e1);
 auto durG = std::chrono::duration_cast<std::chrono::microseconds>(end - f1);
 auto durH = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 LOG_INFO("-----------Debayer Time-----------");
-LOG_INFO("Open:     {:*>8}μs | {:*>8}ms", durA.count(), durA.count()/1000);
-LOG_INFO("Unpack:   {:*>8}μs | {:*>8}ms", durB.count(), durB.count()/1000);
-LOG_INFO("Process:  {:*>8}μs | {:*>8}ms", durC.count(), durC.count()/1000);
-LOG_INFO("Convert:  {:*>8}μs | {:*>8}ms", durD.count(), durD.count()/1000);
-LOG_INFO("Pad:      {:*>8}μs | {:*>8}ms", durE.count(), durE.count()/1000);
-LOG_INFO("Disp:     {:*>8}μs | {:*>8}ms", durF.count(), durF.count()/1000);
-LOG_INFO("Clear:    {:*>8}μs | {:*>8}ms", durG.count(), durG.count()/1000);
+//LOG_INFO("Open:     {:*>8}μs | {:*>8}ms", durA.count(), durA.count()/1000);
+//LOG_INFO("Unpack:   {:*>8}μs | {:*>8}ms", durB.count(), durB.count()/1000);
+//LOG_INFO("Process:  {:*>8}μs | {:*>8}ms", durC.count(), durC.count()/1000);
+//LOG_INFO("Convert:  {:*>8}μs | {:*>8}ms", durD.count(), durD.count()/1000);
+//LOG_INFO("Pad:      {:*>8}μs | {:*>8}ms", durE.count(), durE.count()/1000);
+//LOG_INFO("Disp:     {:*>8}μs | {:*>8}ms", durF.count(), durF.count()/1000);
+//LOG_INFO("Clear:    {:*>8}μs | {:*>8}ms", durG.count(), durG.count()/1000);
 LOG_INFO("Total:    {:*>8}μs | {:*>8}ms", durH.count(), durH.count()/1000);
-LOG_INFO("----------------------------------");
+//LOG_INFO("----------------------------------");
     return img;
 }
 
@@ -863,7 +875,7 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
     {
         LOG_ERROR("[oiio] Could not read the image file: {}", imagePath);
         LOG_ERROR("[oiio] Error: {}", OIIO::geterror());
-        return "Could not open image";
+        return "Could not open image: " + imagePath;
     }
 
     std::filesystem::path imgP = imagePath;
@@ -910,7 +922,7 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
 
     // Pad to RGBA
     img.padToRGBA();
-    if (appPrefs.perfMode)
+    if (appPrefs.prefs.perfMode)
         img.resizeProxy();
     img.setCrop();
 

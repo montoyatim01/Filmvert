@@ -434,7 +434,7 @@ void metalGPU::renderImage(image* _image, ocioSetting ocioSet) {
         computeEncoder->setBuffer(workingA, 0, 0);
         computeEncoder->setBuffer(m_disp, 0, 1);
     }
-    computeEncoder->setBytes(&_image->width, sizeof(unsigned int), 2);
+    computeEncoder->setBytes(&_renderParams.width, sizeof(unsigned int), 2);
     if (ocioSet.texCount == 1) {
         computeEncoder->setTexture(ocioTex, 0);
         computeEncoder->setSamplerState(ocioSample, 0);

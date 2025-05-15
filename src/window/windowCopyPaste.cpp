@@ -1,6 +1,10 @@
 #include "window.h"
 
-
+//--- Copy Into Params ---//
+/*
+    Copy active image's params and metadata into
+    the copyParams struct for later pasting
+*/
 void mainWindow::copyIntoParams() {
     if (validIm()) {
         copyParams.blurAmount = activeImage()->imgParam.blurAmount;
@@ -45,6 +49,11 @@ void mainWindow::copyIntoParams() {
     }
 }
 
+//--- Paste Into Params ---//
+/*
+    For each image selected, paste the selected params
+    from the copyParams struct into the image's params
+*/
 void mainWindow::pasteIntoParams() {
     for (int i = 0; i < activeRollSize(); i++) {
         if (getImage(i)->selected) {

@@ -1,35 +1,31 @@
+#include "metalGPU.h"
 #include "ocioProcessor.h"
 #include "window.h"
 #include <chrono>
 #include <filesystem>
 
 
-// Open up a folder with sub-folders
-// Each subfolder is a "roll"
-// Run through each folder and create vector of images
-// "Roll" object vector containing images and title, other?
-// Only the active roll gets their images processed
-//
-// On open, see if directories or files
-// If any files, ask which roll.
-// Otherwise process folders as rolls
-//
+//--- Open Images ---//
+/*
+    Open a dialog to select individual
+    images for import
+*/
 void mainWindow::openImages() {
-    auto selection = ShowFileOpenDialog();/*pfd::open_file("Select a file", "/Users/timothymontoya/Desktop/CLAi_OFX/2/3/4/5",
-                                    { "Image Files", "*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.exr *.dpx",
-                                      "All Files", "*" },
-                                    pfd::opt::multiselect).result();*/
-    // Do something with selection
-    //int activePos = activeRollSize();
+    auto selection = ShowFileOpenDialog();
+
     if (selection.size() > 0) {
         dispImportPop = true;
         importFiles = selection;
         checkForRaw();
     }
 
-
 }
 
+//--- Open JSON ---//
+/*
+    Open dialog for selecting a roll JSON
+    file for importing
+*/
 bool mainWindow::openJSON() {
     auto selection = ShowFileOpenDialog(false);
 
@@ -48,6 +44,11 @@ bool mainWindow::openJSON() {
     return false;
 }
 
+//--- Open Rolls ---//
+/*
+    Open a dialog for a user to open folder(s)
+    as rolls
+*/
 void mainWindow::openRolls() {
     auto selection = ShowFolderSelectionDialog();
     // Do something with selection
@@ -59,6 +60,13 @@ void mainWindow::openRolls() {
     }
 }
 
+//--- Export Images ---//
+/*
+    Exporting individual images. Loop through
+    all images in current roll, and add the
+    selected images to the thread pool to
+    pre-process, gpu render, export, and post-process
+*/
 void mainWindow::exportImages() {
     for (int i=0; i < activeRollSize(); i++) {
         if (getImage(i) && getImage(i)->selected)
@@ -73,11 +81,15 @@ void mainWindow::exportImages() {
 
         for (int i = 0; i < activeRollSize(); i++) {
             futures.push_back(pool.submit([this, i]() {
+                if (!isExporting) { // If user has cancelled
+                    exportPopup = false; // Bail out
+                    return;
+                }
                 if (getImage(i) && getImage(i)->selected) {
 
                     getImage(i)->exportPreProcess(expSetting.outPath);
-                    mtlGPU->addToRender(getImage(i), r_sdt, exportOCIO);
-                    LOG_INFO("Exporting Image {}: {}", i, getImage(i)->srcFilename);
+                    mtlGPU->addToRender(getImage(i), r_full, exportOCIO);
+                    //LOG_INFO("Exporting Image {}: {}", i, getImage(i)->srcFilename);
                     getImage(i)->writeImg(expSetting, exportOCIO);
                     getImage(i)->exportPostProcess();
                     exportProcCount++;
@@ -89,18 +101,24 @@ void mainWindow::exportImages() {
         for (auto& f : futures) {
             f.get();  // Wait for job to finish
         }
-
+        activeRoll()->checkBuffers();
         exportPopup = false;
         isExporting = false;
+
     }};
     exportThread.detach();
 }
 
-
+//--- Export Rolls ---//
+/*
+    Loop through all selected rolls and
+    add every image to the thread pool to
+    pre-process, gpu render, write, and post-process
+*/
 void mainWindow::exportRolls() {
     for (int r=0; r < activeRolls.size(); r++) {
         if (activeRolls[r].selected) {
-            for (int i = 0; i < activeRolls[r].images.size(); i++) {
+            for (int i = 0; i < activeRolls[r].rollSize(); i++) {
                 if (getImage(r, i))
                     exportImgCount++;
             }
@@ -116,9 +134,13 @@ LOG_INFO("Exporting {} Files", exportImgCount);
 
         for (int r = 0; r < activeRolls.size(); r++) {
             if (activeRolls[r].selected) {
-                for (int i = 0; i < activeRolls[r].images.size(); i++) {
-                    LOG_INFO("Exporting {} Image from {} Roll", i, r);
+                for (int i = 0; i < activeRolls[r].rollSize(); i++) {
+                    //LOG_INFO("Exporting {} Image from {} Roll", i, r);
                     futures.push_back(pool.submit([this, r, i]() {
+                        if (!isExporting) { // If user has cancelled
+                            exportPopup = false; // Bail out
+                            return;
+                        }
                         if (getImage(r, i)) {
                             getImage(r, i)->exportPreProcess(expSetting.outPath + activeRolls[r].rollName);
                             if (!std::filesystem::exists(getImage(r, i)->expFullPath)) {
@@ -126,7 +148,7 @@ LOG_INFO("Exporting {} Files", exportImgCount);
                             }
 
                             mtlGPU->addToRender(getImage(r, i), r_full, exportOCIO);
-                            LOG_INFO("Exporting Roll: {}, Image {}: {}", r, i, getImage(r, i)->srcFilename);
+                            //LOG_INFO("Exporting Roll: {}, Image {}: {}", r, i, getImage(r, i)->srcFilename);
                             getImage(r, i)->writeImg(expSetting, exportOCIO);
                             getImage(r, i)->exportPostProcess();
                             exportProcCount++;
@@ -141,12 +163,11 @@ LOG_INFO("Exporting {} Files", exportImgCount);
         for (auto& f : futures) {
             f.get();  // Wait for job to finish
         }
+        activeRoll()->checkBuffers();
 
         exportPopup = false;
         isExporting = false;
     }};
     exportThread.detach();
-
-
 
 }

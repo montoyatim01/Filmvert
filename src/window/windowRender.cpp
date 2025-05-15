@@ -1,53 +1,29 @@
+#include "logger.h"
 #include "window.h"
 
 
-void mainWindow::initRender(int start, int end) {
-    std::thread renThread = std::thread{ [this, start, end]() {
-        //isRendering = true;
-        for (int i = start; i < end; i++) {
-            if (i >= activeRollSize())
-                break;
-            mtlGPU->addToRender(getImage(i), r_sdt, dispOCIO);
-            //getImage(i)->procDispImg();
-           //getImage(i)->sdlUpdate = true;
-            //updateSDLTexture(getImage(i));
-        }
-
-    }};
-    renThread.detach();
-
-}
-
+//--- Image Render ---//
+/*
+    Add the active image to the GPU render queue
+*/
 void mainWindow::imgRender() {
-
-    if (validIm()) {
-
-        //std::thread renThread = std::thread{ [this]() {
-            //isRendering = true;
-            mtlGPU->addToRender(activeImage(), r_sdt, dispOCIO);
-            //activeImage()->procDispImg();
-            //activeImage()->sdlUpdate = true;
-            //updateSDLTexture(activeImage());
-
-            //} };
-       // renThread.detach();
-
-    }
+    if (validIm())
+        mtlGPU->addToRender(activeImage(), r_sdt, dispOCIO);
 }
 
+//--- Image Render ---//
+/*
+    Add the provided image to the GPU render queue
+*/
 void mainWindow::imgRender(image *img) {
-
-
-    if (img) {
-        //isRendering = true;
+    if (img)
         mtlGPU->addToRender(img, r_sdt, dispOCIO);
-        //img->procDispImg();
-        //img->sdlUpdate = true;
-
-
-        //renderCall = false;
-	}
 }
+
+//--- Roll Render ---//
+/*
+    Queue up the entire active roll for GPU rendering
+*/
 void mainWindow::rollRender() {
     if (validRoll()) {
         for (int i = 0; i < activeRollSize(); i++) {
@@ -56,12 +32,22 @@ void mainWindow::rollRender() {
     }
 }
 
+//--- Roll Render Check ---//
+/*
+    Loop through all rolls/images to determine
+    if any have been rendered and are in need of
+    SDL texture updating.
+
+    Also check through all of the rolls to
+    see if any are in need of dumping for
+    performance mode
+*/
 void mainWindow::rollRenderCheck() {
 
     // Scan through all images needing SDL updates
     // after being rendered (queued by import)
     for (int r = 0; r < activeRolls.size(); r++) {
-        for (int i = 0; i < activeRolls[r].images.size(); i++) {
+        for (int i = 0; i < activeRolls[r].rollSize(); i++) {
             image *img = getImage(r, i);
             if (img && img->imageLoaded && img->sdlUpdate)
                 updateSDLTexture(img);
@@ -72,15 +58,19 @@ void mainWindow::rollRenderCheck() {
     // If no, and if we're not on the selected roll
     // Dump the roll
     for (int r = 0; r < activeRolls.size(); r++) {
-        if (!activeRolls[r].rollLoaded || activeRolls[r].imagesLoading)
+        if (!activeRolls[r].rollLoaded || activeRolls[r].imagesLoading) {
             continue; // We don't want to inturrupt unloaded, or active rolls
+        }
+
         bool imRendering = false;
-        for (int i = 0; i < activeRolls[r].images.size(); i++) {
+        for (int i = 0; i < activeRolls[r].rollSize(); i++) {
             image* im = getImage(r, i);
             if (!im)
                 continue;
-            if (im->sdlUpdate || mtlGPU->isInQueue(im))
+            if (im->sdlUpdate || mtlGPU->isInQueue(im)) {
                 imRendering = true;
+            }
+
         }
         if (!imRendering && r != selRoll &&
             activeRolls[r].rollLoaded &&
@@ -89,13 +79,20 @@ void mainWindow::rollRenderCheck() {
                 // And this is not the active roll
                 // And this roll is fully loaded
                 // And there are not images loading
-                if (appPrefs.perfMode)
+                if (appPrefs.prefs.perfMode) {
                     activeRolls[r].clearBuffers();
+                }
+
             }
     }
 
 }
 
+//--- Analyze Image ---//
+/*
+    Call up the GPU render for the blur pass
+    and run the min/max on the resulting image
+*/
 void mainWindow::analyzeImage() {
 
     if (validIm()) {

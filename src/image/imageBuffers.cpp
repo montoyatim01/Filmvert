@@ -27,7 +27,10 @@ void image::allocateTmpBuf() {
         tmpOutData = procImgData;
         return;
     }
-    tmpOutData = new float[width * height * nChannels];
+    if (rawWidth * rawHeight > width * height)
+        tmpOutData = new float[rawWidth * rawHeight * nChannels];
+    else
+        tmpOutData = new float[width * height * nChannels];
 }
 void image::clearTmpBuf() {
     if (tmpOutData && tmpOutData != procImgData) {
@@ -38,8 +41,12 @@ void image::clearTmpBuf() {
 }
 
 void image::allocProcBuf() {
-    if (!procImgData)
-        procImgData = new float [width * height * 4];
+    if (!procImgData) {
+        if (rawWidth * rawHeight > width * height)
+            procImgData = new float[rawWidth * rawHeight * 4];
+        else
+            procImgData = new float[width * height * 4];
+    }
 }
 void image::delProcBuf() {
     if (procImgData) {
@@ -60,6 +67,12 @@ void image::delDispBuf() {
     }
 }
 
+//--- Clear Buffers ---//
+/*
+    Clear all buffers used by an image
+    (other than the SDL textures) to save
+    on ram usage.
+*/
 void image::clearBuffers() {
     if (!rawImgData)
         return;
@@ -91,13 +104,18 @@ void image::clearBuffers() {
     imageLoaded = false;
 }
 
+//--- Load Buffers ---//
+/*
+    Re-allocate and re-load an image back
+    from disk after it has been unloaded.
+*/
 void image::loadBuffers() {
     if (imageLoaded)
         return;
     allocProcBuf();
     allocDispBuf();
     if (isRawImage) {
-        if(debayerImage(!appPrefs.perfMode, appPrefs.perfMode ? 2 : 11)) {
+        if(debayerImage(!appPrefs.prefs.perfMode, appPrefs.prefs.perfMode ? 2 : 11)) {
             imageLoaded = true;
         }
         else
@@ -117,7 +135,12 @@ void image::loadBuffers() {
     }
 }
 
-
+//--- Pad to RGBA ---//
+/*
+    Pad an RGB (Or R or RG) image to
+    RGBA for all internal processing
+    RGBA for better byte-alignment
+*/
 void image::padToRGBA() {
     if (nChannels == 4)
     {
@@ -140,14 +163,14 @@ void image::padToRGBA() {
     std::vector<std::thread> threads(numThreads);
 
     // Divide the workload into equal parts for each thread
-    int rowsPerThread = height / numThreads;
+    int rowsPerThread = rawHeight / numThreads;
 
     auto processRows = [&](int startRow, int endRow) {
         for (int y=startRow; y<endRow; y++)
         {
-            for (int x=0; x<width; x++)
+            for (int x=0; x<rawWidth; x++)
             {
-                int index = (y * width) + x;
+                int index = (y * rawWidth) + x;
                 procImgData[4 * index] = nChannels >= 1 ? rawImgData[nChannels * index] : 0.0f; // R channel
                 procImgData[4 * index + 1] = nChannels >= 2 ? rawImgData[nChannels * index + 1] : 0.0f; // G channel
                 procImgData[4 * index + 2] = nChannels >= 3 ? rawImgData[nChannels * index + 2] : 0.0f; // B channel
@@ -159,7 +182,7 @@ void image::padToRGBA() {
     // Launch the threads
     for (int i=0; i<numThreads; ++i) {
         int startRow = i * rowsPerThread;
-        int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
+        int endRow = (i == numThreads - 1) ? rawHeight : (i + 1) * rowsPerThread;
         threads[i] = std::thread(processRows, startRow, endRow);
     }
 
@@ -167,11 +190,15 @@ void image::padToRGBA() {
     for (auto& thread : threads) {
         thread.join();
     }
-    memcpy(rawImgData, procImgData, width * height * 4 * sizeof(float));
+    memcpy(rawImgData, procImgData, rawWidth * rawHeight * 4 * sizeof(float));
     delProcBuf();
 }
 
-
+//--- Trim for Save ---//
+/*
+    Trim the output buffer to the same
+    number of channels as the input
+*/
 void image::trimForSave() {
     if (nChannels == 4)
     {
@@ -193,14 +220,14 @@ void image::trimForSave() {
     std::vector<std::thread> threads(numThreads);
 
     // Divide the workload into equal parts for each thread
-    int rowsPerThread = height / numThreads;
+    int rowsPerThread = rawHeight / numThreads;
 
     auto processRows = [&](int startRow, int endRow) {
         for (int y=startRow; y<endRow; y++)
         {
-            for (int x=0; x<width; x++)
+            for (int x=0; x<rawWidth; x++)
             {
-                int index = (y * width) + x;
+                int index = (y * rawWidth) + x;
                 tmpOutData[nChannels * index] = procImgData[4 * index]; // R channel
                 if (nChannels > 1)
                     tmpOutData[nChannels * index + 1] = nChannels >= 2 ? procImgData[4 * index + 1] : 0.0f; // G channel
@@ -215,7 +242,7 @@ void image::trimForSave() {
     // Launch the threads
     for (int i=0; i<numThreads; ++i) {
         int startRow = i * rowsPerThread;
-        int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
+        int endRow = (i == numThreads - 1) ? rawHeight : (i + 1) * rowsPerThread;
         threads[i] = std::thread(processRows, startRow, endRow);
     }
 

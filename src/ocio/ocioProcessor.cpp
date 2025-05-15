@@ -9,6 +9,12 @@
 
 ocioProcessor ocioProc;
 
+//--- Initialize ---//
+/*
+    Initialize the OCIO class with the
+    built-in OCIO config. Load up the vectors
+    with the colorspace and display/view names
+*/
 bool ocioProcessor::initialize(std::string &configFile) {
     try {
         // Load config from the memory stream
@@ -61,6 +67,11 @@ bool ocioProcessor::initialize(std::string &configFile) {
     return true;
 }
 
+//--- Initialize Alternate Config ---//
+/*
+    Attempt to initialize the config at the provided
+    path. Don't yet set it active.
+*/
 bool ocioProcessor::initAltConfig(std::string path) {
     try {
         // Load config from file
@@ -80,6 +91,11 @@ bool ocioProcessor::initAltConfig(std::string path) {
     }
 }
 
+//--- Set External Active---//
+/*
+    If a valid external config exists, set it
+    as the active config.
+*/
 void ocioProcessor::setExtActive() {
     if (!validExternal)
         return;
@@ -121,6 +137,11 @@ void ocioProcessor::setExtActive() {
     }
 }
 
+//--- Set Internal Active---//
+/*
+    Switch from the external OCIO config back
+    to the internal config
+*/
 void ocioProcessor::setIntActive() {
   try {
     OCIO::SetCurrentConfig(OCIOconfig);
@@ -160,17 +181,22 @@ void ocioProcessor::setIntActive() {
   }
 }
 
+//--- Process Image ---//
+/*
+    CPU process an image with the given OCIO Settings
+*/
 void ocioProcessor::processImage(float *img, unsigned int width,
                                  unsigned int height, ocioSetting &ocioSet) {
 
   try {
+      bool ext = ocioSet.ext && validExternal;
       const char *colorspace =
-          !useExt ? OCIOconfig->getColorSpaceNameByIndex(ocioSet.colorspace)
+          !ext ? OCIOconfig->getColorSpaceNameByIndex(ocioSet.colorspace)
                   : extOCIOconfig->getColorSpaceNameByIndex(ocioSet.colorspace);
 
-      const char *display = !useExt ? OCIOconfig->getDisplay(ocioSet.display)
+      const char *display = !ext ? OCIOconfig->getDisplay(ocioSet.display)
                                     : extOCIOconfig->getDisplay(ocioSet.display);
-      const char *view = !useExt ? OCIOconfig->getView(display, ocioSet.view)
+      const char *view = !ext ? OCIOconfig->getView(display, ocioSet.view)
                                  : extOCIOconfig->getView(display, ocioSet.view);
 
     OCIO::ConstProcessorRcPtr processor;
@@ -184,7 +210,7 @@ void ocioProcessor::processImage(float *img, unsigned int width,
             transform->setSrc("ACEScg");
             transform->setDst(colorspace);
         }
-      processor = !useExt ? OCIOconfig->getProcessor(transform)
+      processor = !ext ? OCIOconfig->getProcessor(transform)
                           : extOCIOconfig->getProcessor(transform);
     } else {
       OCIO::DisplayViewTransformRcPtr transform =
@@ -194,7 +220,7 @@ void ocioProcessor::processImage(float *img, unsigned int width,
       transform->setView(view);
       if (ocioSet.inverse)
         transform->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
-      processor = !useExt ? OCIOconfig->getProcessor(transform)
+      processor = !ext ? OCIOconfig->getProcessor(transform)
                           : extOCIOconfig->getProcessor(transform);
     }
 
@@ -234,6 +260,13 @@ void ocioProcessor::processImage(float *img, unsigned int width,
   }
 }
 
+//--- Get Metal Kernel ---//
+/*
+    With the given OCIO Settings, generate the requisite Metal
+    kerenel string. If a 1D LUT is needed for the kernel,
+    assign the pointer to the 1D and the dimentions to the
+    OCIO Settings for copying in the GPU rendering stage
+*/
 std::string ocioProcessor::getMetalKernel(ocioSetting& ocioSet) {
 
 
@@ -298,392 +331,3 @@ std::string ocioProcessor::getMetalKernel(ocioSetting& ocioSet) {
     }
 
 }
-
-void ocioProcessor::processImageGPU(float *img, unsigned int width, unsigned int height) {
-    // Step 1: Set up OpenGL context
-        /*if (!setupOpenGLContext(width, height)) {
-            LOG_ERROR("Failed to set up OpenGL context, falling back to CPU");
-            processImage(img, width, height);
-            return;
-        }*/
-
-        // Step 3: Create the display transform
-        const char * display = OCIOconfig->getDefaultDisplay();
-        const char * view = OCIOconfig->getDefaultView(display);
-
-        OCIO::DisplayViewTransformRcPtr transform = OCIO::DisplayViewTransform::Create();
-        transform->setSrc("ACEScg");
-        transform->setDisplay("sRGB - Display");
-        transform->setView("ACES 1.0 - SDR Video");
-
-        // Step 4: Create the processor
-        OCIO::ConstProcessorRcPtr processor = OCIOconfig->getProcessor(transform);
-
-        try {
-            // Step 5: Create GPU shader description
-            OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateShaderDesc();
-            shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_MSL_2_0);  // macOS compatible GLSL version
-
-            // Step 6: Get the shader program info
-            processor->getDefaultGPUProcessor()->extractGpuShaderInfo(shaderDesc);
-            LOG_INFO("GPU Shader: {}", shaderDesc->getShaderText());
-/*
-            // Step 7: Create input texture
-            GLuint inputTexture;
-            glGenTextures(1, &inputTexture);
-            glBindTexture(GL_TEXTURE_2D, inputTexture);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, img);
-
-            // Step 8: Create output texture/framebuffer
-            GLuint outputTexture;
-            glGenTextures(1, &outputTexture);
-            glBindTexture(GL_TEXTURE_2D, outputTexture);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
-
-            GLuint framebuffer;
-            glGenFramebuffers(1, &framebuffer);
-            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, outputTexture, 0);
-
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-                LOG_ERROR("Framebuffer not complete, falling back to CPU");
-                processImage(img, width, height);
-                return;
-            }
-
-            // Step 9: Create and compile shaders
-            // Create vertex shader
-            const GLchar* vertShaderSrc =
-                "#version 330 core\n"
-                "layout(location = 0) in vec2 position;\n"
-                "layout(location = 1) in vec2 texCoord;\n"
-                "out vec2 TexCoord;\n"
-                "void main() {\n"
-                "    gl_Position = vec4(position, 0.0, 1.0);\n"
-                "    TexCoord = texCoord;\n"
-                "}\n";
-
-            GLuint vertShader = glCreateShader(GL_VERTEX_SHADER);
-            glShaderSource(vertShader, 1, &vertShaderSrc, nullptr);
-            glCompileShader(vertShader);
-
-            // Check vertex shader compilation
-            GLint success;
-            GLchar infoLog[512];
-            glGetShaderiv(vertShader, GL_COMPILE_STATUS, &success);
-            if (!success) {
-                glGetShaderInfoLog(vertShader, 512, nullptr, infoLog);
-                LOG_ERROR("Vertex shader compilation failed: {}", infoLog);
-                processImage(img, width, height);
-                return;
-            }
-
-            // Create fragment shader using OCIO shader program text
-            GLuint fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-            const char* fragShaderSrc = shaderDesc->getShaderText();
-            glShaderSource(fragShader, 1, &fragShaderSrc, nullptr);
-            glCompileShader(fragShader);
-
-            // Check fragment shader compilation
-            glGetShaderiv(fragShader, GL_COMPILE_STATUS, &success);
-            if (!success) {
-                glGetShaderInfoLog(fragShader, 512, nullptr, infoLog);
-                LOG_ERROR("Fragment shader compilation failed: {}", infoLog);
-                processImage(img, width, height);
-                return;
-            }
-
-            // Create shader program
-            GLuint shaderProgram = glCreateProgram();
-            glAttachShader(shaderProgram, vertShader);
-            glAttachShader(shaderProgram, fragShader);
-            glLinkProgram(shaderProgram);
-
-            // Check program linking
-            glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-            if (!success) {
-                glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
-                LOG_ERROR("Shader program linking failed: {}" , infoLog);
-                processImage(img, width, height);
-                return;
-            }
-
-            // Step 10: Set up texture coordinates and vertex positions
-            GLfloat vertices[] = {
-                // positions      // texture coords
-                -1.0f,  1.0f,    0.0f, 1.0f,   // top left
-                -1.0f, -1.0f,    0.0f, 0.0f,   // bottom left
-                 1.0f, -1.0f,    1.0f, 0.0f,   // bottom right
-                 1.0f,  1.0f,    1.0f, 1.0f    // top right
-            };
-
-            GLuint indices[] = {
-                0, 1, 2,  // first triangle
-                0, 2, 3   // second triangle
-            };
-
-            // Create VAO, VBO, EBO
-            GLuint VAO, VBO, EBO;
-            glGenVertexArrays(1, &VAO);
-            glGenBuffers(1, &VBO);
-            glGenBuffers(1, &EBO);
-
-            glBindVertexArray(VAO);
-
-            glBindBuffer(GL_ARRAY_BUFFER, VBO);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-            // Position attribute
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)0);
-            glEnableVertexAttribArray(0);
-
-            // Texture coords attribute
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
-            glEnableVertexAttribArray(1);
-
-            // Step 11: Render with OCIO shaders
-            glUseProgram(shaderProgram);
-
-            // Set input texture
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, inputTexture);
-
-            // Set OCIO shader uniforms
-            // This is where we connect OCIO's 3D LUTs and uniforms to our shader
-            int textureUnit = 1;  // Start from texture unit 1 (0 is our input)
-
-            // Set OCIO's uniforms based on the shader description
-            for (unsigned int i = 0; i < shaderDesc->getNumUniforms(); ++i) {
-                const char* name = shaderDesc->getUniform(i).getUniformName();
-                const OCIO::GpuShaderDesc::UniformData& data = shaderDesc->getUniform(i).getUniformData();
-
-                GLint location = glGetUniformLocation(shaderProgram, name);
-
-                if (location >= 0) {
-                    if (data.getType() == OCIO::UNIFORM_FLOAT) {
-                        glUniform1f(location, data.getFloat());
-                    }
-                    else if (data.getType() == OCIO::UNIFORM_FLOAT_VECTOR3) {
-                        glUniform3fv(location, 1, data.getFloat3());
-                    }
-                    else if (data.getType() == OCIO::UNIFORM_FLOAT_VECTOR4) {
-                        glUniform4fv(location, 1, data.getFloat4());
-                    }
-                }
-            }
-
-            // Set OCIO's textures
-            for (unsigned int i = 0; i < shaderDesc->getNumTextures(); ++i) {
-                const char* name = shaderDesc->getTexture(i).getUniformName();
-                const char* textureName = shaderDesc->getTexture(i).getTextureName();
-                const OCIO::GpuShaderDesc::TextureData& data = shaderDesc->getTexture(i).getTextureData();
-
-                GLint location = glGetUniformLocation(shaderProgram, name);
-
-                if (location >= 0) {
-                    GLuint textureID;
-                    glGenTextures(1, &textureID);
-
-                    GLenum internalFormat = GL_RGB32F;  // Default for 3D LUTs
-                    GLenum format = GL_RGB;
-
-                    if (data.getType() == OCIO::TEXTURE_RED_CHANNEL) {
-                        internalFormat = GL_R32F;
-                        format = GL_RED;
-                    }
-
-                    if (data.getType() == OCIO::TEXTURE_RGB_CHANNEL) {
-                        glActiveTexture(GL_TEXTURE0 + textureUnit);
-                        glBindTexture(GL_TEXTURE_1D, textureID);
-
-                        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-
-                        glTexImage1D(GL_TEXTURE_1D, 0, internalFormat, data.getWidth(), 0, format, GL_FLOAT, data.getValues());
-                    }
-                    else if (data.getType() == OCIO::TEXTURE_3D) {
-                        glActiveTexture(GL_TEXTURE0 + textureUnit);
-                        glBindTexture(GL_TEXTURE_3D, textureID);
-
-                        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-                        glTexImage3D(GL_TEXTURE_3D, 0, internalFormat, data.getWidth(), data.getHeight(), data.getDepth(), 0, format, GL_FLOAT, data.getValues());
-                    }
-
-                    glUniform1i(location, textureUnit);
-                    textureUnit++;
-                }
-            }
-
-            // Step 12: Set viewport and render
-            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-            glViewport(0, 0, width, height);
-            glClear(GL_COLOR_BUFFER_BIT);
-
-            glBindVertexArray(VAO);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            // Step 13: Read back the processed image
-            glReadBuffer(GL_COLOR_ATTACHMENT0);
-            glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, img);
-
-            // Step 14: Clean up resources
-            glDeleteVertexArrays(1, &VAO);
-            glDeleteBuffers(1, &VBO);
-            glDeleteBuffers(1, &EBO);
-            glDeleteTextures(1, &inputTexture);
-            glDeleteTextures(1, &outputTexture);
-            glDeleteFramebuffers(1, &framebuffer);
-            glDeleteProgram(shaderProgram);
-            glDeleteShader(vertShader);
-            glDeleteShader(fragShader);
-
-            // Destroy the window/context
-            glutDestroyWindow(glutGetWindow());*/
-
-        } catch (OCIO::Exception& e) {
-            LOG_ERROR("OCIO GPU processing error: {}", e.what());
-            LOG_ERROR("Falling back to CPU processing");
-            //processImage(img, width, height, oc);
-            //glutDestroyWindow(glutGetWindow());
-        } catch (std::exception& e) {
-            LOG_ERROR("Error during GPU processing: {}", e.what());
-            LOG_ERROR("Falling back to CPU processing");
-            //processImage(img, width, height);
-            //glutDestroyWindow(glutGetWindow());
-        }
-}
-/*
-
-#include <metal_math>
- #include <metal_common>
- #include <metal_compute>
- #include <metal_stdlib>
- using namespace metal;
-
-
-// Declaration of class wrapper
-
-struct ocioOCIOMain
-{
-ocioOCIOMain(
-  texture2d<float> ocio_lut1d_0
-  , sampler ocio_lut1d_0Sampler
-)
-{
-  this->ocio_lut1d_0 = ocio_lut1d_0;
-  this->ocio_lut1d_0Sampler = ocio_lut1d_0Sampler;
-}
-
-
-// Declaration of all variables
-
-texture2d<float> ocio_lut1d_0;
-sampler ocio_lut1d_0Sampler;
-
-// Declaration of all helper methods
-
-float2 ocio_lut1d_0_computePos(float f)
-{
-  float dep;
-  float abs_f = abs(f);
-  if (abs_f > 6.10351562e-05)
-  {
-    float3 fComp = float3(15., 15., 15.);
-    float absarr = min( abs_f, 65504.);
-    fComp.x = floor( log2( absarr ) );
-    float lower = pow( 2.0, fComp.x );
-    fComp.y = ( absarr - lower ) / lower;
-    float3 scale = float3(1024., 1024., 1024.);
-    dep = dot( fComp, scale );
-  }
-  else
-  {
-    dep = abs_f * 16777216.;
-  }
-  dep += (f < 0.) ? 32768.0 : 0.0;
-  float2 retVal;
-  retVal.y = floor(dep / 4095.);
-  retVal.x = dep - retVal.y * 4095.;
-  retVal.x = (retVal.x + 0.5) / 4096.;
-  retVal.y = (retVal.y + 0.5) / 17.;
-  return retVal;
-}
-
-// Declaration of the OCIO shader function
-
-float4 OCIOMain(float4 inPixel)
-{
-  float4 outColor = inPixel;
-
-  // Add Matrix processing
-
-  {
-    float4 res = float4(outColor.rgb.r, outColor.rgb.g, outColor.rgb.b, outColor.a);
-    float4 tmp = res;
-    res = float4x4(0.98098885651333156, -0.092424463103292664, -0.013207065578288116, 0., 0.016565338289531818, 1.1375089483408081, -0.099198515918329705, 0., 0.0024437046414083619, -0.045085870242599385, 1.1124168075232428, 0., 0., 0., 0., 1.) * tmp;
-    outColor.rgb = float3(res.x, res.y, res.z);
-    outColor.a = res.w;
-  }
-
-  // Add Log processing
-
-  {
-    outColor.rgb = max( float3(1.17549435e-38, 1.17549435e-38, 1.17549435e-38), outColor.rgb);
-    outColor.rgb = log(outColor.rgb) * float3(0.434294462, 0.434294462, 0.434294462);
-  }
-
-  // Add LUT 1D processing for ocio_lut1d_0
-
-  {
-    outColor.r = ocio_lut1d_0.sample(ocio_lut1d_0Sampler, ocio_lut1d_0_computePos(outColor.r)).r;
-    outColor.g = ocio_lut1d_0.sample(ocio_lut1d_0Sampler, ocio_lut1d_0_computePos(outColor.g)).r;
-    outColor.b = ocio_lut1d_0.sample(ocio_lut1d_0Sampler, ocio_lut1d_0_computePos(outColor.b)).r;
-  }
-
-  // Add Matrix processing
-
-  {
-    float4 res = float4(outColor.rgb.r, outColor.rgb.g, outColor.rgb.b, outColor.a);
-    float4 tmp = res;
-    res = float4x4(0.66377638658953075, -0.04437344282932907, -0.13576691739002722, 0., -0.15010458188599504, 0.51286205708992816, -0.018002472804856964, 0., -0.024913251428853436, 0.020269939014083319, 0.64252794346956654, 0., 0., 0., 0., 1.) * tmp;
-    res = float4(0.092864126, 0.092864126, 0.092864126, 0.) + res;
-    outColor.rgb = float3(res.x, res.y, res.z);
-    outColor.a = res.w;
-  }
-
-  return outColor;
-}
-
-// Close class wrapper
-
-
-};
-float4 OCIOMain(
-  texture2d<float> ocio_lut1d_0
-  , sampler ocio_lut1d_0Sampler
-  , float4 inPixel)
-{
-  return ocioOCIOMain(
-    ocio_lut1d_0
-    , ocio_lut1d_0Sampler
-  ).OCIOMain(inPixel);
-}
-kernel void ocioProcess(device float4 *imgIn [[buffer(0)]], device uchar4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = (uchar4)(clamp(OCIOMain(imgIn[index]) * 255.0f, 0.0f, 255.0f));}kernel void ocioProcessFull(device float4 *imgIn [[buffer(0)]], device float4 *imgOut [[buffer(1)]], constant int& width [[buffer(2)]], uint2 pos [[thread_position_in_grid]]) { unsigned int index = (pos.y * width) + pos.x; imgOut[index] = OCIOMain(imgIn[index]);}
-*/

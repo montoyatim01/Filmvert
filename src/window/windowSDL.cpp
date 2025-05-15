@@ -9,6 +9,11 @@
 #define HISTWIDTH 512
 #define HISTHEIGHT 256
 
+//--- Create SDL Texture ---//
+/*
+    Create a valid SDL texture with the given image
+    taking into account the image's rotation
+*/
 void mainWindow::createSDLTexture(image* actImage) {
 
     if (!actImage)
@@ -29,9 +34,15 @@ void mainWindow::createSDLTexture(image* actImage) {
 
 }
 
+//--- Update SDL Texture ---//
+/*
+    Update the image's SDL texture based on the Dispbuf.
+    Also queue up a separate thread to process the
+    image's histogram
+*/
 void mainWindow::updateSDLTexture(image* actImage) {
 
-    if (!actImage)
+    if (!actImage || !actImage->imageLoaded)
         return;
 
     if (actImage->texture == nullptr) {
@@ -91,7 +102,7 @@ void mainWindow::updateSDLTexture(image* actImage) {
         return;
     }
     // Launch the thread for the histo calc
-    float histInt = appPrefs.histInt;
+    float histInt = appPrefs.prefs.histInt;
     std::thread histoThread = std::thread([this, &actImage, &hpixels, &hpitch, histInt]{
         updateSDLHistogram(actImage, hpixels, hpitch, histInt);
     });
@@ -189,6 +200,12 @@ void mainWindow::updateSDLTexture(image* actImage) {
         actImage->delDispBuf();
 }
 
+//--- Calculate Histogram from RGBA ---//
+/*
+    Calculate the histogram 'bins' from
+    the Dispimg. Process luma as well based
+    on Rec709 primaries
+*/
 void calculateHistogramFromRGBA(const uint8_t *rgba_buffer, int width,
                                 int height, HistogramData &histogram) {
     // Clear histogram data
@@ -293,11 +310,19 @@ void calculateHistogramFromRGBA(const uint8_t *rgba_buffer, int width,
     }
 }
 
-//--- HISTOGRAM ---//
-
+//--- Update SDL Histogram ---//
+/*
+    Based on the calculated bins, generate the resulting
+    histogram image and save it to the image texture
+*/
 void mainWindow::updateSDLHistogram(image* img, void* pixels, int pitch, float intensityMultiplier) {
     auto start = std::chrono::steady_clock::now();
     uint32_t* pixelBuffer = static_cast<uint32_t*>(pixels);
+
+    if (!appPrefs.prefs.histEnable) {
+        std::memset(pixelBuffer, 0, HISTWIDTH * HISTHEIGHT * sizeof(uint32_t));
+        return;
+    }
 
     // Clamp intensity multiplier to valid range
     intensityMultiplier = std::clamp(intensityMultiplier, 0.0f, 1.0f);

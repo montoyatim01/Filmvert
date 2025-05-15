@@ -1,13 +1,23 @@
+#include "preferences.h"
 #include "window.h"
 
+//--- Check Metadata ---//
+/*
+    If auto save is enabled, and if we've met the
+    minimum duration since the last save, loop
+    through all images in all rolls and check
+    if a save is needed, if so, save the individual image
+
+    Currently does not save a whole roll JSON
+*/
 void mainWindow::checkMeta() {
-    if (!metaRefresh || !appPrefs.autoSave)
+    if (!metaRefresh || !appPrefs.prefs.autoSave)
         return;
     auto now = std::chrono::steady_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::seconds>(now - lastChange);
-    if (dur.count() > appPrefs.autoSFreq) {
+    if (dur.count() > appPrefs.prefs.autoSFreq) {
         for (int r = 0; r < activeRolls.size(); r++) {
-            for (int i = 0; i < activeRolls[r].images.size(); i++) {
+            for (int i = 0; i < activeRolls[r].rollSize(); i++) {
                 image* img = getImage(r, i);
                 if (!img) {
                    LOG_WARN("Cannot update meta on nullptr");
@@ -23,6 +33,29 @@ void mainWindow::checkMeta() {
     return;
 }
 
+//--- Save Meta ---//
+/*
+    Periodically save the state of some of the
+    UI elements.
+
+    Currently histogram settings
+*/
+void mainWindow::saveUI() {
+    auto now = std::chrono::steady_clock::now();
+    auto dur = std::chrono::duration_cast<std::chrono::seconds>(now - lastUISave);
+    if (dur.count() > 10) {
+        appPrefs.saveToFile();
+        lastUISave = std::chrono::steady_clock::now();
+    }
+}
+
+//--- Image Metadata Pre-Edit ---//
+/*
+    Load up the metadata edit struct with the image's
+    current metadata fields. This allows non-destructive
+    changes that only take effect on a "save" or "apply"
+    action.
+*/
 void mainWindow::imageMetaPreEdit() {
     if (!validIm())
         return;
@@ -44,6 +77,12 @@ void mainWindow::imageMetaPreEdit() {
     std::strcpy(metaEdit.devnotes, activeImage()->imMeta.devNotes.c_str());
 }
 
+//--- Image Metadata Post-Edit ---//
+/*
+    After the user has clicked "Save" or "Apply"
+    Copy the metadata fields with valid changes from
+    the struct into the image.
+*/
 void mainWindow::imageMetaPostEdit() {
     if (!validIm())
         return;

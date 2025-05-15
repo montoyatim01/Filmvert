@@ -1,6 +1,11 @@
 #include "window.h"
 #include <imgui.h>
 
+//--- Check Hotkeys ---//
+/*
+    Called from the main loop, check if the user has
+    pressed any of the assigned hotkeys.
+*/
 void mainWindow::checkHotkeys() {
 
     // Open Image(s) (Cmd + O)
@@ -51,8 +56,8 @@ void mainWindow::checkHotkeys() {
     if (ImGui::IsKeyChordPressed(ImGuiKey_Comma | ImGuiMod_Ctrl)) {
         // Preferences
         badOcioText = false;
-        std::strcpy(ocioPath, appPrefs.ocioPath.c_str());
-        if (appPrefs.ocioExt)
+        std::strcpy(ocioPath, appPrefs.prefs.ocioPath.c_str());
+        if (appPrefs.prefs.ocioExt)
             ocioSel = 1;
         preferencesPopTrig = true;
     }

@@ -77,14 +77,12 @@ class mainWindow
         float dispScale = 1.0f;
         ImVec2 dispSize;
         ImVec2 scroll;
-        bool histEnable = true;
 
         // Program state
         bool done = false;
         bool firstImage = false;
 
         std::deque<filmRoll> activeRolls;
-        std::vector<char*>rollNames;
         int selRoll = 0;
 
         ocioSetting dispOCIO;
@@ -108,11 +106,11 @@ class mainWindow
 
         // Popup flags
         bool unsavedPopTrigger = false;
-        bool unsavedForClose = false;
         bool globalMetaPopTrig = false;
         bool localMetaPopTrig = false;
         bool preferencesPopTrig = false;
         bool ackPopTrig = false;
+        closeMode closeMd;
         bool shortPopTrig = false;
         bool badOcioText = false;
         char ackMsg[512];
@@ -121,12 +119,11 @@ class mainWindow
         int ocioSel = 0;
 
 
-        std::map<std::string, int> localMapping;
-        std::map<std::string, int> globalMapping;
-        std::vector<char*> items;
+
 
         // Metadata
         std::chrono::time_point<std::chrono::steady_clock> lastChange;
+        std::chrono::time_point<std::chrono::steady_clock> lastUISave;
         bool metaRefresh = false;
 
         // Interaction timings
@@ -192,6 +189,7 @@ class mainWindow
 
         // windowMeta.cpp
         void checkMeta();
+        void saveUI();
         void imageMetaPreEdit();
         void imageMetaPostEdit();
 
@@ -215,7 +213,7 @@ class mainWindow
         void clearSelection();
 
 
-        void initRender(int start, int end);
+
         void imgRender();
         void imgRender(image *img);
         void rollRenderCheck();

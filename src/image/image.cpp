@@ -41,6 +41,10 @@ void image::rotLeft() {
     }
 }
 
+//--- Set Crop ---//
+/*
+    Set the initial crop state for an image
+*/
 void image::setCrop() {
     imgParam.cropBoxX[0] = 0.1;
     imgParam.cropBoxY[0] = 0.1;
@@ -66,8 +70,8 @@ void image::setCrop() {
 renderParams img_to_param(image* _img) {
     renderParams params;
 
-    params.width = _img->width;
-    params.height = _img->height;
+    params.width = _img->fullIm ? _img->rawWidth : _img->width;
+    params.height = _img->fullIm ? _img->rawHeight : _img->height;
 
     params.sigmaFilter = _img->imgParam.blurAmount;
     params.temp = _img->imgParam.temp;

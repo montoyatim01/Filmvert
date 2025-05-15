@@ -151,4 +151,10 @@ struct HistogramData {
     }
 };
 
+enum closeMode {
+    c_app = 0,
+    c_roll = 1,
+    c_selIm = 2
+};
+
 #endif

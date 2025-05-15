@@ -2,6 +2,7 @@
 #include "window.h"
 #include <imgui.h>
 
+//--- Main Parameter View Routine ---//
 void mainWindow::paramView() {
 
     bool paramChange = false;
@@ -12,7 +13,7 @@ void mainWindow::paramView() {
     ImGui::Begin("Controls", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar);
     {
         ImVec2 ctrlSize = ImGui::GetWindowSize();
-        int histHeight = histEnable ? 128 : 0;
+        int histHeight = appPrefs.prefs.histEnable ? 128 : 0;
         int histSecHeight = histHeight;
         histSecHeight += (ImGui::CalcTextSize("Text").y * 4);
         histSecHeight += (ImGui::GetStyle().FramePadding.y * 4);
@@ -178,12 +179,12 @@ void mainWindow::paramView() {
                 ImGui::SameLine();
                 renderCall |= ImGui::Checkbox("Bypass Render", &activeImage()->renderBypass);
                 ImGui::SameLine();
-                ImGui::Checkbox("Histogram", &histEnable);
+                renderCall |= ImGui::Checkbox("Histogram", &appPrefs.prefs.histEnable);
 
-                if (histEnable) {
+                if (appPrefs.prefs.histEnable) {
                     ImGui::SameLine();
                     ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20);
-                    renderCall |= ImGui::SliderFloat("###int", &appPrefs.histInt, 0.0f, 1.0f);
+                    renderCall |= ImGui::SliderFloat("###int", &appPrefs.prefs.histInt, 0.0f, 1.0f);
                     ImGui::SetItemTooltip("Histogram intensity");
                 }
 
@@ -212,7 +213,7 @@ void mainWindow::paramView() {
             }
             ImGui::Text("%s", statusText.c_str());
             if (validIm()) {
-                if (histEnable)
+                if (appPrefs.prefs.histEnable)
                     ImGui::Image(reinterpret_cast<ImTextureID>(activeImage()->histTex), ImVec2(ImGui::GetWindowWidth(), 128));
             }
         } ImGui::EndChild();

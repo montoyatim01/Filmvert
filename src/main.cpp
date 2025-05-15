@@ -111,4 +111,10 @@ int main(void)
 // -* Same with min/max points
 // -* Reset analysis button
 // -* If user selects auto-save, but doesn't actually save the auto-save kicks in (make a temp variable saved on exit)
-//git filter-repo --invert-paths --path path/to/file
+// -- Make Nlohmann use the custom struct types instead of manually typing everything..
+// -* Histogram setting isn't saved currently (unless user manually saves preferences)
+// -** Make a separate loop to periodically check if it's changed and save? Too expensive?
+// -- Should the raw import first try auto-detecting the first file before prompting the user?
+// -* If user has disabled the histogram, should that be saved in preferences?
+// -* If user has disabled histogram, don't process it dummy!
+// -*BUG! Failing to allocate ProcImgBuf on a re-load in the PadToRGBA function

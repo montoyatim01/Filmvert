@@ -1,6 +1,7 @@
 #include "window.h"
 #include <imgui.h>
 
+//--- Thumbnail View Routine ---//
 void mainWindow::thumbView() {
     ImGui::SetNextWindowPos(ImVec2(0,imageWinSize.y + 25));
     ImGui::SetNextWindowSize(ImVec2(winWidth,winHeight - imageWinSize.y));
@@ -12,6 +13,7 @@ void mainWindow::thumbView() {
                 ImGuiMultiSelectFlags flags = ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_BoxSelect1d;
                 ImGuiMultiSelectIO* ms_io = ImGui::BeginMultiSelect(flags, selection.Size, activeRollSize());
                 selection.ApplyRequests(ms_io);
+
 
                 if (validRoll()) {
                     for (int i = 0; i < activeRollSize(); i++) {
@@ -44,6 +46,7 @@ void mainWindow::thumbView() {
                             auto pos = ImGui::GetCursorPos();
                             ImGui::PushID(i);
                             //Multi-select
+                            selection.SetItemSelected((ImGuiID)activeRoll()->selIm, true);
                             bool item_is_selected = selection.Contains((ImGuiID)i);
                             getImage(i)->selected = item_is_selected;
                             ImGui::SetNextItemSelectionUserData(i);

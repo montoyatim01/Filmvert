@@ -2,7 +2,10 @@
 #include "window.h"
 #include <filesystem>
 
-
+//--- ImGui Style ---//
+/*
+    Set up the styling for the application
+*/
 void imguistyle()
 {
   //Roboto-Regular.ttf
@@ -79,18 +82,6 @@ return;
     colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 }
 
-bool ImRightAlign(const char* str_id)
-{
-    if(ImGui::BeginTable(str_id, 2, ImGuiTableFlags_SizingFixedFit, ImVec2(-1,0)))
-    {
-        ImGui::TableSetupColumn("a", ImGuiTableColumnFlags_WidthStretch);
-
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
-        return true;
-    }
-    return false;
-}
 
 
 // Function to calculate display dimensions while maintaining aspect ratio
@@ -105,6 +96,7 @@ void mainWindow::CalculateThumbDisplaySize(int imageWidth, int imageHeight, floa
     outDisplaySize.x = (float)imWid * scaleRatio;
     outDisplaySize.y = (float)maxHeight;
 }
+
 
 void mainWindow::calculateVisible() {
     // Calculate visible region of the image
@@ -145,58 +137,108 @@ void mainWindow::calculateVisible() {
 
 }
 
-
+//--- Valid Roll ---//
+/*
+    Return if the user has a proper roll selected
+*/
 bool mainWindow::validRoll() {
     return activeRolls.size() > 0 && selRoll >= 0 && selRoll < activeRolls.size();
 }
 
+//--- Valid Image ---//
+/*
+    Return if the user has a proper image selected
+*/
 bool mainWindow::validIm() {
     return activeRolls.size() > 0 && selRoll >= 0 && selRoll < activeRolls.size() && activeRolls[selRoll].validIm();
 }
 
+//--- Active Image ---//
+/*
+    Return the active image.
+    nullptr if no image selected
+*/
 image* mainWindow::activeImage() {
     if (validIm())
         return activeRolls[selRoll].selImage();
     return nullptr;
 }
+
+//--- Active Roll ---//
+/*
+    Return the active roll.
+    nullptr if no roll active
+*/
 filmRoll* mainWindow::activeRoll() {
     if (validRoll()) {
         return &activeRolls[selRoll];
     }
     return nullptr;
 }
+
+//--- Get Image ---//
+/*
+    Get an image from the current roll
+    at a given index. nullptr if image
+    doesn't exist
+*/
 image* mainWindow::getImage(int index) {
     if (selRoll >= 0 && selRoll < activeRolls.size())
         return activeRolls[selRoll].getImage(index);
     return nullptr;
 }
+
+//--- Get Image ---//
+/*
+    Get an image from the specified roll
+    and image index. nullptr if that roll
+    and image combo doesn't exist
+*/
 image* mainWindow::getImage(int roll, int index) {
     if (roll >= 0 && roll < activeRolls.size())
         return activeRolls[roll].getImage(index);
     LOG_WARN("Cannot get buffer for image {} in roll {}", index, roll);
     return nullptr;
 }
+
+//--- Active Roll Size ---//
+/*
+    Return the number of images in
+    the active roll
+*/
 int mainWindow::activeRollSize() {
     if (activeRolls.size() > 0 && selRoll >= 0 && selRoll < activeRolls.size())
-        return activeRolls[selRoll].images.size();
+        return activeRolls[selRoll].rollSize();
     else
         return 0;
 }
 
+//--- Clear Selection ---//
+/*
+    De-select all images in the active roll
+*/
 void mainWindow::clearSelection() {
     for (int i = 0; i < activeRollSize(); i++) {
         getImage(i)->selected = false;
     }
 }
 
+//--- Param Update ---//
+/*
+    A change has been made to the current
+    image. Update the auto-save timeout timer
+    and flag in the image the changes
+*/
 void mainWindow::paramUpdate() {
-    // We've made a change to the current image
-    // Update the timer and flag the changes
     lastChange = std::chrono::steady_clock::now();
     activeImage()->needMetaWrite = true;
     metaRefresh = true;
 }
 
+//--- Remove Roll ---//
+/*
+    Remove the current roll
+*/
 void mainWindow::removeRoll() {
     // Check implication of background rendering
     if (validRoll()) {
@@ -204,9 +246,26 @@ void mainWindow::removeRoll() {
         selRoll = activeRolls.size() > 1 ? selRoll == 0 ? 0 : selRoll-1 : selRoll-1;
         activeRolls[delRoll].clearBuffers(true);
         activeRolls.erase(activeRolls.begin() + delRoll);
+        for (int i = 0; i < activeRolls.size(); i++) {
+            if (selRoll != i) {
+                activeRolls[i].selected = false;
+                if (appPrefs.prefs.perfMode)
+                    activeRolls[i].clearBuffers();
+            }
+            if (selRoll == i) {
+                activeRolls[i].loadBuffers();
+            }
+        }
     }
 }
 
+//--- Check For Raw ---//
+/*
+    Check the active selection
+    (rolls and images) for any files
+    ending in .raw for prompting to
+    enter the image details
+*/
 void mainWindow::checkForRaw() {
     impRawCheck = false;
 
@@ -239,6 +298,11 @@ void mainWindow::checkForRaw() {
     }
 }
 
+//--- Test First Raw File ---//
+/*
+    Attempt to auto-detect the settings based
+    on some known values for Pakon scans
+*/
 void mainWindow::testFirstRawFile() {
     if (!importFiles.empty()) {
         std::filesystem::path firstPath(importFiles[0]);
@@ -335,6 +399,11 @@ void mainWindow::testFirstRawFile() {
     }
 }
 
+//--- Unsaved Changes ---//
+/*
+    Loop through all active rolls and look
+    for any images with unsaved changes
+*/
 bool mainWindow::unsavedChanges() {
     bool unsaved = false;
     for (int r = 0; r < activeRolls.size(); r++) {
@@ -400,82 +469,13 @@ void inverseTransformCoordinates(int& x, int& y, int rotation, int width, int he
 }
 
 
-
+//--- Load Mappings ---//
+/*
+    Load in initial values for some char vectors
+    for display.
+*/
 void mainWindow::loadMappings()
 {
-    localMapping["Arri LogC3 | Arri Wide Gamut v3"] = 0;
-    localMapping["Arri LogC4 | Arri Wide Gamut v4"] = 1;
-    localMapping["Apple Log"] = 2;
-    localMapping["Blackmagic Gen 5"] = 3;
-    localMapping["Canon Log | Canon Cinema Gamut"] = 4;
-    localMapping["Canon Log2 | Canon Cinema Gamut"] = 5;
-    localMapping["Canon Log3 | Canon Cinema Gamut"] = 6;
-    localMapping["DJI D-Log | D-Gamut"] = 7;
-    localMapping["GoPro ProTune Flat"] = 8;
-    localMapping["Fuji F-Log | F-Gamut"] = 9;
-    localMapping["Leica L-Log | L-Gamut"] = 10;
-    localMapping["Nikon N-Log | N-Gamut"] = 11;
-    localMapping["Panasonic VLog | VGamut"] = 12;
-    localMapping["RED Log3G10 | RedWideGamutRGB"] = 13;
-    localMapping["Sony S-Log | S-Gamut"] = 14;
-    localMapping["Song S-Log2 | S-Gamut"] = 15;
-    localMapping["Sony S-Log3 | S-Gamut3.cine"] = 16;
-    localMapping["Sony S-Log3 | S-Gamut3.cine Venice"] = 17;
-    localMapping["DaVinci Wide Gamut | DaVinci Intermediate"] = 18;
-    localMapping["JPLog2 | AP1"] = 19;
-    localMapping["REC 709 | Gamma 2.4"] = 20;
-    localMapping["REC 2020 | Gamma 2.4"] = 21;
-    localMapping["P3D65 | Gamma 2.6"] = 22;
-    localMapping["sRGB | Gamma 2.2"] = 23;
-    localMapping["REC 2020 HDR | ST.2084 1000-nit"] = 24;
-    localMapping["P3D65 HDR | ST.2084 1000-nit"] = 25;
-    localMapping["ACEScct | AP1"] = 26;
-    localMapping["ACEScc | AP1"] = 27;
-    localMapping["ACEScg | AP1"] = 28;
-    localMapping["ACES 2065-1 | AP0"] = 29;
-
-
-
-    globalMapping["Arri LogC3 | Arri Wide Gamut v3"] = 100;
-    globalMapping["Arri LogC4 | Arri Wide Gamut v4"] = 110;
-    globalMapping["Apple Log"] = 116;
-    globalMapping["Blackmagic Gen 5"] = 120;
-    globalMapping["Canon Log | Canon Cinema Gamut"] = 129;
-    globalMapping["Canon Log2 | Canon Cinema Gamut"] = 130;
-    globalMapping["Canon Log3 | Canon Cinema Gamut"] = 140;
-    globalMapping["DJI D-Log | D-Gamut"] = 150;
-    globalMapping["Fuji F-Log | F-Gamut"] = 153;
-    globalMapping["Leica L-Log | L-Gamut"] = 155;
-    globalMapping["Nikon N-Log | N-Gamut"] = 156;
-    globalMapping["Panasonic VLog | VGamut"] = 160;
-    globalMapping["RED Log3G10 | RedWideGamutRGB"] = 170;
-    globalMapping["Sony S-Log | S-Gamut"] = 178;
-    globalMapping["Song S-Log2 | S-Gamut"] = 179;
-    globalMapping["Sony S-Log3 | S-Gamut3.cine Venice"] = 180;
-    globalMapping["Sony S-Log3 | S-Gamut3.cine"] = 190;
-    globalMapping["GoPro ProTune Flat"] = 200;
-    globalMapping["DaVinci Wide Gamut | DaVinci Intermediate"] = 210;
-    globalMapping["JPLog2 | AP1"] = 215;
-    globalMapping["REC 709 | Gamma 2.4"] = 220;
-    globalMapping["REC 2020 | Gamma 2.4"] = 230;
-    globalMapping["P3D65 | Gamma 2.6"] = 240;
-    globalMapping["sRGB | Gamma 2.2"] = 250;
-    globalMapping["REC 2020 HDR | ST.2084 1000-nit"] = 260;
-    globalMapping["P3D65 HDR | ST.2084 1000-nit"] = 270;
-    globalMapping["ACEScct | AP1"] = 280;
-    globalMapping["ACEScc | AP1"] = 290;
-    globalMapping["ACEScg | AP1"] = 300;
-    globalMapping["ACES 2065-1 | AP0"] = 310;
-
-    items.resize(localMapping.size());
-    for (int i = 0; i < items.size(); ++i) {
-      // Find the key corresponding to the current value
-      std::string key = find_key_by_value(localMapping, i);
-
-      // Allocate memory for the char array and copy the string into it
-      items[i] = new char[key.length() + 1];
-      std::strcpy(items[i], key.c_str());
-    }
 
     fileTypes.push_back("DPX");
     fileTypes.push_back("EXR");
@@ -491,7 +491,4 @@ void mainWindow::loadMappings()
     colorspaceSet.push_back("Colorspace");
     colorspaceSet.push_back("Display");
 
-    /*activeRolls.resize(2);
-    rollNames.push_back("roll 1");
-    rollNames.push_back("roll 2");*/
 }
