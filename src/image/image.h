@@ -12,6 +12,7 @@
 #include "renderParams.h"
 #include "imageParams.h"
 #include "imageMeta.h"
+#include "state.h"
 #include "structs.h"
 #include <exiv2/exiv2.hpp>
 
@@ -45,6 +46,7 @@ struct image {
     bool isRawImage = false;
     bool isDataRaw = false;
 
+    // Filenames/paths
     std::string srcFilename;
     std::string srcPath;
     std::string fullPath;
@@ -55,6 +57,9 @@ struct image {
     ocioSetting intOCIOSet;
     rawSetting intRawSet;
 
+    // Undo/Redo state
+    userState imgState;
+
 
     // Status flags
     bool blurReady = false;
@@ -63,6 +68,8 @@ struct image {
     bool fullIm = false;
     bool analyzed = false;
     bool selected = false;
+    bool inRndQueue = false;
+    bool needRndr = false;
 
     // Display/Render flags
     bool renderBypass;

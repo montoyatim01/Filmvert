@@ -1,5 +1,6 @@
 #include "image.h"
 #include "imageMeta.h"
+#include "metalGPU.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "structs.h"
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <cstring>
 #include <imgui.h>
+#include <imgui_internal.h>
 
 //--- Import Raw Settings ---//
 /*
@@ -113,7 +115,8 @@ void mainWindow::importImagePopup() {
             ImGui::OpenPopup("New Roll");
         if (ImGui::BeginPopupModal("New Roll", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
             ImGui::Text("Roll Name: ");
-            //ImGui::SetKeyboardFocusHere();
+            if (ImGui::IsWindowAppearing())
+                ImGui::SetKeyboardFocusHere();
             ImGui::InputTextWithHint("###rName", "Roll Name", rollNameBuf, IM_ARRAYSIZE(rollNameBuf));
             ImGui::Text("Roll Directory (for metadata saving):");
             ImGui::InputText("###rPath", rollPath, IM_ARRAYSIZE(rollPath));
@@ -216,7 +219,8 @@ void mainWindow::importImagePopup() {
                     image *img = getImage(impRoll, i);
 
                     if (img) {
-                        imgRender(img);
+                        imgRender(img, r_bg);
+                        img->imgState.setPtrs(&img->imMeta, &img->imgParam, &img->needRndr);
                         img->imMeta.rollName = activeRolls[impRoll].rollName;
                         img->imMeta.frameNumber = i + 1;
                     }
@@ -342,17 +346,22 @@ void mainWindow::importRollPopup() {
                             LOG_ERROR("Error: {}", std::get<std::string>(res.result));
                         }
                     }
+                    activeRolls[thisRoll].sortRoll();
+                    int maxInt = 0;
                     for (int i = 0; i < activeRolls[thisRoll].rollSize(); i++) {
                         image* thisIm = getImage(thisRoll, i);
-                        //LOG_INFO("Queueing Image: {} from Roll: {}, with iterator: {}, with pointer: {}", thisIm->srcFilename, thisRoll, i, fmt::ptr(thisIm));
-
                         if (thisIm) {
-                            imgRender(thisIm);
+                            imgRender(thisIm, r_bg);
                             thisIm->imMeta.rollName = activeRolls[thisRoll].rollName;
-                            thisIm->imMeta.frameNumber = i + 1;
-                        }
+                            thisIm->imgState.setPtrs(&thisIm->imMeta, &thisIm->imgParam, &thisIm->needRndr);
+                            maxInt = thisIm->imMeta.frameNumber != 9999 ? std::max(std::min(thisIm->imMeta.frameNumber, 9999), maxInt) : maxInt;
+                            if (thisIm->imMeta.frameNumber == 9999)
+                                maxInt++;
+                            thisIm->imMeta.frameNumber = thisIm->imMeta.frameNumber == 9999 ? maxInt : thisIm->imMeta.frameNumber;
 
+                        }
                     }
+
 
                     if (r == 0) {
                         // Only do this for the first roll
@@ -642,9 +651,14 @@ void mainWindow::pastePopup() {
             pasteTrigger = false;
             ImGui::CloseCurrentPopup();
         }
+
         ImGui::SameLine();
+        if (ImGui::IsWindowAppearing())
+            ImGui::SetKeyboardFocusHere();
         if(ImGui::Button("Paste")) {
             pasteIntoParams();
+            if (validRoll())
+                activeRoll()->rollUpState();
             pasteTrigger = false;
             ImGui::CloseCurrentPopup();
         }
@@ -668,6 +682,8 @@ void mainWindow::unsavedRollPopup() {
     if (ImGui::BeginPopupModal("Unsaved Changes", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
         ImGui::Text("There are unsaved changes!");
 
+        if (ImGui::IsWindowAppearing())
+            ImGui::SetKeyboardFocusHere();
         if (ImGui::Button("Cancel")) {
             unsavedPopTrigger = false;
             ImGui::CloseCurrentPopup();
@@ -893,6 +909,7 @@ void mainWindow::globalMetaPopup() {
             // Save the metadata
             if (validRoll()) {
                 activeRoll()->rollMetaPostEdit(&metaEdit);
+                activeRoll()->rollUpState();
                 std::memset(&metaEdit, 0, sizeof(metaBuff));
             }
 
@@ -920,6 +937,25 @@ void mainWindow::localMetaPopup() {
 
         ImGui::Text("Frame Number:");
         ImGui::InputInt("###", &metaEdit.frameNum);
+        ImGui::SameLine();
+        if (ImGui::Button("Ripple")) {
+            // Ripple the frame number across
+            // the remaining images in the roll
+            if (validRoll()) {
+                if (validIm()) {
+                    int curFrame = metaEdit.frameNum;
+                    for (int i = activeRoll()->selIm; i < activeRollSize(); i++) {
+                        if (getImage(i)) {
+                            getImage(i)->imMeta.frameNumber = curFrame;
+                            curFrame++;
+                        }
+                    }
+                }
+                activeRoll()->rollUpState();
+            }
+        }
+        ImGui::SetItemTooltip("Ripple the frame number change across the\nremaining images in this roll.\nThis will immediately change the frame\nnumbers in this image and the following images.");
+
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
@@ -1056,6 +1092,7 @@ void mainWindow::localMetaPopup() {
         ImGui::SameLine();
         if (ImGui::Button("Apply")) {
             imageMetaPostEdit();
+            activeRoll()->rollUpState();
             std::memset(&metaEdit, 0, sizeof(metaBuff));
             localMetaPopTrig = false;
             ImGui::CloseCurrentPopup();
@@ -1077,6 +1114,13 @@ void mainWindow::preferencesPopup() {
 
         ImGui::Separator();
 
+        // Undo Levels
+        ImGui::Text("Undo Levels");
+        ImGui::InputInt("###00a", &appPrefs.prefs.undoLevels);
+
+        ImGui::Separator();
+
+        // Auto-save
         ImGui::Text("Auto-save");
         ImGui::Checkbox("###01", &appPrefs.tmpAutoSave);
         if (appPrefs.tmpAutoSave) {
@@ -1084,6 +1128,7 @@ void mainWindow::preferencesPopup() {
             ImGui::InputInt("Frequency (seconds)", &appPrefs.prefs.autoSFreq);
         }
 
+        // Performance Mode
         ImGui::Text("Roll Performance Mode");
         ImGui::Checkbox("###02", &appPrefs.prefs.perfMode);
         ImGui::SetItemTooltip("Scale resolution down for optimal interaction speed.\nWill also unload non-active rolls to save memory usage.\nUnloaded rolls are re-loaded when active.");
@@ -1092,7 +1137,12 @@ void mainWindow::preferencesPopup() {
         ImGui::SetItemTooltip("Set the maximum resolution on the long side for images\non import. Exported images are rendered in full resolution.");
 
         ImGui::Separator();
+        ImGui::Text("Auto-sort");
+        ImGui::Checkbox("###02a", &appPrefs.prefs.autoSort);
+        ImGui::SetItemTooltip("Auto-sort images based on their indicies when\nimporting rolls or importing roll-metadata.");
+        ImGui::Separator();
 
+        // OCIO
         ImGui::Text("Custom OCIO Config:");
         ImGui::InputText("###03", ocioPath, IM_ARRAYSIZE(ocioPath));
         ImGui::SameLine();
@@ -1160,7 +1210,11 @@ void mainWindow::ackPopup() {
 
         ImGui::Text("%s", ackMsg);
         ImGui::Text("%s", ackError);
+        float windowWidth = ImGui::GetWindowWidth();
+        float buttonWidth = ImGui::CalcTextSize("Okay").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        float xPos = (windowWidth - buttonWidth) * 0.5f;
 
+        ImGui::SetCursorPosX(xPos);
         if (ImGui::Button("Okay")) {
             ackPopTrig = false;
             std::memset(ackMsg, 0, sizeof(ackMsg));
@@ -1190,6 +1244,9 @@ void mainWindow::shortcutsPopup() {
         ImGui::Text("⌘ + Shift + S ");
         ImGui::Text("⌥ + Shift + S ");
         ImGui::Separator();
+        ImGui::Text("⌘ + Z ");
+        ImGui::Text("⌘ + Shift + Z ");
+        ImGui::Separator();
         ImGui::Text("⌘ + E ");
         ImGui::Text("⌘ + G ");
         ImGui::Separator();
@@ -1215,6 +1272,9 @@ void mainWindow::shortcutsPopup() {
         ImGui::Text("Save Image");
         ImGui::Text("Save Roll");
         ImGui::Text("Save All Rolls");
+        ImGui::Spacing();
+        ImGui::Text("Undo");
+        ImGui::Text("Redo");
         ImGui::Spacing();
         ImGui::Text("Edit Image Metadata");
         ImGui::Text("Edit Roll Metadata");

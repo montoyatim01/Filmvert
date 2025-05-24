@@ -105,6 +105,40 @@ void mainWindow::menuBar() {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Edit")) {
+            bool uDis = false;
+            bool rDis = false;
+            if (!validRoll() || !activeRoll()->rollUAvail())
+                uDis = true;
+            if (uDis)
+                ImGui::BeginDisabled();
+            if (ImGui::MenuItem("Undo")) {
+                if (validRoll()) {
+                    activeRoll()->rollUndo();
+                    stateRender();
+                    renderCall = true;
+                }
+
+            }
+            if (uDis)
+                ImGui::EndDisabled();
+
+            if (!validRoll() || !activeRoll()->rollRAvil())
+                rDis = true;
+            if (rDis)
+                ImGui::BeginDisabled();
+            if (ImGui::MenuItem("Redo")) {
+                if (validRoll()) {
+                    activeRoll()->rollRedo();
+                    stateRender();
+                    renderCall = true;
+                }
+
+            }
+            if (rDis)
+                ImGui::EndDisabled();
+
+            ImGui::Separator();
+
             if (ImGui::MenuItem("Select All")) {
                 // Select All
                 if(validRoll()) {
@@ -126,10 +160,23 @@ void mainWindow::menuBar() {
                 pasteTrigger = true;
             }
 
-            // Paste
+            ImGui::Separator();
+
+            // Refresh Roll
             if (ImGui::MenuItem("Refresh Roll")) {
                 for (int i = 0; i < activeRollSize(); i++) {
                     imgRender(getImage(i));
+                }
+            }
+
+            // Sort Roll by Index
+            if (ImGui::MenuItem("Sort Roll by Index")) {
+                if (validRoll()) {
+                    if (!activeRoll()->sortRoll()) {
+                        std::strcpy(ackMsg, "Unable to sort roll!");
+                        std::strcpy(ackError, "One or more images is in the render queue.\nWait a moment and try again.");
+                        ackPopTrig = true;
+                    }
                 }
             }
             // Undo/Redo?
@@ -140,6 +187,8 @@ void mainWindow::menuBar() {
             if (ImGui::MenuItem("Import Roll Metadata")) {
                 if (openJSON()) {
                     std::strcpy(ackMsg, "Metadata imported to Roll successfully!");
+                    if (validRoll())
+                        activeRoll()->rollUpState();
                     ackPopTrig = true;
                 } else {
                     std::string err = ackError;

@@ -55,6 +55,6 @@ do
     -B $BUILD_DIR/$arch -S $SOURCE_DIR \
     -DCMAKE_TOOLCHAIN_FILE="$BUILD_DIR/$arch/conan_toolchain.cmake" \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-  cmake --build $BUILD_DIR/$arch --target Filmvert --config $BUILD_TYPE || exit 255
+  cmake --build $BUILD_DIR/$arch --target Filmvert --config $BUILD_TYPE -j8 || exit 255
 
 done

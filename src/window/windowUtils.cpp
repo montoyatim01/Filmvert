@@ -82,6 +82,38 @@ return;
     colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 }
 
+//--- Custom Color Slider ---//
+/*
+    Custom color slider widget to enable
+    holding shift for more fine-tune
+    controls over the values
+*/
+bool ColorEdit4WithFineTune(const char* label, float col[4], ImGuiColorEditFlags flags) {
+    bool value_changed = false;
+
+    ImGui::PushID(label);
+
+    // Base speed - when shift is held, use much smaller speed
+    float speed = ImGui::GetIO().KeyShift ? 0.000005f : 0.001f;
+
+    // Use DragFloat4 for the color components
+    value_changed = ImGui::DragFloat4("##drag", col, speed, -10.0f, 10.0f);
+
+    // Add color preview
+    ImGui::SameLine();
+    if (ImGui::ColorButton("##preview", ImVec4(col[0], col[1], col[2], col[3]), flags)) {
+        ImGui::OpenPopup("color_picker");
+    }
+    if (ImGui::BeginPopup("color_picker")) {
+        value_changed |= ImGui::ColorPicker4("##picker", col, flags);
+        ImGui::EndPopup();
+    }
+
+    ImGui::PopID();
+
+    return value_changed;
+}
+
 
 
 // Function to calculate display dimensions while maintaining aspect ratio

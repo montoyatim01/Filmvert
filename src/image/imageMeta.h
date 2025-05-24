@@ -11,7 +11,7 @@
 struct imageMetadata {
     std::string fileName;
     std::string rollName;
-    int frameNumber;
+    int frameNumber = 9999;
     std::string cameraMake;
     std::string cameraModel;
     std::string lens;
@@ -34,6 +34,32 @@ struct imageMetadata {
         frameNumber, cameraMake, cameraModel, lens, filmStock,
         focalLength, fNumber, exposureTime, dateTime, location,
         gps, notes, devProcess, chemMfg, devNotes, scanner, scanNotes);
+
+    bool operator==(const imageMetadata& other) const {
+        return fileName == other.fileName &&
+                rollName == other.rollName &&
+                frameNumber == other.frameNumber &&
+                cameraMake == other.cameraMake &&
+                cameraModel == other.cameraModel &&
+                lens == other.lens &&
+                filmStock == other.filmStock &&
+                focalLength == other.focalLength &&
+                fNumber == other.fNumber &&
+                exposureTime == other.exposureTime &&
+                dateTime == other.dateTime &&
+                location == other.location &&
+                gps == other.gps &&
+                notes == other.notes &&
+                devProcess == other.devProcess &&
+                chemMfg == other.chemMfg &&
+                devNotes == other.devNotes &&
+                scanner == other.scanner &&
+                scanNotes == other.scanNotes;
+    }
+
+    bool operator!=(const imageMetadata& other) const {
+        return !(*this == other);
+    }
 };
 
 struct metaBuff {

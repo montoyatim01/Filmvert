@@ -1,10 +1,20 @@
 #ifndef _roll_h_
 #define _roll_h_
 
-#include <vector>
-#include <deque>
 #include "image.h"
 #include "imageMeta.h"
+#include "state.h"
+
+#include "logger.h"
+#include "preferences.h"
+#include "threadPool.h"
+
+#include "nlohmann/json.hpp"
+
+#include <vector>
+#include <deque>
+#include <cstring>
+#include <fstream>
 
 
 class filmRoll {
@@ -23,22 +33,37 @@ class filmRoll {
     void selectAll();
     void clearSelection();
 
+    bool unsavedImages();
+    bool unsavedIndividual();
+
+    bool sortRoll();
+
+    // rollBuffers.cpp
     void clearBuffers(bool remove = false);
     void loadBuffers();
     void checkBuffers();
     void closeSelected();
 
+    // rollIO.cpp
     void saveAll();
     void saveSelected();
+
+    // rollMeta.cpp
     bool exportRollMetaJSON();
     bool exportRollCSV();
     bool importRollMetaJSON(const std::string& jsonFile);
-
-    bool unsavedImages();
-    bool unsavedIndividual();
-
     void rollMetaPreEdit(metaBuff* meta);
     void rollMetaPostEdit(metaBuff* meta);
+
+    // rollState.cpp
+    void rollUpState();
+    void rollUndo();
+    void rollRedo();
+    bool rollUAvail();
+    bool rollRAvil();
+
+
+
 
 
 

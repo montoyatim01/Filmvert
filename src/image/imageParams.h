@@ -1,13 +1,15 @@
 #ifndef _imageParams_h
 #define _imageParams_h
 
+#include <cstring>
+
 struct imageParams {
 
     // Analysis
     float sampleX[2];
     float sampleY[2];
 
-    float blurAmount = 2.5f;
+    float blurAmount = 10.0f;
     float baseColor[3] = {0.5f, 0.5f, 0.5f};
     float whitePoint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     float blackPoint[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -29,6 +31,27 @@ struct imageParams {
 
     float cropBoxX[4];
     float cropBoxY[4];
+
+    // == operator for determing if re-render is needed
+    // So only parameters affecting image
+    bool operator==(const imageParams& other) const {
+        return  std::memcmp(baseColor, other.baseColor, sizeof(baseColor)) == 0 &&
+                std::memcmp(whitePoint, other.whitePoint, sizeof(whitePoint)) == 0 &&
+                std::memcmp(blackPoint, other.blackPoint, sizeof(blackPoint)) == 0 &&
+                temp == other.temp &&
+                tint == other.tint &&
+                std::memcmp(g_blackpoint, other.g_blackpoint, sizeof(g_blackpoint)) == 0 &&
+                std::memcmp(g_whitepoint, other.g_whitepoint, sizeof(g_whitepoint)) == 0 &&
+                std::memcmp(g_lift, other.g_lift, sizeof(g_lift)) == 0 &&
+                std::memcmp(g_gain, other.g_gain, sizeof(g_gain)) == 0 &&
+                std::memcmp(g_mult, other.g_mult, sizeof(g_mult)) == 0 &&
+                std::memcmp(g_offset, other.g_offset, sizeof(g_offset)) == 0 &&
+                std::memcmp(g_gamma, other.g_gamma, sizeof(g_gamma)) == 0;
+    }
+
+    bool operator!=(const imageParams& other) const {
+        return !(*this == other);
+    }
 
     void rstANA();
 

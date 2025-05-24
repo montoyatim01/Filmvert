@@ -21,14 +21,14 @@ void image::processBaseColor() {
         sampleX[i] = imgParam.sampleX[i] * width;
         sampleY[i] = imgParam.sampleY[i] * height;
     }
-    x0 = imgParam.sampleX[0] < imgParam.sampleX[1] ? imgParam.sampleX[0] : imgParam.sampleX[1];
-    x1 = imgParam.sampleX[0] > imgParam.sampleX[1] ? imgParam.sampleX[0] : imgParam.sampleX[1];
+    x0 = sampleX[0] < sampleX[1] ? sampleX[0] : sampleX[1];
+    x1 = sampleX[0] > sampleX[1] ? sampleX[0] : sampleX[1];
 
     x0 = std::clamp(x0, 0u, width - 2);
     x1 = std::clamp(x0, 0u, width - 2);
 
-    y0 = imgParam.sampleY[0] < imgParam.sampleY[1] ? imgParam.sampleY[0] : imgParam.sampleY[1];
-    y1 = imgParam.sampleY[0] > imgParam.sampleY[1] ? imgParam.sampleY[0] : imgParam.sampleY[1];
+    y0 = sampleY[0] < sampleY[1] ? sampleY[0] : sampleY[1];
+    y1 = sampleY[0] > sampleY[1] ? sampleY[0] : sampleY[1];
 
     y0 = std::clamp(y0, 0u, height - 2);
     y1 = std::clamp(y0, 0u, height - 2);

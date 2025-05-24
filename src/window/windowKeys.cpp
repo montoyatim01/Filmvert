@@ -18,6 +18,24 @@ void mainWindow::checkHotkeys() {
         openRolls();
     }
 
+    // Undo (Cmd + Z)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_Z | ImGuiMod_Ctrl)) {
+        if (validRoll()) {
+            activeRoll()->rollUndo();
+            stateRender();
+            renderCall = true;
+        }
+    }
+
+    // Redo (Cmd + Shift + Z)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_Z | ImGuiMod_Ctrl | ImGuiMod_Shift)) {
+        if (validRoll()) {
+            activeRoll()->rollRedo();
+            stateRender();
+            renderCall = true;
+        }
+    }
+
     // Copy (Cmd + C)
     if (ImGui::IsKeyChordPressed(ImGuiKey_C | ImGuiMod_Ctrl)) {
         // Copy
@@ -40,15 +58,18 @@ void mainWindow::checkHotkeys() {
     }
 
     // Save Roll (Cmd + Shift + S)
-    if (ImGui::IsKeyChordPressed(ImGuiKey_V | ImGuiMod_Ctrl | ImGuiMod_Shift)) {
-        if (validRoll())
+    if (ImGui::IsKeyChordPressed(ImGuiKey_S | ImGuiMod_Ctrl | ImGuiMod_Shift)) {
+        if (validRoll()) {
             activeRoll()->saveAll();
+            activeRoll()->exportRollMetaJSON();
+        }
     }
 
     // Save All (Opt + Shift + S)
-    if (ImGui::IsKeyChordPressed(ImGuiKey_V | ImGuiMod_Ctrl | ImGuiMod_Shift)) {
+    if (ImGui::IsKeyChordPressed(ImGuiKey_S | ImGuiMod_Alt | ImGuiMod_Shift)) {
         for (int r = 0; r < activeRolls.size(); r++) {
             activeRolls[r].saveAll();
+            activeRolls[r].exportRollMetaJSON();
         }
     }
 

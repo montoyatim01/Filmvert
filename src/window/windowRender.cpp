@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "metalGPU.h"
 #include "window.h"
 
 
@@ -15,9 +16,9 @@ void mainWindow::imgRender() {
 /*
     Add the provided image to the GPU render queue
 */
-void mainWindow::imgRender(image *img) {
+void mainWindow::imgRender(image *img, renderType rType) {
     if (img)
-        mtlGPU->addToRender(img, r_sdt, dispOCIO);
+        mtlGPU->addToRender(img, rType, dispOCIO);
 }
 
 //--- Roll Render ---//
@@ -27,7 +28,7 @@ void mainWindow::imgRender(image *img) {
 void mainWindow::rollRender() {
     if (validRoll()) {
         for (int i = 0; i < activeRollSize(); i++) {
-            imgRender(getImage(selRoll, i));
+            imgRender(getImage(selRoll, i), r_bg);
         }
     }
 }
@@ -87,6 +88,28 @@ void mainWindow::rollRenderCheck() {
     }
 
 }
+
+//--- State Render ---//
+/*
+    For all images in the current roll
+    check if a re-render is needed based
+    on the state change, queue them up
+*/
+void mainWindow::stateRender() {
+    if (validRoll()) {
+        if (validIm()) {
+            imgRender();
+            activeImage()->needRndr = false;
+        }
+        for (auto &img : activeRoll()->images) {
+            if (img.needRndr) {
+                imgRender(&img);
+                img.needRndr = false;
+            }
+        }
+    }
+}
+
 
 //--- Analyze Image ---//
 /*

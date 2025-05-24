@@ -37,8 +37,6 @@ find_package(SDL2 REQUIRED CONFIG)
 find_package(imgui REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
-add_definitions(-DUSE_OPENIMAGEIO_RAW=1)
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
@@ -56,6 +54,7 @@ include_directories(src/gpu)
 include_directories(src/image)
 include_directories(src/ocio)
 include_directories(src/roll)
+include_directories(src/state)
 include_directories(src/window)
 include_directories("${CMAKE_BINARY_DIR}/bindings")
 
@@ -134,15 +133,15 @@ if (APPLE)
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/default.metallib"
     DEPENDS "${CMAKE_BINARY_DIR}/default.metallib"
 )
-    set(LICENSEWINDOW_SRC
+    set(IMGUI_SRC
     ${CMAKE_BINARY_DIR}/bindings/imgui_demo.cpp
     ${CMAKE_BINARY_DIR}/bindings/imgui_widgets.cpp)
 elseif (WIN32)
-    set(LICENSEWINDOW_SRC
+    set(IMGUI_SRC
     ${CMAKE_BINARY_DIR}/bindings/imgui_demo.cpp
     ${CMAKE_BINARY_DIR}/bindings/imgui_widgets.cpp)
 elseif (UNIX)
-    set(LICENSEWINDOW_SRC
+    set(IMGUI_SRC
     ${CMAKE_BINARY_DIR}/bindings/imgui_demo.cpp
     ${CMAKE_BINARY_DIR}/bindings/imgui_widgets.cpp)
 
@@ -163,6 +162,7 @@ set_property(TARGET resources PROPERTY POSITION_INDEPENDENT_CODE ON)
 file(GLOB_RECURSE IMAGE_SRCS src/image/*.cpp)
 file(GLOB_RECURSE OCIO_SRCS src/ocio/*.cpp)
 file(GLOB_RECURSE ROLL_SRCS src/roll/*.cpp)
+file(GLOB_RECURSE STATE_SRCS src/state/*.cpp)
 file(GLOB_RECURSE WINDOW_SRCS src/window/*.cpp)
 
 
@@ -172,6 +172,7 @@ set(FILMVERT_SRCS
     ${WINDOW_SRCS}
     ${IMAGE_SRCS}
     ${ROLL_SRCS}
+    ${STATE_SRCS}
     ${OCIO_SRCS}
     src/utils.cpp
     src/gpu/metalGPU.cpp
@@ -179,7 +180,7 @@ set(FILMVERT_SRCS
     src/threadPool.h
     src/macOSFile.mm
     src/preferences.cpp
-    ${LICENSEWINDOW_SRC}
+    ${IMGUI_SRC}
     ${IMGUI_SRCS}
 )
 set(CMAKE_MACOSX_RPATH ON)
@@ -188,16 +189,19 @@ set_target_properties(Filmvert PROPERTIES
     BUNDLE True
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.timothymontoya.Filmvert"
     MACOSX_BUNDLE_BUNDLE_NAME "Filmvert"
-    MACOSX_BUNDLE_BUNDLE_VERSION "3.1.0"
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "3.1.0"
-    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in
+    MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
+    MACOSX_BUNDLE_ICON_FILE "AppIcon"
+    #MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in
 )
 
-if (APPLE)
-    #set_source_files_properties(HaloLab/HaloLabPlugin.cpp
-    #                           COMPILE_FLAGS "-x objective-c++")
+# Add the icon file to the bundle resources
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/Icon/AppIcon.icns PROPERTIES
+    MACOSX_PACKAGE_LOCATION Resources
+)
+target_sources(Filmvert PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Icon/AppIcon.icns)
 
-    #target_link_directories(Filmvert PUBLIC "/Users/timothymontoya/Downloads/exiv2-0.28.5/build/lib")
+if (APPLE)
     target_link_libraries(Filmvert
                   "-framework MetalKit"
                   "-framework IOKit"
@@ -216,12 +220,8 @@ if (APPLE)
                   libraw::libraw
                   OpenImageIO::OpenImageIO
                   OpenColorIO::OpenColorIO
-                  exiv2::exiv2
-                  #LibRaw
-                  #-lomp
-    )
+                  exiv2::exiv2)
 elseif (WIN32)
-
     target_link_libraries(Filmvert wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
                           SDL2::SDL2-static
                           imgui::imgui
@@ -260,6 +260,7 @@ target_compile_definitions(Filmvert PRIVATE
 
 if (APPLE)
     add_dependencies(Filmvert make-metallib)
+
 
     #add_custom_command(TARGET Filmvert POST_BUILD
     #  COMMAND ${CMAKE_COMMAND} -E copy_if_different

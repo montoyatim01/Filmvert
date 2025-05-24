@@ -284,7 +284,14 @@ void metalGPU::loadOCIOTex(ocioSetting ocioSet) {
 */
 void metalGPU::addToRender(image *_image, renderType type, ocioSetting ocioSet) {
 
-    renderQueue.push(gpuQueue(_image, type, ocioSet));
+    if (_image) {
+        _image->inRndQueue = true;
+        if (type == r_sdt || r_blr)
+            renderQueue.push_front(gpuQueue(_image, type, ocioSet));
+        else
+            renderQueue.push_back(gpuQueue(_image, type, ocioSet));
+    }
+
 }
 
 //--- Is In Queue ---//
@@ -295,12 +302,12 @@ bool metalGPU::isInQueue(image* _image) {
     if (!_image)
         return false;
     queueLock.lock();
-    std::queue<gpuQueue> searchQueue = renderQueue;
+    std::deque<gpuQueue> searchQueue = renderQueue;
     queueLock.unlock();
     while (!searchQueue.empty()) {
         if (_image == searchQueue.front()._img)
             return true;
-        searchQueue.pop();
+        searchQueue.pop_front();
     }
     return false;
 }
@@ -335,12 +342,13 @@ void metalGPU::processQueue() {
                 renderQueue.front()._ocioSet == ocioSet) {
                 // Removing duplicates to only run a single
                 // instance of this image through the render
-                renderQueue.pop();
+                renderQueue.pop_front();
             }
             queueLock.unlock();
             switch (type) {
                 case r_sdt:
                 case r_full:
+                case r_bg:
                     renderImage(img, ocioSet);
                     break;
                 case r_blr:
@@ -456,6 +464,9 @@ void metalGPU::renderImage(image* _image, ocioSetting ocioSet) {
         memcpy(_image->dispImgData, m_disp->contents(), dispSize);
         _image->sdlUpdate = true;
     }
+
+    if (!isInQueue(_image))
+        _image->inRndQueue = false;
 
 
     auto end = std::chrono::steady_clock::now();
@@ -588,6 +599,9 @@ void metalGPU::renderBlurPass(image* _image) {
     _image->blurReady = true;
     auto end = std::chrono::steady_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    if (!isInQueue(_image))
+        _image->inRndQueue = false;
 
     rdTimer.renderTime = dur.count();
     rdTimer.fps = 1000.0f / (float)dur.count();

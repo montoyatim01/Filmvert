@@ -1,5 +1,6 @@
 #include "preferences.h"
 #include "window.h"
+#include "utils.h"
 #include <SDL_render.h>
 #include <chrono>
 #include <algorithm>
@@ -207,7 +208,8 @@ void mainWindow::updateSDLTexture(image* actImage) {
     on Rec709 primaries
 */
 void calculateHistogramFromRGBA(const uint8_t *rgba_buffer, int width,
-                                int height, HistogramData &histogram) {
+                                int height, HistogramData &histogram,
+                                const unsigned int* xPoints, const unsigned int* yPoints) {
     // Clear histogram data
     histogram = HistogramData();
 
@@ -234,6 +236,10 @@ void calculateHistogramFromRGBA(const uint8_t *rgba_buffer, int width,
             // Process pixels in this thread's range
             for (int i = start; i < end; ++i) {
                 const int idx = i * 4;
+                int y = i / width;
+                int x = i % width;
+                if (!isPointInBox(x, y, xPoints, yPoints))
+                    continue;
                 uint8_t r = rgba_buffer[idx];
                 uint8_t g = rgba_buffer[idx + 1];
                 uint8_t b = rgba_buffer[idx + 2];
@@ -334,9 +340,16 @@ void mainWindow::updateSDLHistogram(image* img, void* pixels, int pitch, float i
             pixelBuffer[y * (pitch / 4) + x] = bg_color;
         }
     }
+    unsigned int cropBoxX[4];
+    unsigned int cropBoxY[4];
+    for (int i = 0; i < 4; i++) {
+        cropBoxX[i] = img->imgParam.cropBoxX[i] * img->width;
+        cropBoxY[i] = img->imgParam.cropBoxY[i] * img->height;
+    }
 
     HistogramData histogram;
-    calculateHistogramFromRGBA(img->dispImgData, img->width, img->height, histogram);
+    calculateHistogramFromRGBA(img->dispImgData, img->width, img->height,
+                            histogram, cropBoxX, cropBoxY);
 
     // Find max values for scaling
     int max_r = *std::max_element(histogram.r_hist.begin(), histogram.r_hist.end());

@@ -6,21 +6,34 @@
 #include <string>
 
 struct preferenceSet {
+
+    // Max Undo States
+    int undoLevels = 200;
+
+    // Autosave
     bool autoSave = false;
     int autoSFreq = 5;
 
+    // Histogram Settings
     float histInt = 0.75;
     bool histEnable = true;
 
+    // Performance Mode
     bool perfMode = true;
     int maxRes = 3000;
 
+    // OCIO
     std::string ocioPath;
     bool ocioExt = false;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(preferenceSet, autoSave,
-        autoSFreq, histInt, histEnable, perfMode, maxRes,
-        ocioPath, ocioExt);
+    // Auto-sort on import
+    bool autoSort = true;
+
+
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(preferenceSet, undoLevels,
+        autoSave, autoSFreq, histInt, histEnable, perfMode,
+        maxRes, ocioPath, ocioExt, autoSort);
 };
 
 class userPreferences {

@@ -32,6 +32,39 @@ float4 XYZtoAP1(float4 XYZ) {
     return ACESAP1;
 }
 
+//---LOG---//
+float4 JPLogtoLin(thread float4 inputPixel)
+{
+    float4 out;
+
+  const float ALOGSM1_LIN_BRKPNT = 0.006801176276;
+  const float ALOGSM1_LOG_BRKPNT = .16129032258064516129;
+  const float ALOGSM1_LINTOLOG_SLOPE = 10.36773919972907075549;
+  const float ALOGSM1_LINTOLOG_YINT = .09077750069969257965;
+
+  out.x = inputPixel.x <= ALOGSM1_LOG_BRKPNT ? (inputPixel.x - ALOGSM1_LINTOLOG_YINT) / ALOGSM1_LINTOLOG_SLOPE : pow( 2.0f , inputPixel.x * 20.46f - 10.5f );
+  out.y = inputPixel.y <= ALOGSM1_LOG_BRKPNT ? (inputPixel.y - ALOGSM1_LINTOLOG_YINT) / ALOGSM1_LINTOLOG_SLOPE : pow( 2.0f , inputPixel.y * 20.46f - 10.5f );
+  out.z = inputPixel.z <= ALOGSM1_LOG_BRKPNT ? (inputPixel.z - ALOGSM1_LINTOLOG_YINT) / ALOGSM1_LINTOLOG_SLOPE : pow( 2.0f , inputPixel.z * 20.46f - 10.5f );
+
+  return out;
+}
+
+float4 LintoJPLog(thread float4 inputPixel)
+{
+    float4 out;
+
+  const float ALOGSM1_LIN_BRKPNT = 0.006801176276;
+  const float ALOGSM1_LOG_BRKPNT = .16129032258064516129;
+  const float ALOGSM1_LINTOLOG_SLOPE = 10.36773919972907075549;
+  const float ALOGSM1_LINTOLOG_YINT = .09077750069969257965;
+
+  out.x = inputPixel.x <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.x + ALOGSM1_LINTOLOG_YINT : ( log(inputPixel.x)/log(2.0f) + 10.5f ) / 20.46f;
+  out.y = inputPixel.y <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.y + ALOGSM1_LINTOLOG_YINT : ( log(inputPixel.y)/log(2.0f) + 10.5f ) / 20.46f;
+  out.z = inputPixel.z <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.z + ALOGSM1_LINTOLOG_YINT : ( log(inputPixel.z)/log(2.0f) + 10.5f ) / 20.46f;
+
+  return out;
+}
+
 
 //---BLUR KERNELS---//
 kernel void m_recursiveGaussian_rgba(device float4 *id [[buffer(0)]],
@@ -200,22 +233,37 @@ kernel void mainProcess(device float4 *imgIn [[buffer(0)]],
 
     // Temp/Tint
     float4 tempPix = pixOut;
-    float4 warm = {1.0f, 0.5f, 0.0f, 1.0f};
-    float4 cool = {0.0f, 0.5f, 1.0f, 1.0f};
-    float4 green = {0.0f, 1.0f, 0.0f, 1.0f};
-    float4 mag = {1.0f, 0.0f, 1.0f, 1.0f};
-    float temp = (0.75f * renderParams->temp);
-    float tint = (0.25f * renderParams->tint);
-    float4 ttXYZIn = AP1toXYZ(tempPix);
-    ttXYZIn.b *= temp + 1.0f;
-    ttXYZIn.g *= (-1.0f * tint) + 1.0f;
-    tempPix = XYZtoAP1(ttXYZIn);
+    float4 warm = {2.0f, 1.0f, 0.0f, 1.0f};
+    float4 cool = {0.0f, 1.0f, 2.0f, 1.0f};
+    float4 green = {0.0f, 1.5f, 0.0f, 1.0f};
+    float4 mag = {1.5f, 0.0f, 1.5f, 1.0f};
+    float temp = (1.0f * renderParams->temp);
+    float tint = (0.75f * renderParams->tint);
+
+    // WB
+    tempPix = temp >= 0.0f ?
+        (tempPix * cool * temp) + ((1.0f - temp) * tempPix) :
+        (tempPix * warm * (-1.0f * temp)) + ((1.0f - (-1.0f * temp)) * tempPix);
+    // Tint
+    tempPix = tint >= 0.0f ?
+        (tempPix * mag * tint) + ((1.0f - tint) * tempPix) :
+        (tempPix * green * (-1.0f * tint)) + ((1.0f - (-1.0f * tint)) * tempPix);
+    //float4 ttXYZIn = AP1toXYZ(tempPix);
+    //ttXYZIn.b *= temp + 1.0f;
+    //ttXYZIn.g *= (-1.0f * tint) + 1.0f;
+    //tempPix = XYZtoAP1(ttXYZIn);
+
+    // Lin to Log for grading
+    tempPix = LintoJPLog(tempPix);
 
     // Grade node operation
     float4 aGrade = G_mult * (G_gain - G_lift) / (G_whitepoint - G_blackpoint);
     float4 bGrade = G_offset + G_lift - aGrade * G_blackpoint;
     tempPix = pow(aGrade * tempPix + bGrade, 1.0f/G_gamma);
     tempPix = clamp(tempPix, 0.0f, 100.0f);
+
+    // Back to lin for output
+    tempPix = JPLogtoLin(tempPix);
 //OCIOMain
     float4 out = (renderParams->bypass == 1 ? pixIn : renderParams->gradeBypass == 1 ? pixOut : tempPix);
     imgOut[index] = out;

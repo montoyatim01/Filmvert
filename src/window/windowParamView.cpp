@@ -91,6 +91,7 @@ void mainWindow::paramView() {
                         analyzeImage();
                         cropDisplay = false;
                         minMaxDisp = true;
+                        activeRoll()->rollUpState();
                     }
                     ImGui::SameLine();
                     ImGui::SameLine();
@@ -99,12 +100,12 @@ void mainWindow::paramView() {
                     ImGui::Checkbox("Display Min/Max Points", &minMaxDisp);
                     ImGui::SetItemTooltip("Display the detected min/max luma points in the image\nused to sample the analyzed black point and white point.");
                     ImGui::Text("Analyzed Black Point");
-                    paramChange |= ImGui::ColorEdit4("##BP", (float*)activeImage()->imgParam.blackPoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##BP", (float*)activeImage()->imgParam.blackPoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the analyzed black point.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##01")){activeImage()->imgParam.rstBP(); paramChange = true;}
                     ImGui::Text("Analyzed White Point");
-                    paramChange |= ImGui::ColorEdit4("##WP", (float*)activeImage()->imgParam.whitePoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##WP", (float*)activeImage()->imgParam.whitePoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the analyzed white point.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##02")){activeImage()->imgParam.rstWP(); paramChange = true;}
@@ -129,37 +130,37 @@ void mainWindow::paramView() {
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##04")){activeImage()->imgParam.rstTnt(); paramChange = true;}
                     ImGui::Text("Black Point");
-                    paramChange |= ImGui::ColorEdit4("##GBP", (float*)activeImage()->imgParam.g_blackpoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##GBP", (float*)activeImage()->imgParam.g_blackpoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image black point.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##05")){activeImage()->imgParam.rst_gBP(); paramChange = true;}
                     ImGui::Text("White Point");
-                    paramChange |= ImGui::ColorEdit4("##GWP", (float*)activeImage()->imgParam.g_whitepoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##GWP", (float*)activeImage()->imgParam.g_whitepoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image white point.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##06")){activeImage()->imgParam.rst_gWP(); paramChange = true;}
                     ImGui::Text("Lift");
-                    paramChange |= ImGui::ColorEdit4("##LFT", (float*)activeImage()->imgParam.g_lift, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##LFT", (float*)activeImage()->imgParam.g_lift, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image lift.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##07")){activeImage()->imgParam.rst_gLft(); paramChange = true;}
                     ImGui::Text("Gain");
-                    paramChange |= ImGui::ColorEdit4("##GN", (float*)activeImage()->imgParam.g_gain, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##GN", (float*)activeImage()->imgParam.g_gain, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image gain.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##08")){activeImage()->imgParam.rst_gGain(); paramChange = true;}
                     ImGui::Text("Multiply");
-                    paramChange |= ImGui::ColorEdit4("##MLT", (float*)activeImage()->imgParam.g_mult, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##MLT", (float*)activeImage()->imgParam.g_mult, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image multiplication.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##09")){activeImage()->imgParam.rst_gMul(); paramChange = true;}
                     ImGui::Text("Offset");
-                    paramChange |= ImGui::ColorEdit4("##OF", (float*)activeImage()->imgParam.g_offset, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##OF", (float*)activeImage()->imgParam.g_offset, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image offset.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##10")){activeImage()->imgParam.rst_gOft(); paramChange = true;}
                     ImGui::Text("Gamma");
-                    paramChange |= ImGui::ColorEdit4("##GAM", (float*)activeImage()->imgParam.g_gamma, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    paramChange |= ColorEdit4WithFineTune("##GAM", (float*)activeImage()->imgParam.g_gamma, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image gamma.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##11")){activeImage()->imgParam.rst_g_Gam(); paramChange = true;}
@@ -221,6 +222,7 @@ void mainWindow::paramView() {
     }
 
     renderCall |= paramChange;
+    needStateUp |= paramChange;
 
     if (paramChange) {
         paramUpdate();

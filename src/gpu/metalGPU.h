@@ -20,7 +20,8 @@ struct gpuTimer {
 enum renderType {
     r_sdt = 0,
     r_blr = 1,
-    r_full = 2
+    r_full = 2,
+    r_bg = 3
 };
 struct gpuQueue {
     image* _img;
@@ -52,7 +53,7 @@ class metalGPU {
 
         bool enableQueue = false;
         std::thread queueThread;
-        std::queue<gpuQueue> renderQueue;
+        std::deque<gpuQueue> renderQueue;
         std::mutex queueLock;
 
         image* prevIm;

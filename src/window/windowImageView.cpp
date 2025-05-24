@@ -211,6 +211,7 @@ void mainWindow::imageView() {
                 // Mouse released, stop dragging
                 dragging = false;
                 draggedCorner = -1;
+                activeRoll()->rollUpState();
             }
         }
 
@@ -434,6 +435,7 @@ void mainWindow::imageView() {
     if (calcBaseColor) {
         if (validIm()) {
             activeImage()->processBaseColor();
+            activeRoll()->rollUpState();
         }
     }
 }

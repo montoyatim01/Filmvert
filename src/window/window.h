@@ -126,6 +126,9 @@ class mainWindow
         std::chrono::time_point<std::chrono::steady_clock> lastUISave;
         bool metaRefresh = false;
 
+        // Undo/redo Timing
+        bool needStateUp = false;
+
         // Interaction timings
         float interactionTimer = 0.0f;
         const float INTERACTION_TIMEOUT = 0.25f; // seconds to wait after last interaction
@@ -213,11 +216,12 @@ class mainWindow
         void clearSelection();
 
 
-
+        // windowRender.cpp
         void imgRender();
-        void imgRender(image *img);
+        void imgRender(image *img, renderType rType = r_sdt);
         void rollRenderCheck();
         void rollRender();
+        void stateRender();
 
         void analyzeImage();
 

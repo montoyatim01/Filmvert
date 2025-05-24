@@ -17,7 +17,7 @@ void imageParams::rstANA() {
 }
 
 void imageParams::rstBLR() {
-    blurAmount = 2.5f;
+    blurAmount = 10.0f;
 }
 void imageParams::rstBP() {
     std::fill(std::begin(blackPoint), std::end(blackPoint), 0.0f);

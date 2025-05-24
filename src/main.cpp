@@ -24,48 +24,8 @@ int main(void)
 
 // TODO/Wishlist:
 //
-// - ImageIO
-// -* Reincorporate OIIO for non-raw formats
-// -* Single import image function, raw first?
-// --* How to handle when image has preview file (dng)
-// -* Import Pakon RAW files (Colorspace?)
-// -- Perf mode off enables full res?
-//
-// - Export Window:
-// -* Single/Multi-export
-// -* Roll export
-// -* Verify metadata
-// -* Roll export asks for directory (sub-directories made based on roll name)
-// -* Debayering (how that works with the half res)
-// -* Fixing the SDL flags in the metal render function
-// -* Proper channel handling
-// -* Remember to write the metadata (with exiv2)
-// -* Remember to set the OCIO kernels correctly
-// -* Global image "export" flag?
-// -* Utilize threadpools
-//
-// - Colorspaces
-// -* OCIO Colorspaces in Export
-// -* Regular spaces as well (ADX10)?
-// -* Handling custom OCIO Configs?
-//
 // - Preferences/Settings
-// -* Auto-save/frequency
-// -* OCIO Config setting
-// -- Default meta options (cameras, lenses)
-// -* Roll load/unload setting (turn off the unloading?)
-//
-// - Menu Bar
-// -* Roll based settings
-// --- Roll Analyze No
-// --* Roll Metadata
-// --* Roll export
-// --* Saving
-// --* Save one
-// --* Save all
-// --* Metadata
-// --* Edit Roll Meta
-// --* Export Roll Meta
+// -- Undo levels? Default 100?
 //
 // - Hotkeys
 // -* Copy/Paste meta **
@@ -80,41 +40,51 @@ int main(void)
 // -- Printer lights? Other adjustments
 // -* Make a popup with key shortcuts displayed
 //
-// - Metadata
-// -- Cache of common options (user-pref) Probably not
-// -- Button in imParam for edit/export No
-//
-// - Cleanup
-// -- Cleanup windows.h header
-// -- Break out the rolls.cpp file?
-// -* Break out the imageio file (rename to image? make class?)
-// --- Continue work on this
-// -- Add additional functions to get active roll, etc in window
-//
 // - Bugs
-// -- Test exporting and OCIO configs
-// -* Rework entire OCIO system (try and get rid of the global variable nonsense)
-// -* How does the Metal GPU know what CS settings to use (image based?)
-// -* Metadata for scanning methods/variables? (Two fields?)
 // -- Add in import from image? (import the metadata or inversion settings)
-// -- How does performance mode affect OIIO opened images and their IDTs?
-// --- Someone opens a bunch of images, changes their config, and then it can't re-read?
-// -* Program in OIIO/Raw-data dump and reload.
-// -- Test OIIO/Raw dump and reload
-// -- Re-arrange images based on import metadata?
-// -* Resize all images down to max res for performance mode?
-// -* Auto-size the image to fit on first import
-// -* Disable the histogram checkbox
-// -* Tooltips
-// -* Block import while importing
-// -* Crop points need to move to a coordinate system
-// -* Same with min/max points
-// -* Reset analysis button
-// -* If user selects auto-save, but doesn't actually save the auto-save kicks in (make a temp variable saved on exit)
-// -- Make Nlohmann use the custom struct types instead of manually typing everything..
-// -* Histogram setting isn't saved currently (unless user manually saves preferences)
-// -** Make a separate loop to periodically check if it's changed and save? Too expensive?
-// -- Should the raw import first try auto-detecting the first file before prompting the user?
-// -* If user has disabled the histogram, should that be saved in preferences?
-// -* If user has disabled histogram, don't process it dummy!
-// -*BUG! Failing to allocate ProcImgBuf on a re-load in the PadToRGBA function
+// --Analysis doesn't work very well (turned up blur)
+// --- Cap limits on white point?
+// --Histogram to follow crop points?
+// --Which images are unsaved? Have a colored dot?
+
+// -- Undo/Redo
+// -- How does an undo operation on many images affect thumbnails?
+// -- Render current image and then call a state-specific
+// ---render function?
+// -- Use the differences between states to determine if render needed.
+// -- Deal with copy + paste and updating structs (paramchange)
+// -- Fix off by one errors for both ends of the state
+// -- Add an initial state
+//
+// -- Bug when closing multiple rolls (maybe roll is loading?)
+// -- Get arrow keys to always switch images?
+// -- Hotkeys for BP/WP RGB
+// -- Sort by name/ripple frame number?
+//
+// -- Priority in the render queue
+// -- User-initiated operations go in the front
+// -- Finish the auto-sort options (nix it?)
+
+/*
+Updates
+
+- Grade happens in JPLog2 now
+- White balance/tint are more intense
+- Render queue supports rough priority (front or back)
+- Analysis blur default is 10.0 now (produces somewhat better results)
+- Organized filmRoll code
+- Ability to sort roll based on frame number/filename
+- Modified the color controls for finer tune (with shift) control
+- Added the ability to ripple frame changes
+- Image changes now appear as a purple dot next to the filename
+- Histogram now only calculates based on the crop box
+- Added the ability to undo/redo changes
+-- Roll-based storage allowing multi-image operations to be undone/redone
+- Added app icon
+
+- Fixed base color coordinate calculation
+- Fixed save roll/save all hotkeys
+- Fixed metadata editing not flagging image state change
+
+
+*/

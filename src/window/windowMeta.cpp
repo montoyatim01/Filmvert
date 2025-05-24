@@ -1,8 +1,12 @@
 #include "preferences.h"
 #include "window.h"
+#include <chrono>
 
 //--- Check Metadata ---//
 /*
+    If there's an state change, update the roll state
+    if we've elapsed enough time
+
     If auto save is enabled, and if we've met the
     minimum duration since the last save, loop
     through all images in all rolls and check
@@ -11,11 +15,22 @@
     Currently does not save a whole roll JSON
 */
 void mainWindow::checkMeta() {
+    auto now = std::chrono::steady_clock::now();
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastChange);
+
+    if (dur.count() > 250) {
+        // 250ms since the last state change
+        // Update the roll
+        if (needStateUp) {
+            if (validRoll())
+                activeRoll()->rollUpState();
+            needStateUp = false;
+        }
+    }
+
     if (!metaRefresh || !appPrefs.prefs.autoSave)
         return;
-    auto now = std::chrono::steady_clock::now();
-    auto dur = std::chrono::duration_cast<std::chrono::seconds>(now - lastChange);
-    if (dur.count() > appPrefs.prefs.autoSFreq) {
+    if (dur.count() * 1000 > appPrefs.prefs.autoSFreq) {
         for (int r = 0; r < activeRolls.size(); r++) {
             for (int i = 0; i < activeRolls[r].rollSize(); i++) {
                 image* img = getImage(r, i);
@@ -86,6 +101,7 @@ void mainWindow::imageMetaPreEdit() {
 void mainWindow::imageMetaPostEdit() {
     if (!validIm())
         return;
+    activeImage()->imMeta.frameNumber = metaEdit.frameNum;
     if (metaEdit.a_camMake)
         activeImage()->imMeta.cameraMake = metaEdit.camMake;
     if (metaEdit.a_camModel)
@@ -115,5 +131,7 @@ void mainWindow::imageMetaPostEdit() {
         activeImage()->imMeta.chemMfg = metaEdit.chem;
     if (metaEdit.a_devnotes)
         activeImage()->imMeta.devProcess = metaEdit.devnotes;
+
+    activeImage()->needMetaWrite = true;
 
 }

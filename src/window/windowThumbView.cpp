@@ -66,7 +66,7 @@ void mainWindow::thumbView() {
                                 ImVec2 screenPos = ImGui::GetCursorScreenPos();
                                 //screenPos.x = screenPos.x - displaySize.x; // Move back to the image's left edge
                                 ImU32 handleColor = IM_COL32(255, 127, 0, 255);
-                                float pointRadius = 6.0f;
+                                float pointRadius = 6.0f * std::clamp(thumbWinSize.y / 280.0f, 0.6f, 1.2f);
                                 // Use absolute screen coordinates for the circle
                                 drawList->AddCircleFilled(ImVec2(screenPos.x + pointRadius + 12, screenPos.y + pointRadius),
                                                         pointRadius, handleColor);
@@ -80,6 +80,7 @@ void mainWindow::thumbView() {
 
                             // Calculate text width to center it
                             float textWidth = ImGui::CalcTextSize(filename).x;
+                            float textHeight = ImGui::CalcTextSize(filename).y;
                             float centerOffset = (displaySize.x - textWidth) * 0.5f;
                             if (centerOffset > 0) {
                                 ImGui::SetCursorPosX(pos.x + centerOffset);
@@ -87,6 +88,14 @@ void mainWindow::thumbView() {
 
                             // Display the filename
                             ImGui::TextUnformatted(filename);
+                            if (getImage(i) && getImage(i)->needMetaWrite) {
+                                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                                ImVec2 screenPos = ImGui::GetCursorScreenPos();
+                                ImU32 handleColor = IM_COL32(172, 2, 250, 255);
+                                float pointRadius = 6.0f * std::clamp(thumbWinSize.y / 280.0f, 0.6f, 1.2f);
+                                drawList->AddCircleFilled(ImVec2(screenPos.x + pointRadius + (centerOffset+textWidth), screenPos.y - (pointRadius+(textHeight/2))),
+                                                        pointRadius, handleColor);
+                            }
 
                             ImGui::EndGroup();
                             ImGui::PopID();
