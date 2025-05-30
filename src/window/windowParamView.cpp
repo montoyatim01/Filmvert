@@ -33,8 +33,8 @@ void mainWindow::paramView() {
                 if (validIm()) {
                     activeImage()->rotLeft();
                     if (activeImage()->texture) {
-                        SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
-                        activeImage()->texture = nullptr;
+                        //SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
+                        //activeImage()->texture = nullptr;
                     }
                     renderCall = true;
                     paramChange = true;
@@ -45,8 +45,8 @@ void mainWindow::paramView() {
                 if (validIm()) {
                     activeImage()->rotRight();
                     if (activeImage()->texture) {
-                        SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
-                        activeImage()->texture = nullptr;
+                        //SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
+                        //activeImage()->texture = nullptr;
                     }
                     renderCall = true;
                     paramChange = true;
@@ -64,6 +64,7 @@ void mainWindow::paramView() {
             if (ImGui::Button("Refresh")) {
                 if (validIm()) {
                     renderCall = true;
+                    activeImage()->imgRst = true;
                 }
             }
             ImGui::SetItemTooltip("Re-render the current image");
@@ -79,7 +80,7 @@ void mainWindow::paramView() {
                     ImGui::SetItemTooltip("Hold ⌘ + shift, click and drag an area in the image\nto sample the base color.");
                     ImGui::SameLine();
                     if(ImGui::Button("Reset##a1")){activeImage()->imgParam.rstBC(); paramChange |= true;}
-                    ImGui::Text("Analysis Blur");
+                    ImGui::Text("Analysis Bias");
                     paramChange |= ImGui::SliderFloat("##AB", &activeImage()->imgParam.blurAmount, 0.5f, 20.0f);
                     ImGui::SetItemTooltip("The amount of blur to apply to the image before analyzing.\nThis smooths out extreme pixel values for a \npotentially more accurate analysis.");
                     ImGui::SameLine();
@@ -144,26 +145,26 @@ void mainWindow::paramView() {
                     ImGui::SetItemTooltip("Adjust the image lift.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##07")){activeImage()->imgParam.rst_gLft(); paramChange = true;}
-                    ImGui::Text("Gain");
-                    paramChange |= ColorEdit4WithFineTune("##GN", (float*)activeImage()->imgParam.g_gain, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
-                    ImGui::SetItemTooltip("Adjust the image gain.\nThe Alpha value acts as a global multiplier for RGB channels");
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset##08")){activeImage()->imgParam.rst_gGain(); paramChange = true;}
-                    ImGui::Text("Multiply");
-                    paramChange |= ColorEdit4WithFineTune("##MLT", (float*)activeImage()->imgParam.g_mult, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
-                    ImGui::SetItemTooltip("Adjust the image multiplication.\nThe Alpha value acts as a global multiplier for RGB channels");
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset##09")){activeImage()->imgParam.rst_gMul(); paramChange = true;}
-                    ImGui::Text("Offset");
-                    paramChange |= ColorEdit4WithFineTune("##OF", (float*)activeImage()->imgParam.g_offset, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
-                    ImGui::SetItemTooltip("Adjust the image offset.\nThe Alpha value acts as a global multiplier for RGB channels");
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset##10")){activeImage()->imgParam.rst_gOft(); paramChange = true;}
                     ImGui::Text("Gamma");
                     paramChange |= ColorEdit4WithFineTune("##GAM", (float*)activeImage()->imgParam.g_gamma, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image gamma.\nThe Alpha value acts as a global multiplier for RGB channels");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##11")){activeImage()->imgParam.rst_g_Gam(); paramChange = true;}
+                    ImGui::Text("Gain");
+                    paramChange |= ColorEdit4WithFineTune("##GN", (float*)activeImage()->imgParam.g_gain, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    ImGui::SetItemTooltip("Adjust the image gain.\nThe Alpha value acts as a global multiplier for RGB channels");
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset##08")){activeImage()->imgParam.rst_gGain(); paramChange = true;}
+                    ImGui::Text("Offset");
+                    paramChange |= ColorEdit4WithFineTune("##OF", (float*)activeImage()->imgParam.g_offset, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    ImGui::SetItemTooltip("Adjust the image offset.\nThe Alpha value acts as a global multiplier for RGB channels");
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset##10")){activeImage()->imgParam.rst_gOft(); paramChange = true;}
+                    ImGui::Text("Multiply");
+                    paramChange |= ColorEdit4WithFineTune("##MLT", (float*)activeImage()->imgParam.g_mult, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
+                    ImGui::SetItemTooltip("Adjust the image multiplication.\nThe Alpha value acts as a global multiplier for RGB channels");
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset##09")){activeImage()->imgParam.rst_gMul(); paramChange = true;}
                     ImGui::TreePop();
                 }
             }
@@ -176,12 +177,12 @@ void mainWindow::paramView() {
         {
             if (validIm()) {
                 ImGui::Separator();
-                renderCall |= ImGui::Checkbox("Bypass Grade", &activeImage()->gradeBypass);
+                renderCall |= ImGui::Checkbox("Bypass Grade", &gradeBypass);
                 ImGui::SameLine();
                 renderCall |= ImGui::Checkbox("Bypass Render", &activeImage()->renderBypass);
                 ImGui::SameLine();
                 renderCall |= ImGui::Checkbox("Histogram", &appPrefs.prefs.histEnable);
-
+                activeImage()->gradeBypass = gradeBypass;
                 if (appPrefs.prefs.histEnable) {
                     ImGui::SameLine();
                     ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20);
@@ -192,13 +193,13 @@ void mainWindow::paramView() {
             }
             if (validIm()) {
                 ImGui::Text("FPS: %.2f | Raw Res: %ix%i | Working Res: %ix%i",
-                    mtlGPU->rdTimer.fps,
+                    gpu->rdTimer.fps,
                     activeImage()->rawWidth, activeImage()->rawHeight,
                     activeImage()->width, activeImage()->height);
             }
 
             std::string statusText;
-            if (mtlGPU->rendering)
+            if (gpu->rendering)
                 statusText += "Rendering... ";
             if(validIm() && activeRoll()->imagesLoading) {
                 if (statusText.empty())
@@ -215,7 +216,7 @@ void mainWindow::paramView() {
             ImGui::Text("%s", statusText.c_str());
             if (validIm()) {
                 if (appPrefs.prefs.histEnable)
-                    ImGui::Image(reinterpret_cast<ImTextureID>(activeImage()->histTex), ImVec2(ImGui::GetWindowWidth(), 128));
+                    ImGui::Image(reinterpret_cast<ImTextureID>(gpu->histoTex()), ImVec2(ImGui::GetWindowWidth(), 128));
             }
         } ImGui::EndChild();
 

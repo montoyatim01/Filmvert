@@ -260,6 +260,55 @@ void ocioProcessor::processImage(float *img, unsigned int width,
   }
 }
 
+//--- Get GL Desc ---//
+/*
+    With the given OCIO Settings, create the requisite
+    GpuShaderDescRcPtr, and return it
+*/
+OCIO::GpuShaderDescRcPtr ocioProcessor::getGLDesc(ocioSetting& ocioSet) {
+    try {
+        const char* colorspace = !useExt ? OCIOconfig->getColorSpaceNameByIndex(ocioSet.colorspace) : extOCIOconfig->getColorSpaceNameByIndex(ocioSet.colorspace);
+
+        const char* display = !useExt ? OCIOconfig->getDisplay(ocioSet.display) : extOCIOconfig->getDisplay(ocioSet.display);
+        const char* view = !useExt ? OCIOconfig->getView(display, ocioSet.view) : extOCIOconfig->getView(display, ocioSet.view);
+
+        OCIO::ConstProcessorRcPtr processor;
+        if (!ocioSet.useDisplay){
+            OCIO::ColorSpaceTransformRcPtr transform = OCIO::ColorSpaceTransform::Create();
+            if (ocioSet.inverse) {
+                transform->setSrc(colorspace);
+                transform->setDst("ACEScg");
+            } else {
+                transform->setSrc("ACEScg");
+                transform->setDst(colorspace);
+            }
+            processor = !useExt ? OCIOconfig->getProcessor(transform) : extOCIOconfig->getProcessor(transform);
+        } else {
+            OCIO::DisplayViewTransformRcPtr transform = OCIO::DisplayViewTransform::Create();
+            transform->setSrc("ACEScg");
+            transform->setDisplay(display);
+            transform->setView(view);
+            if (ocioSet.inverse)
+              transform->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
+            processor = !useExt ? OCIOconfig->getProcessor(transform) : extOCIOconfig->getProcessor(transform);
+        }
+        // Step 5: Create GPU shader description
+        OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateShaderDesc();
+        shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_GLSL_4_0);
+
+        OCIO::OptimizationFlags flags = OCIO::OPTIMIZATION_LOSSLESS;
+        // Step 6: Get the shader program info
+        OCIO::ConstGPUProcessorRcPtr gpu = processor->getOptimizedGPUProcessor(flags);
+        gpu->extractGpuShaderInfo(shaderDesc);
+
+        //LOG_INFO("OpenGL Shaders: {}", shaderDesc->getShaderText());
+        return shaderDesc;
+    } catch (OCIO::Exception& e) {
+        LOG_ERROR("OCIO processing error: {}", e.what());
+        return nullptr;
+    }
+}
+
 //--- Get Metal Kernel ---//
 /*
     With the given OCIO Settings, generate the requisite Metal
@@ -298,14 +347,17 @@ std::string ocioProcessor::getMetalKernel(ocioSetting& ocioSet) {
         }
         // Step 5: Create GPU shader description
         OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateShaderDesc();
-        shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_MSL_2_0);  // macOS compatible GLSL version
+        shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_GLSL_4_0);
 
-        OCIO::OptimizationFlags flags = OCIO::OPTIMIZATION_ALL;
+        OCIO::OptimizationFlags flags = OCIO::OPTIMIZATION_NONE;
         // Step 6: Get the shader program info
         OCIO::ConstGPUProcessorRcPtr gpu = processor->getOptimizedGPUProcessor(flags);
         gpu->extractGpuShaderInfo(shaderDesc);
 
-        if (shaderDesc->getNumTextures() == 1) {
+        LOG_INFO("Texture Count: {}", shaderDesc->getNumTextures());
+        LOG_INFO("3D Texture Count: {}", shaderDesc->getNum3DTextures());
+        ocioSet.texCount = shaderDesc->getNumTextures();
+        if (shaderDesc->getNumTextures() > 0) {
             ocioSet.texCount = shaderDesc->getNumTextures();
             //LOG_INFO("Texture Needed! {}", shaderDesc->getNumTextures());
             const char* name;
@@ -314,16 +366,16 @@ std::string ocioProcessor::getMetalKernel(ocioSetting& ocioSet) {
             OCIO::GpuShaderCreator::TextureDimensions texDim;
             OCIO::Interpolation interp = OCIO::Interpolation::INTERP_LINEAR;
 
-            shaderDesc->getTexture(0, name, sampleName, ocioSet.texWidth, ocioSet.texHeight, texType, texDim, interp);
+            for (int i = 0; i < ocioSet.texCount; i++) {
+                shaderDesc->getTexture(i, name, sampleName, ocioSet.texWidth[i], ocioSet.texHeight[i], texType, texDim, interp);
 
-            // Get the actual texture data
-            shaderDesc->getTextureValues(0, ocioSet.texture);
-        } else if (shaderDesc->getNumTextures() > 1) {
-            // 3D/3D+1D LUT not currently supported!
-            LOG_WARN("OCIO Setting with incompatible LUT format!");
+                // Get the actual texture data
+                shaderDesc->getTextureValues(i, ocioSet.texture[i]);
+            }
+
         }
 
-
+        LOG_INFO("OpenGL Shaders: {}", shaderDesc->getShaderText());
         return shaderDesc->getShaderText();
     } catch (OCIO::Exception& e) {
         LOG_ERROR("OCIO processing error: {}", e.what());

@@ -1,3 +1,4 @@
+//#include "metalGPU.h"
 #include "window.h"
 
 //--- Copy Into Params ---//
@@ -170,7 +171,7 @@ void mainWindow::pasteIntoParams() {
 
 
             getImage(i)->needMetaWrite |= metaChg;
-            imgRender(getImage(i));
+            imgRender(getImage(i), r_sdt);
         }
     }
 }

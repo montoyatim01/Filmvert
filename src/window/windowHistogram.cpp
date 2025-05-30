@@ -7,8 +7,7 @@
 #include <thread>
 #include <atomic>
 
-#define HISTWIDTH 512
-#define HISTHEIGHT 256
+
 
 //--- Create SDL Texture ---//
 /*
@@ -22,7 +21,7 @@ void mainWindow::createSDLTexture(image* actImage) {
     // For rotations 6 and 8 (90 degrees), we need to swap width and height
     int textureWidth = (actImage->imRot == 6 || actImage->imRot == 8) ? actImage->height : actImage->width;
     int textureHeight = (actImage->imRot == 6 || actImage->imRot == 8) ? actImage->width : actImage->height;
-
+/*
     SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING,
                                                 textureWidth, textureHeight);
     if (texture) {
@@ -32,7 +31,7 @@ void mainWindow::createSDLTexture(image* actImage) {
     else {
         LOG_WARN("Unable to create SDL texture for image: {}", actImage->srcFilename);
     }
-
+*/
 }
 
 //--- Update SDL Texture ---//
@@ -45,7 +44,7 @@ void mainWindow::updateSDLTexture(image* actImage) {
 
     if (!actImage || !actImage->imageLoaded)
         return;
-
+/*
     if (actImage->texture == nullptr) {
             createSDLTexture(actImage);
     }
@@ -199,15 +198,56 @@ void mainWindow::updateSDLTexture(image* actImage) {
         SDL_UnlockTexture((SDL_Texture*)actImage->texture);
         actImage->sdlUpdate = false;
         actImage->delDispBuf();
+        */
 }
 
-//--- Calculate Histogram from RGBA ---//
+void mainWindow::updateHistogram() {
+    if (histRunning)
+        return; // Histogram already being worked on
+
+    if (!appPrefs.prefs.histEnable)
+        return; // Don't calculate the histogram if disabled
+    histRunning = true;
+    image* img = activeImage();
+    if (!img)
+        return;
+    float* imgPixels = nullptr;
+    int hWidth, hHeight;
+
+    gpu->getMipMapTexture(img, imgPixels, hWidth, hHeight);
+    if (!imgPixels)
+        return; // Something went wrong in the GL end
+
+    float* histPix = new float[HISTWIDTH * HISTHEIGHT * 4];
+    updateHistPixels(img, imgPixels, histPix, hWidth, hHeight, appPrefs.prefs.histInt);
+
+    gpu->setHistTexture(histPix);
+
+    if (histPix)
+        delete [] histPix;
+    if (imgPixels)
+        delete [] imgPixels;
+    histRunning = false;
+}
 /*
-    Calculate the histogram 'bins' from
-    the Dispimg. Process luma as well based
-    on Rec709 primaries
+OOO
+Flag for histo needing update (take from param/render call)
+allocate buffer for histo (based on static size)
+
+Access the level 2 mipmap from the texture (0.25x scale)
+-Allocate buffer large enough (on gpu side)
+-copy over
+
+Run analysis process
+
+process to histo buffer
+Send pointer to GPU to update histo buffer
+clear flag
 */
-void calculateHistogramFromRGBA(const uint8_t *rgba_buffer, int width,
+
+
+//--- Calculate Histogram from RGBA ---//
+void calculateHistogramFromRGBA(const float *rgba_buffer, int width,
                                 int height, HistogramData &histogram,
                                 const unsigned int* xPoints, const unsigned int* yPoints) {
     // Clear histogram data
@@ -240,18 +280,24 @@ void calculateHistogramFromRGBA(const uint8_t *rgba_buffer, int width,
                 int x = i % width;
                 if (!isPointInBox(x, y, xPoints, yPoints))
                     continue;
-                uint8_t r = rgba_buffer[idx];
-                uint8_t g = rgba_buffer[idx + 1];
-                uint8_t b = rgba_buffer[idx + 2];
+
+                // Convert float values (0.0-1.0) to 8-bit values (0-255)
+                float r_f = std::clamp(rgba_buffer[idx], 0.0f, 1.0f);
+                float g_f = std::clamp(rgba_buffer[idx + 1], 0.0f, 1.0f);
+                float b_f = std::clamp(rgba_buffer[idx + 2], 0.0f, 1.0f);
+
+                uint8_t r = static_cast<uint8_t>(r_f * 255.0f + 0.5f);
+                uint8_t g = static_cast<uint8_t>(g_f * 255.0f + 0.5f);
+                uint8_t b = static_cast<uint8_t>(b_f * 255.0f + 0.5f);
 
                 // For 512 bins, each 8-bit value maps to 2 bins
                 // This ensures smooth distribution without gaps
                 int r_bin_low = r * 2;
-                int r_bin_high = r * 2 + 1;
+                int r_bin_high = std::min(511, r * 2 + 1);
                 int g_bin_low = g * 2;
-                int g_bin_high = g * 2 + 1;
+                int g_bin_high = std::min(511, g * 2 + 1);
                 int b_bin_low = b * 2;
-                int b_bin_high = b * 2 + 1;
+                int b_bin_high = std::min(511, b * 2 + 1);
 
                 // Count RGB values in both bins for smooth interpolation
                 local_r_hist[r_bin_low]++;
@@ -261,17 +307,13 @@ void calculateHistogramFromRGBA(const uint8_t *rgba_buffer, int width,
                 local_b_hist[b_bin_low]++;
                 local_b_hist[b_bin_high]++;
 
-                // Calculate luminance with improved coefficients
-                // Using ITU-R BT.709 standard coefficients
-                float luminance_f = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-                int luminance = static_cast<int>(luminance_f + 0.5f); // Proper rounding
+                // Calculate luminance with ITU-R BT.709 standard coefficients
+                float luminance_f = 0.2126f * r_f + 0.7152f * g_f + 0.0722f * b_f;
+                int luminance = static_cast<int>(luminance_f * 255.0f + 0.5f);
 
                 // Map luminance to two bins
                 int lum_bin_low = luminance * 2;
-                int lum_bin_high = luminance * 2 + 1;
-
-                // Clamp to valid range (luminance can exceed 255 in edge cases)
-                if (lum_bin_high > 511) lum_bin_high = 511;
+                int lum_bin_high = std::min(511, luminance * 2 + 1);
 
                 local_lum_hist[lum_bin_low]++;
                 local_lum_hist[lum_bin_high]++;
@@ -316,40 +358,36 @@ void calculateHistogramFromRGBA(const uint8_t *rgba_buffer, int width,
     }
 }
 
-//--- Update SDL Histogram ---//
-/*
-    Based on the calculated bins, generate the resulting
-    histogram image and save it to the image texture
-*/
-void mainWindow::updateSDLHistogram(image* img, void* pixels, int pitch, float intensityMultiplier) {
-    auto start = std::chrono::steady_clock::now();
-    uint32_t* pixelBuffer = static_cast<uint32_t*>(pixels);
-
-    if (!appPrefs.prefs.histEnable) {
-        std::memset(pixelBuffer, 0, HISTWIDTH * HISTHEIGHT * sizeof(uint32_t));
-        return;
-    }
+//--- Update Histogram to Float Buffer ---//
+void mainWindow::updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier) {
 
     // Clamp intensity multiplier to valid range
     intensityMultiplier = std::clamp(intensityMultiplier, 0.0f, 1.0f);
 
-    // Clear to dark gray background
-    const uint32_t bg_color = 0x7F101010;
+    // Clear to dark gray background (0.06 in float = ~15/255)
+    const float bg_color = 0.06f;
     for (int y = 0; y < HISTHEIGHT; ++y) {
         for (int x = 0; x < HISTWIDTH; ++x) {
-            pixelBuffer[y * (pitch / 4) + x] = bg_color;
+            int idx = (y * HISTWIDTH + x) * 4;
+            histPixels[idx + 0] = bg_color; // R
+            histPixels[idx + 1] = bg_color; // G
+            histPixels[idx + 2] = bg_color; // B
+            histPixels[idx + 3] = 1.0f;     // A
         }
     }
-    unsigned int cropBoxX[4];
-    unsigned int cropBoxY[4];
-    for (int i = 0; i < 4; i++) {
-        cropBoxX[i] = img->imgParam.cropBoxX[i] * img->width;
-        cropBoxY[i] = img->imgParam.cropBoxY[i] * img->height;
-    }
 
+    unsigned int cropBoxX[4];
+        unsigned int cropBoxY[4];
+        for (int i = 0; i < 4; i++) {
+            cropBoxX[i] = img->imgParam.cropBoxX[i] * width;
+            cropBoxY[i] = img->imgParam.cropBoxY[i] * height;
+        }
+
+
+    // Calculate histogram
     HistogramData histogram;
-    calculateHistogramFromRGBA(img->dispImgData, img->width, img->height,
-                            histogram, cropBoxX, cropBoxY);
+    calculateHistogramFromRGBA(imgPixels, width, height,
+                              histogram, cropBoxX, cropBoxY);
 
     // Find max values for scaling
     int max_r = *std::max_element(histogram.r_hist.begin(), histogram.r_hist.end());
@@ -397,84 +435,95 @@ void mainWindow::updateSDLHistogram(image* img, void* pixels, int pitch, float i
     if (max_b == 0) max_b = 1;
     if (max_lum == 0) max_lum = 1;
 
-    // Calculate base intensities with multiplier applied
-    const int red_intensity = static_cast<int>(200 * intensityMultiplier);
-    const int green_intensity = static_cast<int>(200 * intensityMultiplier);
-    const int blue_intensity = static_cast<int>(200 * intensityMultiplier);
-    const int white_intensity = static_cast<int>(255 * intensityMultiplier);
+    // Calculate base intensities with multiplier applied (convert to float)
+    const float red_intensity = (200.0f / 255.0f) * intensityMultiplier;
+    const float green_intensity = (200.0f / 255.0f) * intensityMultiplier;
+    const float blue_intensity = (200.0f / 255.0f) * intensityMultiplier;
+    const float white_intensity = intensityMultiplier; // 1.0 * multiplier
 
-    // Draw histogram with 512 bins
-    for (int i = 0; i < 512; ++i) {
-        // Each bin is exactly 1 pixel wide for 512-width histogram
-        int x = i;
+    // Scale histogram width to match buffer width
+    float x_scale = static_cast<float>(HISTWIDTH) / 512.0f;
+
+    // Draw histogram with 512 bins scaled to histogram width
+    for (int bin = 0; bin < 512; ++bin) {
+        // Map bin to x coordinate(s)
+        int x_start = static_cast<int>(bin * x_scale);
+        int x_end = static_cast<int>((bin + 1) * x_scale);
+        if (x_end >= HISTWIDTH) x_end = HISTWIDTH - 1;
 
         // Calculate heights with channel-specific scaling
-        int r_height = (histogram.r_hist[i] * (HISTHEIGHT - 10)) / max_r;
-        int g_height = (histogram.g_hist[i] * (HISTHEIGHT - 10)) / max_g;
-        int b_height = (histogram.b_hist[i] * (HISTHEIGHT - 10)) / max_b;
-        int lum_height = (histogram.luminance_hist[i] * (HISTHEIGHT - 10)) / max_lum;
+        int r_height = (histogram.r_hist[bin] * (HISTHEIGHT - 10)) / max_r;
+        int g_height = (histogram.g_hist[bin] * (HISTHEIGHT - 10)) / max_g;
+        int b_height = (histogram.b_hist[bin] * (HISTHEIGHT - 10)) / max_b;
+        int lum_height = (histogram.luminance_hist[bin] * (HISTHEIGHT - 10)) / max_lum;
 
         // Apply minimum visibility threshold
-        if (histogram.r_hist[i] > 0 && r_height < 2) r_height = 2;
-        if (histogram.g_hist[i] > 0 && g_height < 2) g_height = 2;
-        if (histogram.b_hist[i] > 0 && b_height < 2) b_height = 2;
-        if (histogram.luminance_hist[i] > 0 && lum_height < 2) lum_height = 2;
+        if (histogram.r_hist[bin] > 0 && r_height < 2) r_height = 2;
+        if (histogram.g_hist[bin] > 0 && g_height < 2) g_height = 2;
+        if (histogram.b_hist[bin] > 0 && b_height < 2) b_height = 2;
+        if (histogram.luminance_hist[bin] > 0 && lum_height < 2) lum_height = 2;
 
-        // Draw luminance histogram in white (lowest layer) with intensity multiplier
-        for (int y = HISTHEIGHT - 1; y >= HISTHEIGHT - lum_height && y >= 0; --y) {
-            uint8_t intensity = static_cast<uint8_t>(white_intensity);
-            pixelBuffer[y * (pitch / 4) + x] = 0xFF000000 | (intensity << 16) | (intensity << 8) | intensity;
-        }
+        // Draw for all x coordinates this bin maps to
+        for (int x = x_start; x <= x_end; ++x) {
+            if (x >= HISTWIDTH) break;
 
-        // Draw RGB histograms with proper additive blending
-        for (int y = HISTHEIGHT - 1; y >= 0; --y) {
-            uint32_t& pixel = pixelBuffer[y * (pitch / 4) + x];
-
-            // Skip if it's already white (luminance) - check for max white with current intensity
-            uint8_t pixel_r = (pixel >> 0) & 0xFF;
-            uint8_t pixel_g = (pixel >> 8) & 0xFF;
-            uint8_t pixel_b = (pixel >> 16) & 0xFF;
-            if (pixel_r == white_intensity && pixel_g == white_intensity && pixel_b == white_intensity) continue;
-
-            // Extract current color components
-            uint8_t current_r = pixel_r;
-            uint8_t current_g = pixel_g;
-            uint8_t current_b = pixel_b;
-            uint8_t current_a = (pixel >> 24) & 0xFF;
-
-            // Determine what to add based on histogram heights
-            float add_r = 0, add_g = 0, add_b = 0;
-
-            if (y >= HISTHEIGHT - r_height) {
-                add_r = red_intensity;
-            }
-            if (y >= HISTHEIGHT - g_height) {
-                add_g = green_intensity;
-            }
-            if (y >= HISTHEIGHT - b_height) {
-                add_b = blue_intensity;
+            // Draw luminance histogram in white (lowest layer)
+            for (int y = HISTHEIGHT - 1; y >= HISTHEIGHT - lum_height && y >= 0; --y) {
+                int idx = (y * HISTWIDTH + x) * 4;
+                histPixels[idx + 0] = white_intensity; // R
+                histPixels[idx + 1] = white_intensity; // G
+                histPixels[idx + 2] = white_intensity; // B
+                histPixels[idx + 3] = 1.0f;           // A
             }
 
-            // Mix colors additively
-            if (add_r > 0 || add_g > 0 || add_b > 0) {
-                // Remove background and add new colors
-                if (current_r == 0x10 && current_g == 0x10 && current_b == 0x10) {
-                    // If it's background, start fresh
-                    current_r = 0;
-                    current_g = 0;
-                    current_b = 0;
+            // Draw RGB histograms with proper additive blending
+            for (int y = HISTHEIGHT - 1; y >= 0; --y) {
+                int idx = (y * HISTWIDTH + x) * 4;
+
+                // Skip if it's already white (luminance)
+                if (histPixels[idx + 0] == white_intensity &&
+                    histPixels[idx + 1] == white_intensity &&
+                    histPixels[idx + 2] == white_intensity) continue;
+
+                // Extract current color components
+                float current_r = histPixels[idx + 0];
+                float current_g = histPixels[idx + 1];
+                float current_b = histPixels[idx + 2];
+
+                // Determine what to add based on histogram heights
+                float add_r = 0, add_g = 0, add_b = 0;
+
+                if (y >= HISTHEIGHT - r_height) {
+                    add_r = red_intensity;
+                }
+                if (y >= HISTHEIGHT - g_height) {
+                    add_g = green_intensity;
+                }
+                if (y >= HISTHEIGHT - b_height) {
+                    add_b = blue_intensity;
                 }
 
-                current_r = std::min(255, current_r + static_cast<int>(add_r));
-                current_g = std::min(255, current_g + static_cast<int>(add_g));
-                current_b = std::min(255, current_b + static_cast<int>(add_b));
+                // Mix colors additively
+                if (add_r > 0 || add_g > 0 || add_b > 0) {
+                    // Remove background and add new colors
+                    if (current_r == bg_color && current_g == bg_color && current_b == bg_color) {
+                        // If it's background, start fresh
+                        current_r = 0;
+                        current_g = 0;
+                        current_b = 0;
+                    }
 
-                // Recompose pixel
-                pixel = (current_a << 24) | (current_b << 16) | (current_g << 8) | current_r;
+                    current_r = std::min(1.0f, current_r + add_r);
+                    current_g = std::min(1.0f, current_g + add_g);
+                    current_b = std::min(1.0f, current_b + add_b);
+
+                    // Update pixel
+                    histPixels[idx + 0] = current_r;
+                    histPixels[idx + 1] = current_g;
+                    histPixels[idx + 2] = current_b;
+                    histPixels[idx + 3] = 1.0f;
+                }
             }
         }
     }
-    auto end = std::chrono::steady_clock::now();
-    auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    //LOG_INFO("Histo: {}us, {}ms", dur.count(), dur.count()/1000);
 }

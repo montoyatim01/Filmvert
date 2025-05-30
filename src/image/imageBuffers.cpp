@@ -21,16 +21,16 @@ void image::delBlurBuf() {
 }
 
 void image::allocateTmpBuf() {
-    if (nChannels == 4)
+    if (nChannels == 4 && fullIm)
     {
         // We already have an alpha channel
         tmpOutData = procImgData;
         return;
     }
     if (rawWidth * rawHeight > width * height)
-        tmpOutData = new float[rawWidth * rawHeight * nChannels];
+        tmpOutData = new float[rawWidth * rawHeight * 4];
     else
-        tmpOutData = new float[width * height * nChannels];
+        tmpOutData = new float[width * height * 4];
 }
 void image::clearTmpBuf() {
     if (tmpOutData && tmpOutData != procImgData) {

@@ -1,6 +1,6 @@
 #include "image.h"
 #include "imageMeta.h"
-#include "metalGPU.h"
+//#include "metalGPU.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "structs.h"
@@ -414,7 +414,10 @@ void mainWindow::batchRenderPopup() {
     if (exportPopup)
         ImGui::OpenPopup("Export Image(s)");
     if (ImGui::BeginPopupModal("Export Image(s)", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
-        ImGui::Text("Export selected image(s)");
+        if (expRolls)
+            ImGui::Text("Export selected roll(s)");
+        else
+            ImGui::Text("Export selected image(s)");
         ImGui::Separator();
         if (expRolls) {
             // Table for selecting rolls
@@ -1137,9 +1140,9 @@ void mainWindow::preferencesPopup() {
         ImGui::SetItemTooltip("Set the maximum resolution on the long side for images\non import. Exported images are rendered in full resolution.");
 
         ImGui::Separator();
-        ImGui::Text("Auto-sort");
-        ImGui::Checkbox("###02a", &appPrefs.prefs.autoSort);
-        ImGui::SetItemTooltip("Auto-sort images based on their indicies when\nimporting rolls or importing roll-metadata.");
+        ImGui::Text("Debayer Mode");
+        ImGui::InputInt("###db1", &appPrefs.prefs.debayerMode);
+        ImGui::SetItemTooltip("Set the debayer mode on export/when not using Performance Mode.\n0: Bilinear\n1: VNG\n2: PPG\n3: AHD\n4: DCB\n5: PL_AHD\n6: AFD\n7: VCD\n8: VCD + AHD\n9: LMMSE\n10: AMaZE\n11: DHT\n12: AP_AHD");
         ImGui::Separator();
 
         // OCIO
@@ -1219,6 +1222,26 @@ void mainWindow::ackPopup() {
             ackPopTrig = false;
             std::memset(ackMsg, 0, sizeof(ackMsg));
             std::memset(ackError, 0, sizeof(ackError));
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::Spacing();
+        ImGui::EndPopup();
+    }
+}
+
+//--- Analyze Popup ---//
+/*
+    Simple message while waiting for
+    analysis to finish
+*/
+void mainWindow::analyzePopup() {
+    if (anaPopTrig)
+        ImGui::OpenPopup("Analyze");
+    if (ImGui::BeginPopupModal("Analyze", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+
+        ImGui::Text("Analyzing...");
+
+        if (!anaPopTrig) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::Spacing();

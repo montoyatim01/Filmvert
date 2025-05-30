@@ -1,6 +1,9 @@
 #ifndef _utils_h
 #define _utils_h
 #include <stdint.h>
+
+#define KERNELSIZE 6
+
 struct xyPoint {
     float x;
     float y;
@@ -19,4 +22,6 @@ void ap0_to_ap1(float* in, float* out);
 
 uint16_t swapBytes16(uint16_t value);
 uint32_t swapBytes32(uint32_t value);
+
+void computeKernels(float strength, float* kernels);
 #endif

@@ -90,6 +90,8 @@ void mainWindow::imageMetaPreEdit() {
     std::strcpy(metaEdit.dev, activeImage()->imMeta.devProcess.c_str());
     std::strcpy(metaEdit.chem, activeImage()->imMeta.chemMfg.c_str());
     std::strcpy(metaEdit.devnotes, activeImage()->imMeta.devNotes.c_str());
+    std::strcpy(metaEdit.scanner, activeImage()->imMeta.scanner.c_str());
+    std::strcpy(metaEdit.scannotes, activeImage()->imMeta.scanNotes.c_str());
 }
 
 //--- Image Metadata Post-Edit ---//

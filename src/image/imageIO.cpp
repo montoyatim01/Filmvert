@@ -21,7 +21,7 @@
     (for performance mode half-res debayers)
 
     Reload/Debayer full image in highest quality
-    (11 for libraw)
+    (pref for libraw)
 
     Allocate necessary buffers for processing
 */
@@ -74,6 +74,8 @@ void image::exportPostProcess() {
     }
     fullIm = false;
     renderReady = false;
+    imgRst = true;
+    needRndr = true;
 }
 
 //---Write Image---//
@@ -88,21 +90,6 @@ void image::exportPostProcess() {
     Write metadata to final file after OIIO close
 */
 bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
-    // Wait for the metal render to finish
-    auto start = std::chrono::steady_clock::now();
-    while (!renderReady) {
-        auto end = std::chrono::steady_clock::now();
-        auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-        if (dur.count() > 15000) {
-            // Bailing out after waiting 15 seconds for Metal to finish rendering..
-            // At avg of 20-30fps it should never take this long
-            LOG_ERROR("Stuck waiting for Metal GPU render. Cannot export file: {}!", srcFilename);
-            return false;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    }
-    renderReady = false;
 
     OIIO::TypeDesc format = OIIO::TypeDesc::FLOAT;
     OIIO::TypeDesc outFormat;
@@ -174,9 +161,9 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
 
     // Trim proc data for save
     allocateTmpBuf();
-
-
     trimForSave();
+
+
     // Write the image data
     if (!out->write_image(format, tmpOutData)) {
         LOG_ERROR("Failed to write image data: {}", OIIO::geterror());
@@ -718,7 +705,7 @@ std::variant<image, std::string> readRawImage(std::string imagePath) {
     rawProcessor->imgdata.params.no_auto_bright = 1;    // Disable auto-brightening
     rawProcessor->imgdata.params.use_camera_wb = 1;     // Use camera white balance
     rawProcessor->imgdata.params.output_color = 6;      // Output color space: 1 = sRGB
-    rawProcessor->imgdata.params.user_qual = appPrefs.prefs.perfMode ? 2 : 11;
+    rawProcessor->imgdata.params.user_qual = appPrefs.prefs.perfMode ? 2 : appPrefs.prefs.debayerMode;
     rawProcessor->imgdata.params.half_size = appPrefs.prefs.perfMode ? 1 : 0;
 
     // Open the raw file

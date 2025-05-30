@@ -99,7 +99,7 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
         for (int i = 0; i < images.size(); i++) {
             if (jRoll.contains(images[i].srcFilename)) {
                 nlohmann::json obj = jRoll[images[i].srcFilename].get<nlohmann::json>();
-                images[i].loadMetaFromStr(obj.dump(-1));
+                images[i].loadMetaFromStr(obj.dump(-1), true);
             }
         }
         if (appPrefs.prefs.autoSort)

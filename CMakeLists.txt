@@ -17,14 +17,6 @@ set (CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(NOT APPLE)
-    find_package(CUDA 11.0 REQUIRED)
-    message(STATUS "Found CUDA ${CUDA_VERSION_STRING} at ${CUDA_TOOLKIT_ROOT_DIR}")
-
-    find_package(OpenCL)
-    set(OPENSSL_USE_STATIC_LIBS TRUE)
-    find_package(OpenSSL REQUIRED)
-endif()
 
 find_package(libraw REQUIRED)
 find_package(OpenImageIO REQUIRED)
@@ -36,6 +28,9 @@ find_package(spdlog REQUIRED)
 find_package(SDL2 REQUIRED CONFIG)
 find_package(imgui REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(glfw3 REQUIRED)
+find_package(GLEW REQUIRED)
+
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
@@ -75,19 +70,6 @@ execute_process(COMMAND git rev-parse HEAD
                 OUTPUT_VARIABLE GIT_COMMIT_HASH
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-list(APPEND CUDA_NVCC_FLAGS
-    -lineinfo
-    -gencode=arch=compute_50,code=sm_50
-    -gencode=arch=compute_52,code=sm_52
-    -gencode=arch=compute_60,code=sm_60
-    -gencode=arch=compute_61,code=sm_61
-    -gencode=arch=compute_62,code=sm_62
-    -gencode=arch=compute_70,code=sm_70
-    -gencode=arch=compute_72,code=sm_72
-    -gencode=arch=compute_75,code=sm_75
-    -gencode=arch=compute_80,code=sm_80
-    -gencode=arch=compute_80,code=compute_80
-)
 
 if (APPLE)
     SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} \"-Wno-deprecated\"")
@@ -108,12 +90,6 @@ endif()
 
 
 
-set(IMGUI_SRCS
-    ${CMAKE_BINARY_DIR}/bindings/imgui_impl_sdl2.h
-    ${CMAKE_BINARY_DIR}/bindings/imgui_impl_sdl2.cpp
-    ${CMAKE_BINARY_DIR}/bindings/imgui_impl_sdlrenderer2.h
-    ${CMAKE_BINARY_DIR}/bindings/imgui_impl_sdlrenderer2.cpp
-)
 
 if (APPLE)
     add_custom_target(make-metallib DEPENDS default.metallib)
@@ -133,18 +109,6 @@ if (APPLE)
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/default.metallib"
     DEPENDS "${CMAKE_BINARY_DIR}/default.metallib"
 )
-    set(IMGUI_SRC
-    ${CMAKE_BINARY_DIR}/bindings/imgui_demo.cpp
-    ${CMAKE_BINARY_DIR}/bindings/imgui_widgets.cpp)
-elseif (WIN32)
-    set(IMGUI_SRC
-    ${CMAKE_BINARY_DIR}/bindings/imgui_demo.cpp
-    ${CMAKE_BINARY_DIR}/bindings/imgui_widgets.cpp)
-elseif (UNIX)
-    set(IMGUI_SRC
-    ${CMAKE_BINARY_DIR}/bindings/imgui_demo.cpp
-    ${CMAKE_BINARY_DIR}/bindings/imgui_widgets.cpp)
-
 endif()
 
 cmrc_add_resource_library(resources
@@ -156,9 +120,12 @@ assets/fonts/Roboto-Regular.ttf
 assets/fonts/JetBrainsMono-Regular.ttf
 assets/default.metallib
 assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio
+assets/studio-config-v3.0.0_aces-v2.0_ocio-v2.4.ocio
 )
 set_property(TARGET resources PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+file(GLOB_RECURSE IMGUI_SRCS ${CMAKE_BINARY_DIR}/bindings/*.cpp)
+file(GLOB_RECURSE GPU_SRCS src/gpu/*.cpp)
 file(GLOB_RECURSE IMAGE_SRCS src/image/*.cpp)
 file(GLOB_RECURSE OCIO_SRCS src/ocio/*.cpp)
 file(GLOB_RECURSE ROLL_SRCS src/roll/*.cpp)
@@ -166,7 +133,10 @@ file(GLOB_RECURSE STATE_SRCS src/state/*.cpp)
 file(GLOB_RECURSE WINDOW_SRCS src/window/*.cpp)
 
 
+
+
 set(FILMVERT_SRCS
+    ${IMGUI_SRCS}
     src/main.cpp
     src/logger.cpp
     ${WINDOW_SRCS}
@@ -174,34 +144,33 @@ set(FILMVERT_SRCS
     ${ROLL_SRCS}
     ${STATE_SRCS}
     ${OCIO_SRCS}
+    ${GPU_SRCS}
     src/utils.cpp
-    src/gpu/metalGPU.cpp
     src/threadPool.cpp
     src/threadPool.h
-    src/macOSFile.mm
     src/preferences.cpp
-    ${IMGUI_SRC}
-    ${IMGUI_SRCS}
+    src/fileIO.cpp
 )
-set(CMAKE_MACOSX_RPATH ON)
-add_executable(Filmvert MACOSX_BUNDLE ${FILMVERT_SRCS})
-set_target_properties(Filmvert PROPERTIES
+
+
+if (APPLE)
+    set(CMAKE_MACOSX_RPATH ON)
+    add_executable(Filmvert MACOSX_BUNDLE ${FILMVERT_SRCS} src/macOSFile.mm)
+    set_target_properties(Filmvert PROPERTIES
     BUNDLE True
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.timothymontoya.Filmvert"
     MACOSX_BUNDLE_BUNDLE_NAME "Filmvert"
     MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
     MACOSX_BUNDLE_ICON_FILE "AppIcon"
-    #MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in
 )
 
-# Add the icon file to the bundle resources
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/Icon/AppIcon.icns PROPERTIES
+    # Add the icon file to the bundle resources
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/Icon/AppIcon.icns PROPERTIES
     MACOSX_PACKAGE_LOCATION Resources
 )
-target_sources(Filmvert PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Icon/AppIcon.icns)
+    target_sources(Filmvert PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Icon/AppIcon.icns)
 
-if (APPLE)
     target_link_libraries(Filmvert
                   "-framework MetalKit"
                   "-framework IOKit"
@@ -212,7 +181,9 @@ if (APPLE)
                   "-framework QuartzCore"
                   "-framework Foundation"
                   "-framework Metal"
-      SDL2::SDL2-static
+                  glfw
+                  GLEW::GLEW
+                  SDL2::SDL2-static
                   imgui::imgui
                   spdlog::spdlog_header_only
                   assets::rc
@@ -222,33 +193,33 @@ if (APPLE)
                   OpenColorIO::OpenColorIO
                   exiv2::exiv2)
 elseif (WIN32)
+    add_executable(Filmvert ${FILMVERT_SRCS})
     target_link_libraries(Filmvert wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
-                          SDL2::SDL2-static
-                          imgui::imgui
-                          spdlog::spdlog_header_only
-                          assets::rc
-                          nlohmann_json::nlohmann_json
-                          OpenImageIO::OpenImageIO
-                          cuda)
+        glfw
+        GLEW::GLEW
+        SDL2::SDL2-static
+        imgui::imgui
+        spdlog::spdlog_header_only
+        assets::rc
+        nlohmann_json::nlohmann_json
+        libraw::libraw
+        OpenImageIO::OpenImageIO
+        OpenColorIO::OpenColorIO
+        exiv2::exiv2)
 elseif (UNIX)
-    target_link_libraries(Filmvert -lOpenCL -lcurl -lcrypto -lz)
+    add_executable(Filmvert ${FILMVERT_SRCS})
     target_link_libraries(Filmvert
-                          SDL2::SDL2-static
-                          imgui::imgui
-                          spdlog::spdlog_header_only
-                          assets::rc
-                          nlohmann_json::nlohmann_json
-                          OpenImageIO::OpenImageIO
-                          cuda)
-    include_directories("/usr/include/gtk-3.0"
-         "/usr/include/glib-2.0"
-         "/usr/include/pango-1.0"
-                        "/usr/include/harfbuzz"
-         "/usr/include/cairo"
-         "/usr/include/gdk-pixbuf-2.0"
-         "/usr/include/atk-1.0"
-              "/usr/lib64/glib-2.0/include"
-              "/usr/lib/x86_64-linux-gnu/glib-2.0/include")
+        glfw
+        GLEW::GLEW
+        SDL2::SDL2-static
+        imgui::imgui
+        spdlog::spdlog_header_only
+        assets::rc
+        nlohmann_json::nlohmann_json
+        libraw::libraw
+        OpenImageIO::OpenImageIO
+        OpenColorIO::OpenColorIO
+        exiv2::exiv2)
 endif()
 
 target_compile_definitions(Filmvert PRIVATE
@@ -258,20 +229,6 @@ target_compile_definitions(Filmvert PRIVATE
 )
 
 
-if (APPLE)
-    add_dependencies(Filmvert make-metallib)
-
-
-    #add_custom_command(TARGET Filmvert POST_BUILD
-    #  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    #          "${CMAKE_SOURCE_DIR}/LibRaw/lib/libraw_r.24.dylib"
-    #          "$<TARGET_BUNDLE_DIR:Filmvert>/Contents/Frameworks/libraw_r.24.dylib"
-    #  COMMAND install_name_tool -id "@rpath/libraw_r.24.dylib"
-    #          "$<TARGET_BUNDLE_DIR:Filmvert>/Contents/Frameworks/libraw_r.24.dylib"
-    #  COMMAND install_name_tool -add_rpath "@executable_path/../Frameworks"
-    #          $<TARGET_FILE:Filmvert>
-    #  COMMAND install_name_tool -change "/usr/local/lib/libraw_r.24.dylib"
-    #          "@rpath/libraw_r.24.dylib"
-    #          $<TARGET_FILE:Filmvert>)
-
-endif()
+#if (APPLE)
+#    add_dependencies(Filmvert make-metallib)
+#endif()

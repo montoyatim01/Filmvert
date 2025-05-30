@@ -54,6 +54,7 @@ class FilmvertConan(ConanFile):
 
     def requirements(self):
         self.requires("libpng/1.6.44")
+        self.requires("lcms/2.16")
         self.requires("fmt/10.2.1")
         self.requires("imgui/1.91.4")
         self.requires("sdl/2.30.6")
@@ -61,9 +62,11 @@ class FilmvertConan(ConanFile):
         self.requires("nlohmann_json/3.11.3")
         self.requires("libraw/0.21.2")
         self.requires("openimageio/2.5.16.0")
-        self.requires("opencolorio/2.4.0")
+        self.requires("opencolorio/2.4.2")
         self.requires("minizip-ng/4.0.6")
         self.requires("exiv2/0.28.2")
+        self.requires("glfw/3.4")
+        self.requires("glew/2.2.0")
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -74,5 +77,11 @@ class FilmvertConan(ConanFile):
         self.copy("imgui_impl_sdlrenderer2.cpp", dst="bindings", src="res/bindings")
         self.copy("imgui_impl_sdl2.cpp", dst="bindings", src="res/bindings")
         self.copy("imgui_impl_sdl2.h", dst="bindings", src="res/bindings")
+        self.copy("imgui_impl_glfw.h", dst="bindings", src="res/bindings")
+        self.copy("imgui_impl_glfw.cpp", dst="bindings", src="res/bindings")
+        self.copy("imgui_impl_opengl3.h", dst="bindings", src="res/bindings")
+        self.copy("imgui_impl_opengl3.cpp", dst="bindings", src="res/bindings")
+        self.copy("imgui_impl_opengl3_loader.h", dst="bindings", src="res/bindings")
+        self.copy("imgui_impl_opengl3_loader.cpp", dst="bindings", src="res/bindings")
         self.copy("imgui_demo.cpp", dst="bindings", src="res/src")
         self.copy("imgui_widgets.cpp", dst="bindings", src="res/src")

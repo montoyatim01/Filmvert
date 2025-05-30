@@ -1,5 +1,5 @@
 #include "logger.h"
-#include "metalGPU.h"
+//#include "metalGPU.h"
 #include "window.h"
 
 
@@ -9,7 +9,7 @@
 */
 void mainWindow::imgRender() {
     if (validIm())
-        mtlGPU->addToRender(activeImage(), r_sdt, dispOCIO);
+        gpu->addToRender(activeImage(), r_sdt, dispOCIO);
 }
 
 //--- Image Render ---//
@@ -18,7 +18,7 @@ void mainWindow::imgRender() {
 */
 void mainWindow::imgRender(image *img, renderType rType) {
     if (img)
-        mtlGPU->addToRender(img, rType, dispOCIO);
+        gpu->addToRender(img, rType, dispOCIO);
 }
 
 //--- Roll Render ---//
@@ -68,7 +68,7 @@ void mainWindow::rollRenderCheck() {
             image* im = getImage(r, i);
             if (!im)
                 continue;
-            if (im->sdlUpdate || mtlGPU->isInQueue(im)) {
+            if (im->sdlUpdate || gpu->isInQueue(im)) {
                 imRendering = true;
             }
 
@@ -119,20 +119,28 @@ void mainWindow::stateRender() {
 void mainWindow::analyzeImage() {
 
     if (validIm()) {
-        LOG_INFO("Analyzing");
-        //isRendering = true;
+        if (!activeImage()->imageLoaded) {
+            std::strcpy(ackMsg, "Cannot analyze while image is being loaded!\nWait for image to finish loading.");
+            ackPopTrig = true;
+            return;
+        }
+        LOG_INFO("Analyzing {}", activeImage()->srcFilename);
+        anaPopTrig = true;
+
+    std::thread analyzeThread([this]{
         if (!activeImage()->blurImgData)
             activeImage()->allocBlurBuf();
-        mtlGPU->addToRender(activeImage(), r_blr, dispOCIO);
-        while (!activeImage()->blurReady){}
+        activeImage()->blurImage();
         activeImage()->processMinMax();
+        anaPopTrig = false;
         activeImage()->needMetaWrite = true;
         metaRefresh = true;
-        //activeImage()->procDispImg();
-        //activeImage()->sdlUpdate = true;
         activeImage()->delBlurBuf();
         activeImage()->renderBypass = false;
-
         imgRender();
+    });
+
+    analyzeThread.detach();
+
     }
 }

@@ -2,10 +2,12 @@
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "structs.h"
-#include <SDL_pixels.h>
-#include <SDL_render.h>
-#include <SDL_video.h>
-#include <SDL2/SDL_syswm.h>
+
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+#include <GLES2/gl2.h>
+#endif
+#include <GLFW/glfw3.h> // Will drag system OpenGL headers
+
 #include <chrono>
 #include <cstring>
 #include <imgui.h>
@@ -13,11 +15,15 @@
 #include <stdlib.h>
 #include <cmrc/cmrc.hpp>  //read embedded stuff
 
-
-
 CMRC_DECLARE(assets);
 
 #define IMGUI_ENABLE_FREETYPE
+
+
+static void glfw_error_callback(int error, const char* description)
+{
+    fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+}
 
 
 
@@ -39,6 +45,55 @@ int mainWindow::openWindow()
     // Load colorspace mappings
     loadMappings();
 
+    // Setup GLFW
+    glfwSetErrorCallback(glfw_error_callback);
+        if (!glfwInit())
+            return 1;
+
+    // Decide GL+GLSL versions
+    #if defined(IMGUI_IMPL_OPENGL_ES2)
+        // GL ES 2.0 + GLSL 100 (WebGL 1.0)
+        const char* glsl_version = "#version 100";
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+    #elif defined(IMGUI_IMPL_OPENGL_ES3)
+        // GL ES 3.0 + GLSL 300 es (WebGL 2.0)
+        const char* glsl_version = "#version 300 es";
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+    #elif defined(__APPLE__)
+        // GL 3.2 + GLSL 150
+        const char* glsl_version = "#version 150";
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
+    #else
+        // GL 3.0 + GLSL 130
+        const char* glsl_version = "#version 130";
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+        //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+        //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+    #endif
+
+    // Create window with graphics context
+    GLFWwindow* window = glfwCreateWindow(1600, 1000, "Filmvert", nullptr, nullptr);
+    if (window == nullptr)
+        return 1;
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
+
+    glfwWindowHint(GLFW_RED_BITS, 16);
+    glfwWindowHint(GLFW_GREEN_BITS, 16);
+    glfwWindowHint(GLFW_BLUE_BITS, 16);
+    glfwWindowHint(GLFW_ALPHA_BITS, 16);
+
+    //--------------------------------------------------------------//
+
+    /*
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
     {
@@ -65,6 +120,7 @@ int mainWindow::openWindow()
       LOG_CRITICAL("Error creating SDL renderer");
         return -1;
     }
+    */
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -72,6 +128,10 @@ int mainWindow::openWindow()
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup Platform/Renderer backends
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        ImGui_ImplOpenGL3_Init(glsl_version);
 
     //Font Loading
     auto fs = cmrc::assets::get_filesystem();
@@ -105,7 +165,7 @@ int mainWindow::openWindow()
       return -1;
     }
 
-    auto ocioConfigFile = fs.open("assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio");
+    auto ocioConfigFile = fs.open("assets/studio-config-v3.0.0_aces-v2.0_ocio-v2.4.ocio");
     if (!ocioConfigFile) {
         LOG_ERROR("Error opening OCIO Config!");
         return -1;
@@ -117,7 +177,12 @@ int mainWindow::openWindow()
     }
 
     // Initialie the OCIO metal kernel
-    mtlGPU->initOCIOKernels(dispOCIO);
+    //mtlGPU->initOCIOKernels(dispOCIO);
+
+    // Initialize GL Processor
+    gpu = new openglGPU();
+    // Initialize GL Kernels
+    gpu->initialize(dispOCIO);
 
     // Load in user preferences
     appPrefs.loadFromFile();
@@ -135,8 +200,8 @@ int mainWindow::openWindow()
     imguistyle();
 
     // Setup Platform/Renderer backends
-    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-    ImGui_ImplSDLRenderer2_Init(renderer);
+    //ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
+    //ImGui_ImplSDLRenderer2_Init(renderer);
 
 
 
@@ -152,7 +217,7 @@ int mainWindow::openWindow()
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-        SDL_Event event;
+        /*SDL_Event event;
         while (SDL_PollEvent(&event))
         {
             ImGui_ImplSDL2_ProcessEvent(&event);
@@ -184,14 +249,48 @@ int mainWindow::openWindow()
             }
             saveUI();
             loopCounter = 0;
+        }*/
+        if (glfwWindowShouldClose(window)) {
+            if (unsavedChanges()) {
+                // Don't quit immediately
+                unsavedPopTrigger = true;
+                closeMd = c_app;
+            } else {
+                done = true;
+            }
         }
 
-
-        SDL_GetWindowSize(window, &winWidth, &winHeight);
+        glfwPollEvents();
+        if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
+        {
+            ImGui_ImplGlfw_Sleep(10);
+            continue;
+        }
 
         // Start the Dear ImGui frame
-        ImGui_ImplSDLRenderer2_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+
+        glfwGetWindowSize(window, &winWidth, &winHeight);
+        if (loopCounter % 120 == 0) {
+            // Only check periodically
+            if (unsavedChanges()) {
+                #ifdef __APPLE__
+                setMacOSWindowModified(window, true);
+                #endif
+            } else {
+                #ifdef __APPLE__
+                setMacOSWindowModified(window, false);
+                #endif
+            }
+            saveUI();
+            loopCounter = 0;
+        }
+        //SDL_GetWindowSize(window, &winWidth, &winHeight);
+
+        // Start the Dear ImGui frame
+        //ImGui_ImplSDLRenderer2_NewFrame();
+        //ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
         // Menu bar
@@ -211,6 +310,7 @@ int mainWindow::openWindow()
 
         if (renderCall && !isExporting) {
             imgRender();
+            updateHistogram();
         }
         renderCall = false;
 
@@ -219,6 +319,16 @@ int mainWindow::openWindow()
 
         // Routine for updating thumbnails
         rollRenderCheck();
+
+
+        // Check for GPU errors
+        if (gpu->getStatus()) {
+            // We've encountered some kind of error
+            std::strcpy(ackMsg, "GPU Rendering Error:");
+            std::strcpy(ackError, gpu->getError().c_str());
+            gpu->clearError();
+            ackPopTrig = true;
+        }
 
         // Popup functions
         importImagePopup();
@@ -231,29 +341,51 @@ int mainWindow::openWindow()
         preferencesPopup();
         shortcutsPopup();
         ackPopup();
+        analyzePopup();
+
+        // Check analyze timeout?
 
         loopCounter++;
 
+        if (demoWin)
+            ImGui::ShowDemoWindow();
+
         // Rendering
         ImGui::Render();
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        //glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(window);
+
+        // Render one image from the queue
+        gpu->processQueue();
+
+        /*
         SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
         //SDL_SetRenderDrawColor(renderer, (Uint8)(windowCL.x * 255), (Uint8)(windowCL.y * 255), (Uint8)(windowCL.z * 255), (Uint8)(windowCL.w * 255));
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);
+        */
     }
 
     // Cleanup
-    ImGui_ImplSDLRenderer2_Shutdown();
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    /*ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-    SDL_Quit();
+    SDL_Quit();*/
     return returnValue;
-}
-
-void mainWindow::actionA() {
-    LOG_INFO("Menu Button Press");
 }

@@ -3,6 +3,7 @@
 
 //System
 #include <chrono>
+#include <cstddef>
 #include <iostream>
 #include <ctime>
 #include <mutex>
@@ -18,18 +19,19 @@
 #include <thread>
 
 //ImGui
-#include "imageMeta.h"
+
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_sdlrenderer2.h"
-#include <SDL.h>
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
 //Logging
 #include "logger.h"
 
+#include "gpu.h"
 #include "image.h"
-#include "metalGPU.h"
+#include "imageMeta.h"
+//#include "metalGPU.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "roll.h"
@@ -40,7 +42,10 @@
 // Declared functions from macOSFile.mm
 std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canChooseDirectories = false);
 std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true);
-void setSDLWindowModified(SDL_Window* window, bool modified);
+
+#ifdef __APPLE__
+void setMacOSWindowModified(GLFWwindow* window, bool modified);
+#endif
 
 std::string find_key_by_value(const std::map<std::string, int>& my_map, int value);
 
@@ -61,11 +66,12 @@ class mainWindow
         ~mainWindow(){};
 
         int openWindow();
-        void setGPU(metalGPU* mtl){mtlGPU = mtl;}
+        //void setGPU(metalGPU* mtl){mtlGPU = mtl;}
 
     private:
-        SDL_Renderer* renderer;
-        metalGPU* mtlGPU;
+        //SDL_Renderer* renderer;
+        //metalGPU* mtlGPU;
+        openglGPU* gpu = nullptr;
         bool renderCall = false;
 
         // Window Layout
@@ -81,6 +87,8 @@ class mainWindow
         // Program state
         bool done = false;
         bool firstImage = false;
+        bool rollChange = false;
+        bool histRunning = false;
 
         std::deque<filmRoll> activeRolls;
         int selRoll = 0;
@@ -96,6 +104,7 @@ class mainWindow
         bool cropDisplay = true;
         bool minMaxDisp = false;
         bool sampleVisible = false;
+        bool gradeBypass = false;
 
         // Copy/Paste
         imageParams copyParams;
@@ -110,6 +119,7 @@ class mainWindow
         bool localMetaPopTrig = false;
         bool preferencesPopTrig = false;
         bool ackPopTrig = false;
+        bool anaPopTrig = false;
         closeMode closeMd;
         bool shortPopTrig = false;
         bool badOcioText = false;
@@ -117,6 +127,7 @@ class mainWindow
         char ackError[512];
         char ocioPath[1024];
         int ocioSel = 0;
+        bool demoWin = false;
 
 
 
@@ -208,6 +219,7 @@ class mainWindow
         // windowIO.cpp
         void openImages();
         bool openJSON();
+        bool openImageMeta();
         void openRolls();
         void exportImages();
         void exportRolls();
@@ -218,7 +230,7 @@ class mainWindow
 
         // windowRender.cpp
         void imgRender();
-        void imgRender(image *img, renderType rType = r_sdt);
+        void imgRender(image *img, renderType rType = r_bg);
         void rollRenderCheck();
         void rollRender();
         void stateRender();
@@ -226,9 +238,10 @@ class mainWindow
         void analyzeImage();
 
         // windowSDL.cpp
+        void updateHistogram();
         void createSDLTexture(image* actImage);
         void updateSDLTexture(image* actImage);
-        void updateSDLHistogram(image* img, void* pixels, int pitch, float intensityMultiplier);
+        void updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier);
 
         // windowPopups.cpp
         void importRawSettings();
@@ -242,6 +255,7 @@ class mainWindow
         void localMetaPopup();
         void preferencesPopup();
         void ackPopup();
+        void analyzePopup();
         void shortcutsPopup();
 
         void copyIntoParams();

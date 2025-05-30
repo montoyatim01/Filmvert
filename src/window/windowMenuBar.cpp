@@ -1,4 +1,5 @@
 #include "logger.h"
+//#include "metalGPU.h"
 #include "ocioProcessor.h"
 #include "structs.h"
 #include "window.h"
@@ -41,46 +42,53 @@ void mainWindow::menuBar() {
             ImGui::Separator();
 
             if (ImGui::MenuItem("Export Image(s)")) {
-                //exportOCIO.display = dispOCIO.display;
-                //exportOCIO.view = dispOCIO.view;
+                exportOCIO.display = dispOCIO.display;
+                exportOCIO.view = dispOCIO.view;
                 expRolls = false;
                 exportPopup = true;
             }
             if (ImGui::MenuItem("Export Roll(s)")) {
-               // exportOCIO.display = dispOCIO.display;
-               // exportOCIO.view = dispOCIO.view;
+                exportOCIO.display = dispOCIO.display;
+                exportOCIO.view = dispOCIO.view;
                 expRolls = true;
                 exportPopup = true;
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Close Selected Image(s)")) {
                 if (validRoll()) {
-                    if (activeRoll()->unsavedIndividual()) {
-                        closeMd = c_selIm;
-                        unsavedPopTrigger = true;
+                    if (activeRoll()->imagesLoading) {
+                        std::strcpy(ackMsg, "Cannot close selected image(s) while there are images loading!");
+                        ackPopTrig = true;
                     } else {
-                        activeRoll()->closeSelected();
+                        if (activeRoll()->unsavedIndividual()) {
+                            closeMd = c_selIm;
+                            unsavedPopTrigger = true;
+                        } else {
+                            activeRoll()->closeSelected();
+                        }
                     }
-
                 }
             }
             if (ImGui::MenuItem("Close Roll")) {
-                //closeRoll;
-                //Actions needed to close a roll
-                //Check if unsaved, prompt
-                if (validRoll()) {
-                    if (activeRoll()->unsavedImages()) {
-                        // We have unsaved images, prompt user
-                        closeMd = c_roll;
-                        unsavedPopTrigger = true;
 
+                if (validRoll()) {
+                    // Check if roll is loading first
+                    if (activeRoll()->imagesLoading) {
+                        std::strcpy(ackMsg, "Cannot close roll while images are loading!");
+                        ackPopTrig = true;
                     } else {
-                        removeRoll();
+                        // Check if unsaved, prompt
+                        if (activeRoll()->unsavedImages()) {
+                            // We have unsaved images, prompt user
+                            closeMd = c_roll;
+                            unsavedPopTrigger = true;
+
+                        } else {
+                            removeRoll();
+                        }
                     }
+
                 }
-                //Change current active roll to previous (-1 if 0)
-                //Unload the roll
-                //Delete from the queue
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Preferences")) {
@@ -165,7 +173,7 @@ void mainWindow::menuBar() {
             // Refresh Roll
             if (ImGui::MenuItem("Refresh Roll")) {
                 for (int i = 0; i < activeRollSize(); i++) {
-                    imgRender(getImage(i));
+                    imgRender(getImage(i), r_bg);
                 }
             }
 
@@ -187,6 +195,22 @@ void mainWindow::menuBar() {
             if (ImGui::MenuItem("Import Roll Metadata")) {
                 if (openJSON()) {
                     std::strcpy(ackMsg, "Metadata imported to Roll successfully!");
+                    if (validRoll())
+                        activeRoll()->rollUpState();
+                    ackPopTrig = true;
+                } else {
+                    std::string err = ackError;
+                    if (!err.empty()) {
+                        std::strcpy(ackMsg, "Metadata failed to import:");
+                        ackPopTrig = true;
+                    }
+                }
+            }
+
+            // Import Image Metadata
+            if (ImGui::MenuItem("Import Image Metadata")) {
+                if (openImageMeta()) {
+                    std::strcpy(ackMsg, "Metadata imported to image successfully!");
                     if (validRoll())
                         activeRoll()->rollUpState();
                     ackPopTrig = true;
@@ -260,7 +284,7 @@ void mainWindow::menuBar() {
 
             }
             if (ImGui::MenuItem("About")) {
-
+                demoWin = true;
             }
 
             ImGui::EndMenu();
@@ -274,6 +298,7 @@ void mainWindow::menuBar() {
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetWindowWidth() * 0.05f));
                 ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.25f);
                 if (ImGui::Combo("###", &selRoll, rollPointers.data(), rollPointers.size())) {
+                    rollChange = true;
                     // This is where we call the function necessary for dumping
                     // the loaded images and loading the selected images
                     for (int i = 0; i < activeRolls.size(); i++) {

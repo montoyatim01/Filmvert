@@ -1,28 +1,21 @@
-#! /opt/Nuke15.1v5/libnuke-15.1.5.so -nx
-version 15.1 v5
+#! /Applications/Nuke15.1v3/Nuke15.1v3.app/Contents/MacOS/libnuke-15.1.3.dylib -nx
+version 15.1 v3
 define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
 <layout version="1.0">
-    <window x="70" y="27" w="3770" h="2096" maximized="1" screen="0">
+    <window x="0" y="44" w="1800" h="1033" maximized="1" screen="0">
         <splitter orientation="1">
             <split size="40"/>
             <dock id="" hideTitles="1" activePageId="Toolbar.1">
                 <page id="Toolbar.1"/>
             </dock>
-            <split size="3107" stretch="1"/>
+            <split size="1137" stretch="1"/>
             <splitter orientation="2">
-                <split size="1202"/>
-                <splitter orientation="1">
-                    <split size="1552"/>
-                    <dock id="" activePageId="Viewer.1">
-                        <page id="Viewer.1"/>
-                    </dock>
-                    <split size="1551"/>
-                    <dock id="" activePageId="Viewer.2">
-                        <page id="Viewer.2"/>
-                    </dock>
-                </splitter>
-                <split size="848"/>
-                <dock id="" activePageId="DAG.1">
+                <split size="594"/>
+                <dock id="" activePageId="Viewer.1">
+                    <page id="Viewer.1"/>
+                </dock>
+                <split size="419"/>
+                <dock id="" activePageId="DAG.1" focus="true">
                     <page id="DAG.1"/>
                     <page id="Curve Editor.1"/>
                     <page id="DopeSheet.1"/>
@@ -39,13 +32,14 @@ define_window_layout_xml {<?xml version="1.0" encoding="UTF-8"?>
 }
 Root {
  inputs 0
- name /home/timothymontoya/Pictures/FilmInversionWorkflow.nk
+ name /Users/timothymontoya/Documents/Filmvert/Research/FilmInversionWorkflow.nk
  fps 23.976
  format "3840 2160 0 0 3840 2160 1 UHD_4K"
  proxy_type scale
  proxy_format "1024 778 0 0 1024 778 1 1K_Super_35(full-ap)"
  colorManagement OCIO
  OCIO_config fn-nuke_studio-config-v1.0.0_aces-v1.3_ocio-v2.1
+ customOCIOConfigPath /opt/OCIO/aces_1.2/config.ocio
  defaultViewerLUT "OCIO LUTs"
  workingSpaceLUT scene_linear
  monitorLut "ACES 1.0 - SDR Video (sRGB - Display)"
@@ -55,382 +49,14 @@ Root {
  logLut compositing_log
  floatLut scene_linear
 }
-Read {
- inputs 0
- file_type dng
- file /home/timothymontoya/Pictures/20250427/GQ6A2648.dng
- format "6000 4000 0 0 6000 4000 1 "
- origset true
- colorspace "Linear Rec.709 (sRGB)"
- dng_force_linear true
- dng_white_balance Custom
- dng_temperature 5000
- dng_tint -7.640879154
- name Read2
- xpos -738
- ypos -369
-}
-DiskCache {
- name DiskCache2
- xpos -738
- ypos -273
-}
-Read {
- inputs 0
- file_type dng
- file /home/timothymontoya/Pictures/20250427/GQ6A2189.dng
- format "6000 4000 0 0 6000 4000 1 "
- origset true
- colorspace "Linear Rec.709 (sRGB)"
- dng_force_linear true
- dng_white_balance Custom
- dng_temperature 5000
- dng_tint -7
- name Read1
- xpos -848
- ypos -404
-}
-DiskCache {
- name DiskCache1
- xpos -848
- ypos -308
-}
-Constant {
- inputs 0
- channels rgb
- color {0.7357837558 0.4481810033 0.1982794255 0}
- format "6000 4000 0 0 6000 4000 1 "
- name Constant1
- xpos -472
- ypos -183
-}
-Read {
- inputs 0
- file_type dng
- file /home/timothymontoya/Pictures/20250427/GQ6A2671.dng
- format "6000 4000 0 0 6000 4000 1 "
- origset true
- colorspace "Linear Rec.709 (sRGB)"
- dng_force_linear true
- dng_white_balance Custom
- dng_temperature 5000
- dng_tint -7.223054409
- name Read3
- xpos -268
- ypos -220
-}
-DiskCache {
- name DiskCache3
- xpos -268
- ypos -124
-}
-Merge2 {
- inputs 2
- operation divide
- name Merge1
- xpos -336
- ypos -23
-}
-set N3fc94410 [stack 0]
-Blur {
- size 20
- name Blur1
- xpos -710
- ypos -29
-}
-CurveTool {
- operation "Max Luma Pixel"
- ROI {558 182 5564 3440}
- autocropdata {960 540 2880 1620}
- intensitydata {{curve}}
- maxlumapixdata {{curve x1 1993} {curve x1 2765}}
- maxlumapixvalue {{curve x1 3.001909018} {curve x1 3.994718075} {curve x1 4.988490582}}
- minlumapixdata {{curve x1 3047} {curve x1 1403}}
- minlumapixvalue {{curve x1 0.9674805403} {curve x1 0.96245718} {curve x1 0.9706239104}}
- name CurveTool1
- xpos -710
- ypos 17
-}
-push $N3fc94410
-Grade {
- blackpoint {0 0 0 0}
- whitepoint {0.52364 0.6721 1 1}
- name whitepointcolor
- xpos -336
- ypos 38
-}
-Grade {
- whitepoint 8.73
- name whitepointluma
- xpos -336
- ypos 64
-}
-Grade {
- blackpoint {0.1156 0.0598 0 0}
- name blackpointcolor
- xpos -336
- ypos 105
-}
-Grade {
- blackpoint 0.11
- name blackpointluma
- xpos -336
- ypos 131
-}
-Grade {
- gamma 1.3
- name Grade5
- xpos -336
- ypos 178
-}
-push $N3fc94410
-Grade {
- blackpoint {{parent.CurveTool1.minlumapixvalue.r} {parent.CurveTool1.minlumapixvalue.g} {parent.CurveTool1.minlumapixvalue.b} 0}
- whitepoint {{parent.CurveTool1.maxlumapixvalue.r} {parent.CurveTool1.maxlumapixvalue.g} {parent.CurveTool1.maxlumapixvalue.b} 1}
- name Grade3
- xpos -591
- ypos 81
-}
-Viewer {
- frame 1
- frame_range 1-100
- fps 23.97602463
- full_frame_processing true
- colour_sample_bbox {0.8323333263 0.03066666611 0.8433333039 0.08166666329}
- viewerProcess "ACES 1.0 - SDR Video (sRGB - Display)"
- monitorOutNDISenderName "NukeX - untitled - Viewer1"
- name Viewer1
- xpos -591
- ypos 271
-}
-Read {
- inputs 0
- file_type dng
- file /home/timothymontoya/Pictures/20250427/GQ6A2672.dng
- format "6000 4000 0 0 6000 4000 1 "
- origset true
- colorspace "Linear Rec.709 (sRGB)"
- dng_force_linear true
- dng_white_balance Custom
- dng_temperature 5000
- dng_tint -7.866053104
- name Read4
- xpos 180
- ypos -261
-}
-DiskCache {
- name DiskCache4
- xpos 180
- ypos -165
-}
-Constant {
- inputs 0
- channels rgb
- color {0.6439802647 0.3923983276 0.1591000706 0}
- format "6000 4000 0 0 6000 4000 1 "
- name Constant2
- xpos 233
- ypos -52
-}
-Read {
- inputs 0
- file_type dng
- file /home/timothymontoya/Pictures/20250427/GQ6A2563.dng
- format "6000 4000 0 0 6000 4000 1 "
- origset true
- colorspace "Linear Rec.709 (sRGB)"
- dng_force_linear true
- dng_white_balance Custom
- dng_temperature 5000
- dng_tint -7
- name Read5
- xpos 371
- ypos -215
-}
-DiskCache {
- name DiskCache5
- xpos 371
- ypos -119
-}
-Merge2 {
- inputs 2
- operation divide
- name Merge2
- xpos 371
- ypos -29
-}
-set N3fbbf780 [stack 0]
-Blur {
- size 20
- name Blur2
- xpos 561
- ypos -35
-}
-CurveTool {
- operation "Max Luma Pixel"
- ROI {504 162 5564 3428}
- autocropdata {960 540 2880 1620}
- intensitydata {{curve}}
- maxlumapixdata {{curve x1 2439} {curve x1 217}}
- maxlumapixvalue {{curve x1 23.36518669} {curve x1 26.70624924} {curve x1 11.77316856}}
- minlumapixdata {{curve x1 5509} {curve x1 1835}}
- minlumapixvalue {{curve x1 0.9895803928} {curve x1 0.9717143178} {curve x1 1.017325044}}
- name CurveTool2
- xpos 561
- ypos 11
-}
-push $N3fbbf780
-Grade {
- blackpoint {{parent.CurveTool2.minlumapixvalue.r} {parent.CurveTool2.minlumapixvalue.g} {parent.CurveTool2.minlumapixvalue.b} 0}
- whitepoint {{parent.CurveTool2.maxlumapixvalue.r} {parent.CurveTool2.maxlumapixvalue.g} {parent.CurveTool2.maxlumapixvalue.b} 1}
- name Grade1
- xpos 371
- ypos 95
-}
-Grade {
- white 4
- multiply {1.129999995 1 0.8700000048 1}
- gamma 1.18
- name Grade2
- xpos 371
- ypos 149
-}
-Constant {
- inputs 0
- channels rgb
- color {0.4682356715 0.2369051874 0.03719222918 0}
- format "6000 4000 0 0 6000 4000 1 "
- name Constant3
- xpos 982
- ypos -105
-}
-Read {
- inputs 0
- file_type dng
- file /home/timothymontoya/Pictures/20250427/GQ6A2533.dng
- format "6000 4000 0 0 6000 4000 1 "
- origset true
- colorspace "Linear Rec.709 (sRGB)"
- dng_force_linear true
- dng_white_balance Custom
- dng_temperature 4972.407715
- dng_tint -7
- name Read6
- xpos 1120
- ypos -233
-}
-DiskCache {
- name DiskCache6
- xpos 1120
- ypos -137
-}
-Merge2 {
- inputs 2
- operation divide
- name Merge3
- xpos 1120
- ypos -82
-}
-set Nf46a1040 [stack 0]
-Blur {
- size 5
- name Blur3
- xpos 1310
- ypos -88
-}
-CurveTool {
- operation "Max Luma Pixel"
- ROI {542 140 5552 3446}
- autocropdata {960 540 2880 1620}
- intensitydata {{curve}}
- maxlumapixdata {{curve x1 3064} {curve x1 199}}
- maxlumapixvalue {{curve x1 4.563312531} {curve x1 4.716240406} {curve x1 4.681614399}}
- minlumapixdata {{curve x1 4078} {curve x1 2239}}
- minlumapixvalue {{curve x1 0.8783295155} {curve x1 0.8241445422} {curve x1 0.8067550063}}
- name CurveTool3
- xpos 1310
- ypos -42
-}
-push $Nf46a1040
-Grade {
- blackpoint {{parent.CurveTool3.minlumapixvalue.r} {parent.CurveTool3.minlumapixvalue.g} {parent.CurveTool3.minlumapixvalue.b} 0}
- whitepoint {{parent.CurveTool3.maxlumapixvalue.r} {parent.CurveTool3.maxlumapixvalue.g} {parent.CurveTool3.maxlumapixvalue.b} 1}
- name Grade4
- xpos 1120
- ypos 42
-}
-Constant {
- inputs 0
- channels rgb
- color {0.5524798632 0.289981842 0.05006764829 0}
- format "6000 4000 0 0 6000 4000 1 "
- name Constant4
- xpos 1628
- ypos -89
-}
-Read {
- inputs 0
- file_type dng
- file /home/timothymontoya/Pictures/20250427/GQ6A2518.dng
- format "6000 4000 0 0 6000 4000 1 "
- origset true
- colorspace "Linear Rec.709 (sRGB)"
- dng_force_linear true
- dng_white_balance Custom
- dng_temperature 5000
- dng_tint -8.572574615
- name Read7
- xpos 1766
- ypos -226
-}
-DiskCache {
- name DiskCache7
- xpos 1766
- ypos -130
-}
-Merge2 {
- inputs 2
- operation divide
- name Merge4
- xpos 1766
- ypos -66
-}
-set N10ab9300 [stack 0]
-Blur {
- size 10
- name Blur4
- xpos 1956
- ypos -72
-}
-CurveTool {
- operation "Max Luma Pixel"
- ROI {559 180 5554 3424.5}
- autocropdata {960 540 2880 1620}
- intensitydata {{curve}}
- maxlumapixdata {{curve x1 3373} {curve x1 280}}
- maxlumapixvalue {{curve x1 3.623454809} {curve x1 3.981364489} {curve x1 4.356006145}}
- minlumapixdata {{curve x1 5486} {curve x1 2628}}
- minlumapixvalue {{curve x1 0.9397360086} {curve x1 0.8967836499} {curve x1 0.8625735044}}
- name CurveTool4
- xpos 1956
- ypos -26
-}
-push $N10ab9300
-Grade {
- blackpoint {{parent.CurveTool4.minlumapixvalue.r} {parent.CurveTool4.minlumapixvalue.g} {parent.CurveTool4.minlumapixvalue.b} 0}
- whitepoint {{parent.CurveTool4.maxlumapixvalue.r} {parent.CurveTool4.maxlumapixvalue.g} {parent.CurveTool4.maxlumapixvalue.b} 1}
- name Grade6
- xpos 1766
- ypos 58
-}
 Constant {
  inputs 0
  channels rgb
  color {0.7493475676 0.4841757417 0.2307148278 0}
  format "6000 4000 0 0 6000 4000 1 "
  name Constant5
- xpos 2213
- ypos -118
+ xpos 268
+ ypos -33
 }
 Read {
  inputs 0
@@ -443,27 +69,54 @@ Read {
  dng_temperature 4703.965332
  dng_tint -8.189544678
  name Read8
- xpos 2351
- ypos -252
+ xpos 406
+ ypos -167
 }
 DiskCache {
  name DiskCache8
- xpos 2351
- ypos -156
+ xpos 406
+ ypos -71
 }
 Merge2 {
  inputs 2
  operation divide
  name Merge5
- xpos 2351
- ypos -95
+ xpos 406
+ ypos -9
 }
-set N5970a1b0 [stack 0]
+set Ncd9ee600 [stack 0]
+Grade {
+ blackpoint {{parent.CurveTool5.minlumapixvalue.r} {parent.CurveTool5.minlumapixvalue.g} {parent.CurveTool5.minlumapixvalue.b} 0}
+ whitepoint {{parent.CurveTool5.maxlumapixvalue.r} {parent.CurveTool5.maxlumapixvalue.g} {parent.CurveTool5.maxlumapixvalue.b} 1}
+ name Grade7
+ xpos 406
+ ypos 114
+}
+Grade {
+ blackpoint 0.02
+ white 2.24
+ multiply {1.013459206 0.8721971512 0.8734592199 1}
+ gamma 1.42
+ name Grade8
+ xpos 406
+ ypos 140
+}
+Viewer {
+ frame_range 1-100
+ fps 23.97602463
+ colour_sample_bbox {0.8193333149 0.05466666818 0.8410000205 0.1220000014}
+ viewerProcess "ACES 1.0 - SDR Video (sRGB - Display)"
+ monitorOutNDISenderName "NukeX - FilmInversionWorkflow - Viewer2"
+ name Viewer2
+ xpos 406
+ ypos 228
+}
+push $Ncd9ee600
 Blur {
  size 10
  name Blur5
- xpos 2541
- ypos -101
+ xpos 596
+ ypos -13
 }
 CurveTool {
  operation "Max Luma Pixel"
@@ -475,34 +128,6 @@ CurveTool {
  minlumapixdata {{curve x1 5472} {curve x1 1694}}
  minlumapixvalue {{curve x1 0.9770146608} {curve x1 0.9436330795} {curve x1 0.9348070025}}
  name CurveTool5
- xpos 2541
- ypos -55
-}
-push $N5970a1b0
-Grade {
- blackpoint {{parent.CurveTool5.minlumapixvalue.r} {parent.CurveTool5.minlumapixvalue.g} {parent.CurveTool5.minlumapixvalue.b} 0}
- whitepoint {{parent.CurveTool5.maxlumapixvalue.r} {parent.CurveTool5.maxlumapixvalue.g} {parent.CurveTool5.maxlumapixvalue.b} 1}
- name Grade7
- xpos 2351
- ypos 29
-}
-Grade {
- blackpoint 0.02
- white 2.24
- multiply {1.013459206 0.8721971512 0.8734592199 1}
- gamma 1.42
- name Grade8
- selected true
- xpos 2351
- ypos 55
-}
-Viewer {
- frame_range 1-100
- fps 23.97602463
- colour_sample_bbox {0.8193333149 0.05466666818 0.8410000205 0.1220000014}
- viewerProcess "ACES 1.0 - SDR Video (sRGB - Display)"
- monitorOutNDISenderName "NukeX - untitled - Viewer2"
- name Viewer2
- xpos -336
- ypos 266
+ xpos 596
+ ypos 34
 }

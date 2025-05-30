@@ -62,14 +62,35 @@ void userPreferences::saveToFile() {
     Get the location of the preferences file
 */
 std::string userPreferences::getPrefFile() {
-    #ifdef __APPLE__
+
+    #if defined(WIN32)
+    std::string appData;
+    char szPath[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_COMMON_APPDATA, NULL, 0, szPath)))
+    {
+        appData = szPath;
+    }
+    else
+    {
+        LOG_CRITICAL("Cannot query the AppData folder!");
+    }
+    appData += "\\Filmvert\\";
+    std::string prefPath = appData;
+    prefPath += std::string("/fv_pref.json");
+    return prefPath;
+
+
+    #elif defined __APPLE__
     char* homeDir = getenv("HOME");
     std::string homeStr = homeDir;
     homeStr += "/Library/Preferences/";
-    homeStr += "filmvert.json";
-
+    homeStr += "fv_pref.json";
     return homeStr;
+
+
     #else
-    return "";
+
+    return "/usr/local/Filmvert/fv_pref.json";
+
     #endif
 }

@@ -7,7 +7,6 @@
     their default values
 */
 void imageParams::rstANA() {
-    rstBC();
     rstBP();
     rstWP();
     minX = 0.0f;

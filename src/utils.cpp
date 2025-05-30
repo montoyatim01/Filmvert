@@ -75,3 +75,28 @@ uint32_t swapBytes32(uint32_t value) {
            ((value & 0x0000FF00) << 8)  |
            ((value & 0x000000FF) << 24);
 }
+
+
+void computeKernels(float strength, float* kernels)
+{
+  float h_PI = 3.14159265359;
+  int kernelSize = (int)(strength * KERNELSIZE) + 1;
+  kernelSize = kernelSize % 2 == 0 ? kernelSize + 1 : kernelSize;
+  int posI = 0;
+  float kernelSum = 0.0f;
+  // Loop through the kernel and apply the Gaussian blur
+  for (int i = -kernelSize / 2; i <= kernelSize / 2; i++)
+  {
+          float weight = exp(-0.5f * pow(i / strength, 2)) / (strength * sqrt(2 * h_PI));
+          kernels[posI] = weight;
+          kernelSum += weight;
+          posI++;
+  }
+
+  // Normalize the kernel
+  for (int i = 0; i < posI; i++)
+  {
+      kernels[i] /= kernelSum;
+  }
+
+}

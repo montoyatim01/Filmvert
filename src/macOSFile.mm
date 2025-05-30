@@ -1,7 +1,8 @@
 #include <vector>
 #include <string>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_syswm.h>
+#include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_COCOA
+#include <GLFW/glfw3native.h>
 
 #import <Cocoa/Cocoa.h>
 
@@ -53,14 +54,9 @@ std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true) {
     return result;
 }
 
-void setSDLWindowModified(SDL_Window* window, bool modified) {
-    SDL_SysWMinfo wmInfo;
-    SDL_VERSION(&wmInfo.version);
-
-    if (SDL_GetWindowWMInfo(window, &wmInfo)) {
-        // macOS implementation
-        NSWindow* nswindow = wmInfo.info.cocoa.window;
-        [nswindow setDocumentEdited:modified];
-
+void setMacOSWindowModified(GLFWwindow* window, bool modified) {
+    NSWindow* nswindow = glfwGetCocoaWindow(window);
+    if (nswindow) {
+        [nswindow setDocumentEdited:modified ? YES : NO];
     }
 }

@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #include "logger.h"
-#include "metalGPU.h"
+//#include "metalGPU.h"
 #include "window.h"
 
 int main(void)
@@ -12,11 +12,11 @@ int main(void)
     LOG_INFO("Build {:.8}-{}", GIT_COMMIT_HASH, BUILD_DATE);
 
     // Initialize Metal/CUDA Subsystem
-    metalGPU metalSubsystem;
+    //metalGPU metalSubsystem;
 
     // Start Window
     mainWindow window;
-    window.setGPU(&metalSubsystem);
+    //window.setGPU(&metalSubsystem);
     return window.openWindow();
 
 }
@@ -24,67 +24,36 @@ int main(void)
 
 // TODO/Wishlist:
 //
-// - Preferences/Settings
-// -- Undo levels? Default 100?
 //
 // - Hotkeys
-// -* Copy/Paste meta **
-// -* Copy/Paste params **
-// -* Save state
-// -* Save roll - Add Roll JSON
-// -* Save all - Add Roll JSON
-// -* Rot left
-// -* Rot right
-// -* Local Meta edit? (cmd + e?)
-// -* Global Meta edit? (cmd + g)
-// -- Printer lights? Other adjustments
-// -* Make a popup with key shortcuts displayed
+// -- Printer lights? BP/WP?
 //
 // - Bugs
 // -- Add in import from image? (import the metadata or inversion settings)
-// --Analysis doesn't work very well (turned up blur)
-// --- Cap limits on white point?
-// --Histogram to follow crop points?
-// --Which images are unsaved? Have a colored dot?
-
-// -- Undo/Redo
-// -- How does an undo operation on many images affect thumbnails?
-// -- Render current image and then call a state-specific
-// ---render function?
-// -- Use the differences between states to determine if render needed.
-// -- Deal with copy + paste and updating structs (paramchange)
-// -- Fix off by one errors for both ends of the state
-// -- Add an initial state
 //
-// -- Bug when closing multiple rolls (maybe roll is loading?)
+// -* Bug when closing multiple rolls (maybe roll is loading?)
 // -- Get arrow keys to always switch images?
-// -- Hotkeys for BP/WP RGB
-// -- Sort by name/ripple frame number?
+// -- Hotkeys for BP/WP RGB?
 //
-// -- Priority in the render queue
-// -- User-initiated operations go in the front
-// -- Finish the auto-sort options (nix it?)
+// -- Make the min/max points adjustable??
+// -- Grade disabled notification? (Text on image view)
+// -- Undo/redo triggers zoom
+// --- Change zoom key?
+// -* BP/WP grade to happen in linear and not jplog
+// -- Replace the lancir image resizer (only does 8-bit) ugh
+// -- Import image metadata
+// -- Select images to sync metadata (import roll)
+// -* Select debayer method (preferences)
+// -* Disallow certain operations if the image is still loading (or queue it up?)
 
 /*
-Updates
-
-- Grade happens in JPLog2 now
-- White balance/tint are more intense
-- Render queue supports rough priority (front or back)
-- Analysis blur default is 10.0 now (produces somewhat better results)
-- Organized filmRoll code
-- Ability to sort roll based on frame number/filename
-- Modified the color controls for finer tune (with shift) control
-- Added the ability to ripple frame changes
-- Image changes now appear as a purple dot next to the filename
-- Histogram now only calculates based on the crop box
-- Added the ability to undo/redo changes
--- Roll-based storage allowing multi-image operations to be undone/redone
-- Added app icon
-
-- Fixed base color coordinate calculation
-- Fixed save roll/save all hotkeys
-- Fixed metadata editing not flagging image state change
-
-
+- Changed GPU and ImGui backend to OpenGL
+- Intial work for cross-platform builds
+- Enabled the moving of the analyzed min/max points to set new whitepoint/blackpoint
+- Added the ability to import single-image parameters from exported images
+- Added error messaging for GPU anomolies
+- Addressed an issue where closing a roll would cause a crash
+- Addressed an issue where analyzing an image being loaded would cause a crash
+- Fixed bug where single image export was blank
+- Fixed bug where roll-based scanner meta wouldn't show on single image edit
 */

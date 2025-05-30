@@ -22,6 +22,9 @@ struct preferenceSet {
     bool perfMode = true;
     int maxRes = 3000;
 
+    // Debayer Mode
+    int debayerMode = 10;
+
     // OCIO
     std::string ocioPath;
     bool ocioExt = false;
@@ -33,7 +36,7 @@ struct preferenceSet {
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(preferenceSet, undoLevels,
         autoSave, autoSFreq, histInt, histEnable, perfMode,
-        maxRes, ocioPath, ocioExt, autoSort);
+        maxRes, debayerMode, ocioPath, ocioExt, autoSort);
 };
 
 class userPreferences {

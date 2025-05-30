@@ -70,13 +70,17 @@ struct image {
     bool selected = false;
     bool inRndQueue = false;
     bool needRndr = false;
+    bool imgRst = false;
+    bool minSel = false;
 
     // Display/Render flags
     bool renderBypass;
     bool gradeBypass;
 
 
-    // SDL Display
+    // GL Display
+    uint64_t glTexture;
+
     void* texture = nullptr;
     void* histTex = nullptr;
     int sdlRotation;
@@ -113,11 +117,12 @@ struct image {
 
     // imageMeta.cpp
     void readMetaFromFile();
-    bool loadMetaFromStr(const std::string& j);
+    bool loadMetaFromStr(const std::string& j, bool loadMeta);
     std::optional<nlohmann::json> getJSONMeta();
     void updateMetaStr();
     void writeXMPFile();
     bool writeExpMeta(std::string filename);
+    bool importImageMeta(std::string filename);
 
     // image.cpp
     void rotLeft();
@@ -127,7 +132,9 @@ struct image {
 
     // imageProcessing.cpp
     void processBaseColor();
+    void blurImage();
     void processMinMax();
+    void setMinMax();
     void resizeProxy();
 
 };

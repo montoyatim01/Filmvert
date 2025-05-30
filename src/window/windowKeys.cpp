@@ -88,7 +88,7 @@ void mainWindow::checkHotkeys() {
         if (validIm()) {
             activeImage()->rotLeft();
             if (activeImage()->texture) {
-                SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
+                //SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
                 activeImage()->texture = nullptr;
             }
             renderCall = true;
@@ -103,7 +103,7 @@ void mainWindow::checkHotkeys() {
         if (validIm()) {
             activeImage()->rotRight();
             if (activeImage()->texture) {
-                SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
+                //SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
                 activeImage()->texture = nullptr;
             }
             renderCall = true;

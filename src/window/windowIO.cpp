@@ -1,4 +1,4 @@
-#include "metalGPU.h"
+//#include "metalGPU.h"
 #include "ocioProcessor.h"
 #include "window.h"
 #include <chrono>
@@ -39,6 +39,24 @@ bool mainWindow::openJSON() {
             }
         } else {
             std::strcpy(ackError, "Invalid roll selected!");
+        }
+    }
+    return false;
+}
+
+bool mainWindow::openImageMeta() {
+    auto selection = ShowFileOpenDialog(false);
+
+    if (selection.size() > 0) {
+        if (validIm()) {
+            if (activeImage()->importImageMeta(selection[0])) {
+                imgRender();
+                return true;
+            } else {
+                std::strcpy(ackError, "Failed to parse image metadata!");
+            }
+        } else {
+            std::strcpy(ackError, "Invalid image selected!");
         }
     }
     return false;
@@ -88,7 +106,21 @@ void mainWindow::exportImages() {
                 if (getImage(i) && getImage(i)->selected) {
 
                     getImage(i)->exportPreProcess(expSetting.outPath);
-                    mtlGPU->addToRender(getImage(i), r_full, exportOCIO);
+                    gpu->addToRender(getImage(i), r_full, exportOCIO);
+                    auto start = std::chrono::steady_clock::now();
+                    while (!getImage(i)->renderReady) {
+                        auto end = std::chrono::steady_clock::now();
+                        auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+                        if (dur.count() > 15000) {
+                            // Bailing out after waiting 15 seconds for Metal to finish rendering..
+                            // At avg of 20-30fps it should never take this long
+                            LOG_ERROR("Stuck waiting for Metal GPU render. Cannot export file: {}!", getImage(i)->srcFilename);
+                            return;
+                        }
+                        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                    }
+                    getImage(i)->renderReady = false;
                     //LOG_INFO("Exporting Image {}: {}", i, getImage(i)->srcFilename);
                     getImage(i)->writeImg(expSetting, exportOCIO);
                     getImage(i)->exportPostProcess();
@@ -147,7 +179,7 @@ LOG_INFO("Exporting {} Files", exportImgCount);
                                 std::filesystem::create_directories(getImage(r, i)->expFullPath);
                             }
 
-                            mtlGPU->addToRender(getImage(r, i), r_full, exportOCIO);
+                            gpu->addToRender(getImage(r, i), r_full, exportOCIO);
                             //LOG_INFO("Exporting Roll: {}, Image {}: {}", r, i, getImage(r, i)->srcFilename);
                             getImage(r, i)->writeImg(expSetting, exportOCIO);
                             getImage(r, i)->exportPostProcess();
@@ -167,6 +199,7 @@ LOG_INFO("Exporting {} Files", exportImgCount);
 
         exportPopup = false;
         isExporting = false;
+        stateRender();
     }};
     exportThread.detach();
 

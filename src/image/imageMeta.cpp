@@ -79,7 +79,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta)) {
+                if (loadMetaFromStr(customMeta, true)) {
                     return;
                 }
             }
@@ -95,7 +95,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta)) {
+                if (loadMetaFromStr(customMeta, true)) {
                     return;
                 }
             }
@@ -114,7 +114,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta)) {
+                if (loadMetaFromStr(customMeta, true)) {
                     return;
                 }
             }
@@ -344,7 +344,7 @@ void image::writeXMPFile() {
     metadata values (incomplete match possible)
 */
 
-bool image::loadMetaFromStr(const std::string& j) {
+bool image::loadMetaFromStr(const std::string& j, bool loadMeta) {
     try {
             // Parse JSON into class members
             nlohmann::json jsonObject = nlohmann::json::parse(j);
@@ -534,10 +534,12 @@ bool image::loadMetaFromStr(const std::string& j) {
                 goodImgParm = false;
             }
 
-            if (jsonObject.contains("metadata")) {
-                imMeta = jsonObject["metadata"].get<imageMetadata>();
-            } else {
-                LOG_WARN("No metadata found!");
+            if (loadMeta) {
+                if (jsonObject.contains("metadata")) {
+                    imMeta = jsonObject["metadata"].get<imageMetadata>();
+                } else {
+                    LOG_WARN("No metadata found!");
+                }
             }
 
             if (goodImgParm) {
@@ -550,4 +552,39 @@ bool image::loadMetaFromStr(const std::string& j) {
             LOG_WARN("Exception parsing metadata: {}", e.what());
             return false;
         }
+}
+
+//--- Import Image Metadata ---//
+/*
+    Import the params (if available) from the
+    selected image
+*/
+bool image::importImageMeta(std::string filename) {
+    try {
+        Exiv2::enableBMFF();
+        auto image = Exiv2::ImageFactory::open(filename);
+        if (!image) {
+            throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Could not open the image for metadata reading");
+        }
+
+        image->readMetadata();
+
+        // Read EXIF Data into Image
+        Exiv2::ExifData exifData = image->exifData();
+
+        if (!exifData.empty()) {
+            if (auto fvMetaOpt = getExifValue<std::string>(exifData, "Exif.Image.ImageDescription"); fvMetaOpt.has_value()) {
+                std::string customMeta = saniJsonString(fvMetaOpt.value());
+                if (!customMeta.empty()) {
+                    // Run the meta loding function
+                    return loadMetaFromStr(customMeta, false);
+                }
+            }
+        }
+
+    } catch (const Exiv2::Error& e) {
+        LOG_ERROR("Exiv2 image exception: {}", e.what());
+        return false;
+    }
+    return true;
 }

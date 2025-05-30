@@ -34,6 +34,9 @@ do
     rm -rf $BUILD_DIR/$arch
   fi
 
+  ## For OpenColorIO V2.4.2
+  conan export conan-recipes/opencolorio
+
   mkdir -p $BUILD_DIR/$arch
   CONAN_CMAKE_SYSTEM_PROCESSOR=$arch conan install -if $BUILD_DIR/$arch \
     -pr:b default \

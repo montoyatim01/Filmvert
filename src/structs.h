@@ -113,9 +113,10 @@ struct ocioSetting {
     bool ext = false;
 
     int texCount = 0;
-    const float* texture;
-    unsigned int texWidth = 0;
-    unsigned int texHeight = 0;
+    const float* texture[3];
+
+    unsigned int texWidth[3];
+    unsigned int texHeight[3];
 
     bool operator==(const ocioSetting& other) const {
         return colorspace == other.colorspace &&
@@ -125,9 +126,9 @@ struct ocioSetting {
                 useDisplay == other.useDisplay &&
                 ext == other.ext &&
                 texCount == other.texCount &&
-                texture == other.texture &&
-                texWidth == other.texWidth &&
-                texHeight == other.texHeight;
+                texture[0] == other.texture[0] &&
+                texWidth[0] == other.texWidth[0] &&
+                texHeight[0] == other.texHeight[0];
     }
 
 

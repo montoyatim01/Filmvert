@@ -13,16 +13,21 @@ void mainWindow::thumbView() {
                 ImGuiMultiSelectFlags flags = ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_BoxSelect1d;
                 ImGuiMultiSelectIO* ms_io = ImGui::BeginMultiSelect(flags, selection.Size, activeRollSize());
                 selection.ApplyRequests(ms_io);
-
+                if (rollChange) {
+                    selection.Clear();
+                    if (validRoll())
+                        selection.SetItemSelected(activeRoll()->selIm, true);
+                    rollChange = false;
+                }
 
                 if (validRoll()) {
                     for (int i = 0; i < activeRollSize(); i++) {
-                        if (!getImage(i)->texture) {
+                        /*if (!getImage(i)->texture) {
                             updateSDLTexture(getImage(i));
                         }
                         if (getImage(i)->sdlUpdate) {
                             updateSDLTexture(getImage(i));
-                        }
+                            }*/
                         ImVec2 thumbWinSize = ImGui::GetWindowSize();
                         ImGui::SetWindowFontScale(std::clamp(thumbWinSize.y / 280.0f, 0.6f, 1.2f));
 
@@ -57,7 +62,59 @@ void mainWindow::thumbView() {
                             }
                             ImGui::SetItemAllowOverlap();
                             ImGui::SetCursorPos(ImVec2(pos.x, pos.y));
-                            ImGui::Image(reinterpret_cast<ImTextureID>(getImage(i)->texture), displaySize);
+                            ImVec2 IMscreenPos = ImGui::GetCursorScreenPos(); // Get screen pos AFTER setting cursor pos
+
+                            //ImGui::Image(reinterpret_cast<ImTextureID>(getImage(i)->glTexture), displaySize);
+                            {
+                                ImDrawList* draw_list = ImGui::GetWindowDrawList();
+                                ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+
+                                // Define UV coordinates for each corner based on rotation
+                                ImVec2 uv0, uv1, uv2, uv3; // top-left, top-right, bottom-right, bottom-left
+                                switch (getImage(i)->imRot) {
+                                    case 1: // Normal (0°)
+                                        uv0 = ImVec2(0,0); uv1 = ImVec2(1,0);
+                                        uv2 = ImVec2(1,1); uv3 = ImVec2(0,1);
+                                        break;
+                                    case 6: // 90° clockwise
+                                        uv0 = ImVec2(0,1); uv1 = ImVec2(0,0);
+                                        uv2 = ImVec2(1,0); uv3 = ImVec2(1,1);
+                                        break;
+                                    case 3: // 180°
+                                        uv0 = ImVec2(1,1); uv1 = ImVec2(0,1);
+                                        uv2 = ImVec2(0,0); uv3 = ImVec2(1,0);
+                                        break;
+                                    case 8: // 90° counter-clockwise
+                                        uv0 = ImVec2(1,0); uv1 = ImVec2(1,1);
+                                        uv2 = ImVec2(0,1); uv3 = ImVec2(0,0);
+                                        break;
+                                }
+
+                                // Draw the rotated quad
+                                draw_list->AddImageQuad(
+                                    reinterpret_cast<ImTextureID>(getImage(i)->glTexture),
+                                    canvas_pos, // top-left
+                                    ImVec2(canvas_pos.x + displaySize.x, canvas_pos.y), // top-right
+                                    ImVec2(canvas_pos.x + displaySize.x, canvas_pos.y + displaySize.y), // bottom-right
+                                    ImVec2(canvas_pos.x, canvas_pos.y + displaySize.y), // bottom-left
+                                    uv0, uv1, uv2, uv3
+                                );
+
+                                // Reserve space in ImGui layout
+                                ImGui::Dummy(displaySize);
+                            }
+
+                            // Draw custom selection border if selected
+                            if (getImage(i)->selected) {
+                                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                                ImVec2 topLeft = IMscreenPos; // Start at the image position
+                                ImVec2 bottomRight = ImVec2(IMscreenPos.x + displaySize.x, IMscreenPos.y + displaySize.y); // Add display size
+
+                                float borderThickness = 3.0f;
+                                ImU32 borderColor = IM_COL32(60, 180, 255, 255);
+
+                                drawList->AddRect(topLeft, bottomRight, borderColor, 0.0f, 0, borderThickness);
+                            }
 
                             // Draw orange circle if image is not loaded
                             if (getImage(i) && !getImage(i)->imageLoaded) {

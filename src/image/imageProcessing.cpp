@@ -58,6 +58,94 @@ void image::processBaseColor() {
 
 }
 
+//--- Blur Image ---//
+/*
+    Blur the image based on the bias
+    setting set in the UI
+*/
+void image::blurImage() {
+    allocateTmpBuf();
+
+    int kernelSize = (int)(imgParam.blurAmount * KERNELSIZE) + 1;
+    kernelSize = kernelSize % 2 == 0 ? kernelSize + 1 : kernelSize;
+
+    int halfSize = kernelSize / 2;
+
+    float* blurKern = new float[kernelSize];
+
+    computeKernels(imgParam.blurAmount, blurKern);
+
+    unsigned int numThreads = std::thread::hardware_concurrency();
+    numThreads = numThreads == 0 ? 2 : numThreads;
+    // Create a vector of threads
+    std::vector<std::thread> threads(numThreads);
+
+    int rowsPerThread = height / numThreads;
+    int colsPerThread = width / numThreads;
+
+    // Horizontal Blur
+    auto processRows = [&](int startRow, int endRow) {
+        for (int y=startRow; y<endRow; y++)
+        {
+            for (int x=0; x < width; x++) {
+                for (int ch = 0; ch < 3; ch++) {
+                    float outPix = 0.0f;
+                    int kernelCounterx = 0;
+                    for (int i = -halfSize; i <= halfSize; i++)
+                    {
+                        outPix += blurKern[kernelCounterx] * rawImgData[(((y * width) + std::clamp(x + i, 0, (int)width - 1)) * 4 )+ch];
+                        kernelCounterx++;
+                    }
+                    tmpOutData[(((y * width) + x) * 4 ) + ch] = outPix;
+                }
+            }
+        }
+    };
+    // Launch the threads
+    for (int i=0; i<numThreads; ++i) {
+        int startRow = i * rowsPerThread;
+        int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
+        threads[i] = std::thread(processRows, startRow, endRow);
+    }
+
+    // Wait for all threads to finish
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    // Vertical Blur
+    auto processCols = [&](int startCol, int endCol) {
+        for (int x = startCol; x < endCol; x++) {
+            for (int y = 0; y < height; y++) {
+                for (int ch = 0; ch < 3; ch++) {
+                    float outPix = 0.0f;
+                    int kernelCountery = 0;
+                    for (int i = -halfSize; i <= halfSize; i++) {
+                        outPix += blurKern[kernelCountery] * tmpOutData[(((std::clamp(y + i, 0, (int)height - 1) * width) + x) * 4)+ch];
+                        kernelCountery++;
+                    }
+                    blurImgData[(((y * width) + x) * 4 ) + ch] = (imgParam.baseColor[ch] / outPix) * 0.1f;
+                }
+            }
+        }
+    };
+    // Launch the threads
+    for (int i=0; i<numThreads; ++i) {
+        int startCol = i * colsPerThread;
+        int endCol = (i == numThreads - 1) ? width : (i + 1) * colsPerThread;
+        threads[i] = std::thread(processCols, startCol, endCol);
+    }
+
+    // Wait for all threads to finish
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    clearTmpBuf();
+    delete [] blurKern;
+    blurReady = true;
+}
+
 
 //--- Process Min/Max values ---//
 /*
@@ -119,6 +207,51 @@ void image::processMinMax() {
     LOG_INFO("Min Values: {}, {}, {}", imgParam.blackPoint[0], imgParam.blackPoint[1], imgParam.blackPoint[2]);
     LOG_INFO("Max Pixel: {},{}", imgParam.maxX, imgParam.maxY);
     LOG_INFO("Max Values: {}, {}, {}", imgParam.whitePoint[0], imgParam.whitePoint[1], imgParam.whitePoint[2]);
+}
+
+//--- Set MinMax ---//
+/*
+    Blur the area around the selected min/max
+    point based on the set blur amount. Set the
+    min/max point based on the blur
+*/
+void image::setMinMax() {
+
+    // Kernel size and half-kernel size
+    int kernelSize = (int)(imgParam.blurAmount * KERNELSIZE) + 1;
+    kernelSize = kernelSize % 2 == 0 ? kernelSize + 1 : kernelSize;
+    int halfSize = kernelSize / 2;
+
+    // Point to use for processing
+    int pointX = minSel ? imgParam.minX * width : imgParam.maxX * width;
+    int pointY = minSel ? imgParam.minY * height : imgParam.maxY * height;
+
+    float sumWeights = 0.0;
+    float outPix[3] = {0.0f, 0.0f, 0.0f};
+    int ySq, xSq;
+
+    for (int y = -halfSize; y <= halfSize; y++) {
+        ySq = y * y;
+        for (int x = -halfSize; x<= halfSize; x++) {
+            xSq = x * x;
+            int xPos = std::clamp(pointX + x, 0, (int)width - 1);
+            int yPos = std::clamp(pointY + y, 0, (int)height - 1);
+            float weight = exp(-((float)(xSq + ySq)) / (2.0f * imgParam.blurAmount * imgParam.blurAmount));
+            for (int ch = 0; ch < 3; ch ++) {
+                outPix[ch] += weight * rawImgData[(((yPos * width) + xPos) * 4) + ch];
+            }
+            sumWeights += weight;
+        }
+    }
+    if (minSel) {
+        imgParam.blackPoint[0] = (imgParam.baseColor[0] / (outPix[0] / sumWeights)) * 0.1f;
+        imgParam.blackPoint[1] = (imgParam.baseColor[1] / (outPix[1] / sumWeights)) * 0.1f;
+        imgParam.blackPoint[2] = (imgParam.baseColor[2] / (outPix[2] / sumWeights)) * 0.1f;
+    } else {
+        imgParam.whitePoint[0] = (imgParam.baseColor[0] / (outPix[0] / sumWeights)) * 0.1f;
+        imgParam.whitePoint[1] = (imgParam.baseColor[1] / (outPix[1] / sumWeights)) * 0.1f;
+        imgParam.whitePoint[2] = (imgParam.baseColor[2] / (outPix[2] / sumWeights)) * 0.1f;
+    }
 }
 
 //--- Resize Proxy ---//

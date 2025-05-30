@@ -25,6 +25,7 @@ class ocioProcessor {
     void setIntActive();
 
     void processImage(float* img, unsigned int width, unsigned int height, ocioSetting &ocioSet);
+    OCIO::GpuShaderDescRcPtr getGLDesc(ocioSetting& ocioSet);
     std::string getMetalKernel(ocioSetting& ocioSet);
 
     std::vector<char*> colorspaces;

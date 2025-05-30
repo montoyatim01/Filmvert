@@ -1,0 +1,111 @@
+diff -Naur src/libutils/oglapphelpers/glsl.cpp src/libutils/oglapphelpers/glsl.cpp
+--- src/libutils/oglapphelpers/glsl.cpp	2025-03-18 20:20:12
++++ src/libutils/oglapphelpers/glsl.cpp	2025-05-29 12:53:55
+@@ -75,7 +75,7 @@
+     glTexParameteri(textureType, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+ }
+ 
+-void AllocateTexture3D(unsigned index, unsigned & texId, 
++void AllocateTexture3D(unsigned index, unsigned & texId,
+                         Interpolation interpolation,
+                         unsigned edgelen, const float * values)
+ {
+@@ -125,7 +125,7 @@
+     {
+     case GpuShaderCreator::TEXTURE_1D:
+         glBindTexture(GL_TEXTURE_1D, texId);
+-        
++
+         SetTextureParameters(GL_TEXTURE_1D, interpolation);
+ 
+         glTexImage1D(GL_TEXTURE_1D, 0, internalformat, width, 0, format, GL_FLOAT, values);
+@@ -136,7 +136,7 @@
+ 
+         SetTextureParameters(GL_TEXTURE_2D, interpolation);
+ 
+-        glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, GL_FLOAT, values);    
++        glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, GL_FLOAT, values);
+         break;
+ 
+     default:
+@@ -179,7 +179,7 @@
+     return shader;
+ }
+ 
+-void LinkShaders(GLuint program, GLuint fragShader)
++void LinkShaders(GLuint program, GLuint fragShader, GLuint vertShader)
+ {
+     CheckStatus();
+ 
+@@ -187,16 +187,18 @@
+     {
+         throw Exception("Missing shader program");
+     }
+-    else        
++    else
+     {
+         glAttachShader(program, fragShader);
++        if (vertShader)
++            glAttachShader(program, vertShader);
+     }
+ 
+     glLinkProgram(program);
+ 
+     GLint stat;
+     glGetProgramiv(program, GL_LINK_STATUS, &stat);
+-    if (!stat) 
++    if (!stat)
+     {
+         GLchar log[1000];
+         GLsizei len;
+@@ -477,7 +479,7 @@
+     }
+ }
+ 
+-unsigned OpenGLBuilder::buildProgram(const std::string & clientShaderProgram, bool standaloneShader)
++unsigned OpenGLBuilder::buildProgram(const std::string & clientShaderProgram, bool standaloneShader, unsigned vertShader)
+ {
+     const std::string shaderCacheID = m_shaderDesc->getCacheID();
+     if(shaderCacheID!=m_shaderCacheID)
+@@ -503,7 +505,7 @@
+ 
+         m_fragShader = CompileShaderText(GL_FRAGMENT_SHADER, oss.str().c_str());
+ 
+-        LinkShaders(m_program, m_fragShader);
++        LinkShaders(m_program, m_fragShader, vertShader);
+         m_shaderCacheID = shaderCacheID;
+ 
+         linkAllUniforms();
+@@ -534,9 +536,9 @@
+ 
+     while(w>1)
+     {
+-        glTexImage2D(GL_PROXY_TEXTURE_2D, 0, 
+-                     GL_RGB32F_ARB, 
+-                     w, h, 0, 
++        glTexImage2D(GL_PROXY_TEXTURE_2D, 0,
++                     GL_RGB32F_ARB,
++                     w, h, 0,
+                      GL_RGB, GL_FLOAT, NULL);
+ 
+         bool texValid = true;
+diff -Naur src/libutils/oglapphelpers/glsl.h src/libutils/oglapphelpers/glsl.h
+--- src/libutils/oglapphelpers/glsl.h	2025-03-18 20:20:12
++++ src/libutils/oglapphelpers/glsl.h	2025-05-29 12:53:28
+@@ -77,9 +77,9 @@
+     // Update all uniforms.
+     void useAllUniforms();
+ 
+-    // Build the complete shader program which includes the OCIO shader program 
++    // Build the complete shader program which includes the OCIO shader program
+     // and the client shader program.
+-    unsigned buildProgram(const std::string & clientShaderProgram, bool standaloneShader);
++    unsigned buildProgram(const std::string & clientShaderProgram, bool standaloneShader, unsigned vertShader = 0);
+     void useProgram();
+     unsigned getProgramHandle();
+ 
+@@ -118,4 +118,3 @@
+ } // namespace OCIO_NAMESPACE
+ 
+ #endif // INCLUDED_OCIO_GLSL_H
+-
