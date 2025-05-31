@@ -203,6 +203,12 @@ int mainWindow::openWindow()
     //ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     //ImGui_ImplSDLRenderer2_Init(renderer);
 
+    // Clear all text buffers initially
+    std::memset(ackMsg, 0, sizeof(ackMsg));
+    std::memset(ackError, 0, sizeof(ackError));
+    std::memset(ocioPath, 0, sizeof(ocioPath));
+    std::memset(rollNameBuf, 0, sizeof(rollNameBuf));
+    std::memset(rollPath, 0, sizeof(rollPath));
 
 
     // Main loop
@@ -255,6 +261,7 @@ int mainWindow::openWindow()
                 // Don't quit immediately
                 unsavedPopTrigger = true;
                 closeMd = c_app;
+                glfwSetWindowShouldClose(window, done);
             } else {
                 done = true;
             }

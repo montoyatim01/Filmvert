@@ -118,7 +118,7 @@ assets/fonts/Roboto-Black.ttf
 assets/fonts/Roboto-Bold.ttf
 assets/fonts/Roboto-Regular.ttf
 assets/fonts/JetBrainsMono-Regular.ttf
-assets/default.metallib
+#assets/default.metallib
 assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio
 assets/studio-config-v3.0.0_aces-v2.0_ocio-v2.4.ocio
 )

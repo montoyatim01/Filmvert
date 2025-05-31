@@ -45,6 +45,8 @@ int main(void)
 // -- Select images to sync metadata (import roll)
 // -* Select debayer method (preferences)
 // -* Disallow certain operations if the image is still loading (or queue it up?)
+// -- Add in scroll speed preferences (for mouse)
+// -- Mouse vs trackpad mode? - Preferences
 
 /*
 - Changed GPU and ImGui backend to OpenGL

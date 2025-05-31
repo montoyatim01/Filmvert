@@ -534,7 +534,8 @@ void mainWindow::imageView() {
             }
 
             // Only allow panning if we're not dragging a corner and not making a selection
-            if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) && !dragging && !isSelecting && !minDrag && !maxDrag) {
+            if ((ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f)) &&
+                    !dragging && !isSelecting && !minDrag && !maxDrag) {
                 scroll.x = ImGui::GetScrollX() - ImGui::GetIO().MouseDelta.x;
                 scroll.y = ImGui::GetScrollY() - ImGui::GetIO().MouseDelta.y;
                 ImGui::SetScrollX(scroll.x);

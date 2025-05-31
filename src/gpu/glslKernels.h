@@ -148,7 +148,9 @@ const std::string glsl_process(R"V0G0N(
         // Grade node operation
         vec4 aGrade = G_mult * (G_gain - G_lift) / (1.0 - 0.0);
         vec4 bGrade = G_offset + G_lift - aGrade * 0.0;
-        tempPix = pow(aGrade * tempPix + bGrade, 1.0/G_gamma);
+        vec4 powBase = aGrade * tempPix + bGrade;
+        powBase = max(powBase, vec4(0.0001));
+        tempPix = pow(powBase, 1.0/G_gamma);
         tempPix = clamp(tempPix, 0.0, 100.0);
 
         // Back to lin for output
@@ -161,6 +163,7 @@ const std::string glsl_process(R"V0G0N(
     {
         vec4 inputPixel = texture(inputTexture, texCoord);
         vec4 gradedPixel = imgProcess(inputPixel);
+        gradedPixel.w = 1.0;
         fragColor = OCIOFUNC(gradedPixel);
     }
 )V0G0N");

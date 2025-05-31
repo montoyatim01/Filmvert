@@ -79,7 +79,7 @@ struct image {
 
 
     // GL Display
-    uint64_t glTexture;
+    long long unsigned int glTexture;
 
     void* texture = nullptr;
     void* histTex = nullptr;

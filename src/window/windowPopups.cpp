@@ -1258,33 +1258,41 @@ void mainWindow::shortcutsPopup() {
     if (shortPopTrig)
         ImGui::OpenPopup("Keyboard Shortcuts");
     if (ImGui::BeginPopupModal("Keyboard Shortcuts", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
-
+        std::string s_cmd = "";
+        std::string s_opt = "";
+        #ifdef __APPLE__
+        s_cmd = "⌘";
+        s_opt = "⌥";
+        #else
+        s_cmd = "Ctrl";
+        s_opt = "Alt";
+        #endif
         ImGui::BeginGroup();
-        ImGui::Text("⌘ + O ");
-        ImGui::Text("⌘ + Shift + O ");
+        ImGui::Text("%s + O ", s_cmd.c_str());
+        ImGui::Text("%s + Shift + O ", s_cmd.c_str());
         ImGui::Separator();
-        ImGui::Text("⌘ + S ");
-        ImGui::Text("⌘ + Shift + S ");
-        ImGui::Text("⌥ + Shift + S ");
+        ImGui::Text("%s + S ", s_cmd.c_str());
+        ImGui::Text("%s + Shift + S ", s_cmd.c_str());
+        ImGui::Text("%s + Shift + S ", s_opt.c_str());
         ImGui::Separator();
-        ImGui::Text("⌘ + Z ");
-        ImGui::Text("⌘ + Shift + Z ");
+        ImGui::Text("%s + Z ", s_cmd.c_str());
+        ImGui::Text("%s + Shift + Z ", s_cmd.c_str());
         ImGui::Separator();
-        ImGui::Text("⌘ + E ");
-        ImGui::Text("⌘ + G ");
+        ImGui::Text("%s + E ", s_cmd.c_str());
+        ImGui::Text("%s + G ", s_cmd.c_str());
         ImGui::Separator();
-        ImGui::Text("Z");
-        ImGui::Text("⌥ + Scroll");
+        ImGui::Text("H");
+        ImGui::Text("%s + Scroll", s_opt.c_str());
         ImGui::Text("Shift + Scroll");
         ImGui::Separator();
-        ImGui::Text("⌘ + [ ");
-        ImGui::Text("⌘ + ] ");
+        ImGui::Text("%s + [ ", s_cmd.c_str());
+        ImGui::Text("%s + ] ", s_cmd.c_str());
         ImGui::Separator();
-        ImGui::Text("⌘ + A ");
-        ImGui::Text("⌘ + C ");
-        ImGui::Text("⌘ + V ");
+        ImGui::Text("%s + A ", s_cmd.c_str());
+        ImGui::Text("%s + C ", s_cmd.c_str());
+        ImGui::Text("%s + V ", s_cmd.c_str());
         ImGui::Separator();
-        ImGui::Text("⌘ + , ");
+        ImGui::Text("%s + , ", s_cmd.c_str());
         ImGui::EndGroup();
 
         ImGui::SameLine();

@@ -40,7 +40,7 @@ class openglGPU {
         void getMipMapTexture(image* _img, float*& pixels, int &width, int &height);
         void setHistTexture(float* pixels);
 
-        uint64_t histoTex(){return m_histoTex;}
+        long long unsigned int histoTex(){return m_histoTex;}
 
         gpuTimer rdTimer;
         bool rendering = false;
