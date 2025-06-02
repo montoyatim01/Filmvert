@@ -199,6 +199,12 @@ int mainWindow::openWindow()
 
         start = std::chrono::steady_clock::now();
 
+        // Attempt close from elsewhere in the program
+        if (wantClose) {
+            glfwSetWindowShouldClose(window, true);
+            wantClose = false;
+        }
+
         if (glfwWindowShouldClose(window)) {
             if (unsavedChanges()) {
                 // Don't quit immediately

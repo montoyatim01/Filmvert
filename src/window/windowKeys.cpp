@@ -16,6 +16,11 @@ void mainWindow::checkHotkeys() {
             return;
         }
 
+    // Close app
+    if (ImGui::IsKeyChordPressed(ImGuiKey_Q | ImGuiMod_Ctrl)) {
+        wantClose = true;
+    }
+
     // Open Image(s) (Cmd + O)
     if (ImGui::IsKeyChordPressed(ImGuiKey_O | ImGuiMod_Ctrl)) {
         openImages();

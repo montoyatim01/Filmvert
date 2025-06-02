@@ -222,26 +222,11 @@ void openglGPU::bufferCheck(image* _image)
     unsigned int nWidth = _image->fullIm ? _image->rawWidth : _image->width;
     unsigned int nHeight = _image->fullIm ? _image->rawHeight : _image->height;
 
-    GLint width, height;
-    width = 0;
-    height = 0;
-
-    /*if (glIsTexture(_image->glTexture) != GL_FALSE) {
-        glBindTexture(GL_TEXTURE_2D, (GLuint)_image->glTexture);
-        checkError("Input Texture Query");
-
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        checkError("Input Texture Dimension Access");
-    }*/
-
-
     if (nWidth > m_width || nHeight > m_height) {
         LOG_INFO("Resizing Input Buffer");
 
         // Create input texture
-        if (glIsTexture(m_inputTexture) == GL_FALSE) {
+        if (m_inputTexture == 0 || glIsTexture(m_inputTexture) == GL_FALSE) {
             glGenTextures(1, &m_inputTexture);
             checkError("Generating Input Texture");
         }
@@ -543,12 +528,6 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
 
 void openglGPU::copyToTex(GLuint textureID, int width, int height, float* rgbaData) {
     glBindTexture(GL_TEXTURE_2D, textureID);
-
-    GLint texW, texH;
-
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &texW);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texH);
-    //LOG_INFO("Copying to texture: TexDim: {}x{}, inputDim: {}x{}", texW, texH, width, height);
 
     // Upload the data to the existing texture
     glTexSubImage2D(GL_TEXTURE_2D, 0,          // target, level

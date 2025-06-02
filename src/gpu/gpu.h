@@ -71,8 +71,8 @@ class openglGPU {
         ocioSetting prevOCIO;
 
         unsigned long long imBufferSize;
-        unsigned int m_width;
-        unsigned int m_height;
+        unsigned int m_width = 0;
+        unsigned int m_height = 0;
 
 
 

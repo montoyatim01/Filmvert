@@ -91,6 +91,7 @@ class mainWindow
         bool firstImage = false;
         bool rollChange = false;
         bool histRunning = false;
+        bool wantClose = false;
 
         std::deque<filmRoll> activeRolls;
         int selRoll = 0;
