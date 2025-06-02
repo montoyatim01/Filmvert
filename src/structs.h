@@ -67,7 +67,7 @@ struct copyPaste {
         else
             make = model = lens = stock = focal =
             fstop = exposure = date = location =
-            gps = notes = dev = chem = devnote = scanner = scanner = true;
+            gps = notes = dev = chem = devnote = scanner = scannotes = true;
     }
 };
 

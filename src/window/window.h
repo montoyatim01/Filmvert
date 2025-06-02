@@ -17,6 +17,7 @@
 #include <deque>
 #include <string>
 #include <thread>
+#include <csignal>
 
 //ImGui
 
@@ -37,6 +38,7 @@
 #include "roll.h"
 #include "structs.h"
 #include "threadPool.h"
+#include "windowHistogram.h"
 #include "windowUtils.h"
 
 // Declared functions from macOSFile.mm
@@ -69,10 +71,10 @@ class mainWindow
         //void setGPU(metalGPU* mtl){mtlGPU = mtl;}
 
     private:
-        //SDL_Renderer* renderer;
-        //metalGPU* mtlGPU;
         openglGPU* gpu = nullptr;
+        winHistogram histo;
         bool renderCall = false;
+        float fps;
 
         // Window Layout
         ImVec2 imageWinSize;
@@ -105,6 +107,7 @@ class mainWindow
         bool minMaxDisp = false;
         bool sampleVisible = false;
         bool gradeBypass = false;
+        bool fpsFlag = false;
 
         // Copy/Paste
         imageParams copyParams;
@@ -122,6 +125,8 @@ class mainWindow
         bool anaPopTrig = false;
         closeMode closeMd;
         bool shortPopTrig = false;
+        bool imMatchPopTrig = false;
+        bool ImMatchRoll = false;
         bool badOcioText = false;
         char ackMsg[512];
         char ackError[512];
@@ -136,6 +141,8 @@ class mainWindow
         std::chrono::time_point<std::chrono::steady_clock> lastChange;
         std::chrono::time_point<std::chrono::steady_clock> lastUISave;
         bool metaRefresh = false;
+        bool paramImp = true;
+        bool metaImp = true;
 
         // Undo/redo Timing
         bool needStateUp = false;
@@ -161,6 +168,8 @@ class mainWindow
         // Import OCIO Struct
         ocioSetting importOCIO;
         int ocioCS_Disp = 1;
+        std::vector<std::string> imgMetImp;
+        copyPaste metImpOpt;
 
 
         // Export
@@ -220,6 +229,7 @@ class mainWindow
         void openImages();
         bool openJSON();
         bool openImageMeta();
+        bool setImpImage();
         void openRolls();
         void exportImages();
         void exportRolls();
@@ -237,11 +247,11 @@ class mainWindow
 
         void analyzeImage();
 
-        // windowSDL.cpp
-        void updateHistogram();
-        void createSDLTexture(image* actImage);
-        void updateSDLTexture(image* actImage);
-        void updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier);
+        // windowHistogram.cpp
+        //void updateHistogram();
+        //void createSDLTexture(image* actImage);
+        //void updateSDLTexture(image* actImage);
+        //void updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier);
 
         // windowPopups.cpp
         void importRawSettings();
@@ -257,6 +267,7 @@ class mainWindow
         void ackPopup();
         void analyzePopup();
         void shortcutsPopup();
+        void importImMatchPopup();
 
         void copyIntoParams();
         void pasteIntoParams();

@@ -194,10 +194,8 @@ void mainWindow::menuBar() {
             // Import Roll Metadata
             if (ImGui::MenuItem("Import Roll Metadata")) {
                 if (openJSON()) {
-                    std::strcpy(ackMsg, "Metadata imported to Roll successfully!");
-                    if (validRoll())
-                        activeRoll()->rollUpState();
-                    ackPopTrig = true;
+                    imMatchPopTrig = true;
+                    ImMatchRoll = true;
                 } else {
                     std::string err = ackError;
                     if (!err.empty()) {
@@ -210,10 +208,7 @@ void mainWindow::menuBar() {
             // Import Image Metadata
             if (ImGui::MenuItem("Import Image Metadata")) {
                 if (openImageMeta()) {
-                    std::strcpy(ackMsg, "Metadata imported to image successfully!");
-                    if (validRoll())
-                        activeRoll()->rollUpState();
-                    ackPopTrig = true;
+                    imMatchPopTrig = true;
                 } else {
                     std::string err = ackError;
                     if (!err.empty()) {
@@ -245,6 +240,19 @@ void mainWindow::menuBar() {
                         ackPopTrig = true;
                     } else {
                         std::strcpy(ackMsg, "CSV Failed to export!");
+                        ackPopTrig = true;
+                    }
+                }
+            }
+
+            // Export Single Image JSON
+            if (ImGui::MenuItem("Export Image Metadata")) {
+                if (validIm()) {
+                    if (activeImage()->writeJSONFile()) {
+                        std::strcpy(ackMsg, "Image metadata exported to Roll directory.");
+                        ackPopTrig = true;
+                    } else {
+                        std::strcpy(ackMsg, "Image metadata failed to export!");
                         ackPopTrig = true;
                     }
                 }
@@ -322,12 +330,18 @@ void mainWindow::menuBar() {
         ImGui::Text("Display:");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.15f);
-        renderCall |= ImGui::Combo("##01", &dispOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
+        if (ImGui::Combo("##01", &dispOCIO.display, ocioProc.displays.data(), ocioProc.displays.size())) {
+            renderCall |= true;
+            rollRender();
+        }
         ImGui::SameLine();
         ImGui::Text("View:");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20f);
-        renderCall |= ImGui::Combo("##02", &dispOCIO.view, ocioProc.views[dispOCIO.display].data(), ocioProc.views[dispOCIO.display].size());
+        if(ImGui::Combo("##02", &dispOCIO.view, ocioProc.views[dispOCIO.display].data(), ocioProc.views[dispOCIO.display].size())) {
+            renderCall |= true;
+            rollRender();
+        }
 
                 ImGui::EndMainMenuBar();
     }

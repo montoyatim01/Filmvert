@@ -70,7 +70,7 @@ void image::delDispBuf() {
 //--- Clear Buffers ---//
 /*
     Clear all buffers used by an image
-    (other than the SDL textures) to save
+    (other than the GL textures) to save
     on ram usage.
 */
 void image::clearBuffers() {
@@ -133,6 +133,7 @@ void image::loadBuffers() {
             LOG_WARN("Unable to re-load image: {}", fullPath);
         }
     }
+    needRndr = true;
 }
 
 //--- Pad to RGBA ---//

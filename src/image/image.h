@@ -51,6 +51,7 @@ struct image {
     std::string srcPath;
     std::string fullPath;
     std::string expFullPath;
+    std::string rollPath;
 
     // Analysis/Grade parameters
     imageParams imgParam;
@@ -72,6 +73,7 @@ struct image {
     bool needRndr = false;
     bool imgRst = false;
     bool minSel = false;
+    bool needHist = false;
 
     // Display/Render flags
     bool renderBypass;
@@ -79,12 +81,10 @@ struct image {
 
 
     // GL Display
-    long long unsigned int glTexture;
+    long long unsigned int glTexture = 0;
 
-    void* texture = nullptr;
     void* histTex = nullptr;
-    int sdlRotation;
-    bool sdlUpdate = false;
+    bool glUpdate = false;
 
 
 
@@ -117,12 +117,14 @@ struct image {
 
     // imageMeta.cpp
     void readMetaFromFile();
-    bool loadMetaFromStr(const std::string& j, bool loadMeta);
+    bool loadMetaFromStr(const std::string& j, copyPaste* impOpt = nullptr);
     std::optional<nlohmann::json> getJSONMeta();
     void updateMetaStr();
     void writeXMPFile();
+    bool writeJSONFile();
     bool writeExpMeta(std::string filename);
-    bool importImageMeta(std::string filename);
+    bool importImageMeta(std::string filename, copyPaste* impOpt = nullptr);
+    void metaPaste(copyPaste selectons, imageParams* params, imageMetadata* meta);
 
     // image.cpp
     void rotLeft();

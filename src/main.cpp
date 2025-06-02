@@ -29,24 +29,48 @@ int main(void)
 // -- Printer lights? BP/WP?
 //
 // - Bugs
-// -- Add in import from image? (import the metadata or inversion settings)
+// -* Add in import from image? (import the metadata or inversion settings)
 //
 // -* Bug when closing multiple rolls (maybe roll is loading?)
 // -- Get arrow keys to always switch images?
 // -- Hotkeys for BP/WP RGB?
 //
-// -- Make the min/max points adjustable??
-// -- Grade disabled notification? (Text on image view)
-// -- Undo/redo triggers zoom
-// --- Change zoom key?
+// -* Make the min/max points adjustable??
+// -* Grade disabled notification? (Text on image view)
+// -* Undo/redo triggers zoom
+// --* Change zoom key?
 // -* BP/WP grade to happen in linear and not jplog
-// -- Replace the lancir image resizer (only does 8-bit) ugh
-// -- Import image metadata
-// -- Select images to sync metadata (import roll)
+// -* Import image metadata
+// -* Select images to sync metadata (import roll)
 // -* Select debayer method (preferences)
 // -* Disallow certain operations if the image is still loading (or queue it up?)
-// -- Add in scroll speed preferences (for mouse)
-// -- Mouse vs trackpad mode? - Preferences
+// -* Add in scroll speed preferences (for mouse)
+// -* Mouse vs trackpad mode? - Preferences
+// -* Fix the damn histogram
+// -* remove legacy SDL code/variables
+// -* Metadata paste doesn't trigger save required?
+// -* Use same import window for image import (select meta or params)
+// -- Cycling quickly between rolls (with a lot loaded) slows it way down
+// -- Cycling quickly between rolls that are loading (while closing them) causes a crash, resizeproxy thread
+// -- Close roll/Image shortcut (Cmd + W?)
+// -- Check esc hotkey in popups to close them!
+//
+
+/*
+- Significantly improved histogram performance
+- Swapped Temperature slider direction
+- Added the ability to export a single image JSON file (to roll directory)
+- Added the ability to import a single image JSON file
+- Added the ability to select individual options on JSON import.
+- Added hotkeys for closing images/rolls
+- Roll re-loads now trigger a re-render
+- Fixed OpenGL Errors
+- Fixed an issue where Dev process wouldn't paste across images
+- Fixed an issue where the dev notes, scanner, and scan notes wouldn't apply editing a single image
+- Fixed an issue where the hotkeys would mis-trigger while in a pop-up
+- Fixed an issue where the "All Metadata" button wouldn't paste scan notes
+- Fixed an issue where a metadata-only paste wouldn't mark unsaved changes
+*/
 
 /*
 - Changed GPU and ImGui backend to OpenGL

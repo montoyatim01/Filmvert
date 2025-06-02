@@ -7,7 +7,6 @@ void mainWindow::thumbView() {
     ImGui::SetNextWindowSize(ImVec2(winWidth,winHeight - imageWinSize.y));
     ImGui::Begin("Thumbnails", 0, ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
             {
-                //SDL_GetWindowSize(window, &winWidth, &winHeight);
 
                 //Multi-Select
                 ImGuiMultiSelectFlags flags = ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_BoxSelect1d;
@@ -22,12 +21,6 @@ void mainWindow::thumbView() {
 
                 if (validRoll()) {
                     for (int i = 0; i < activeRollSize(); i++) {
-                        /*if (!getImage(i)->texture) {
-                            updateSDLTexture(getImage(i));
-                        }
-                        if (getImage(i)->sdlUpdate) {
-                            updateSDLTexture(getImage(i));
-                            }*/
                         ImVec2 thumbWinSize = ImGui::GetWindowSize();
                         ImGui::SetWindowFontScale(std::clamp(thumbWinSize.y / 280.0f, 0.6f, 1.2f));
 

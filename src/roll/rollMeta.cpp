@@ -1,4 +1,5 @@
 #include "roll.h"
+#include "structs.h"
 
 
 
@@ -87,6 +88,7 @@ bool filmRoll::exportRollCSV() {
     the roll based on the JSON roll's name.
 */
 bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
+    metaImp.clear();
      try {
         nlohmann::json jIn;
         std::ifstream f(jsonFile);
@@ -99,11 +101,12 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
         for (int i = 0; i < images.size(); i++) {
             if (jRoll.contains(images[i].srcFilename)) {
                 nlohmann::json obj = jRoll[images[i].srcFilename].get<nlohmann::json>();
-                images[i].loadMetaFromStr(obj.dump(-1), true);
+                metaImp.emplace_back(MetaImpSet(&images[i], true, images[i].srcFilename, obj.dump(-1)));
+                //images[i].loadMetaFromStr(obj.dump(-1), true);
             }
         }
-        if (appPrefs.prefs.autoSort)
-            sortRoll();
+        //if (appPrefs.prefs.autoSort)
+        //    sortRoll();
         return true;
 
     } catch (const std::exception& e) {
@@ -111,6 +114,27 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
         return false;
     }
 
+}
+
+void filmRoll::applyRollMetaJSON(bool params, copyPaste impOpt) {
+    for (int i = 0; i < metaImp.size(); i++) {
+        if (metaImp[i].selected) {
+            if (metaImp[i].img) {
+                metaImp[i].img->loadMetaFromStr(metaImp[i].json, &impOpt);
+            }
+        }
+    }
+    sortRoll();
+}
+
+bool filmRoll::applySelMetaJSON(std::string inFile, copyPaste impOpt) {
+    bool goodSet = true;
+    for (auto& img : images) {
+        if (img.selected) {
+            goodSet &= img.importImageMeta(inFile, &impOpt);
+        }
+    }
+    return goodSet;
 }
 
 
@@ -241,8 +265,12 @@ void filmRoll::rollMetaPreEdit(metaBuff *meta) {
 void filmRoll::rollMetaPostEdit(metaBuff *meta) {
     if (!meta)
         return;
-    if (meta->a_rollPath)
+    if (meta->a_rollPath) {
         rollPath = meta->rollPath;
+        for (auto& img : images)
+            img.rollPath = rollPath;
+    }
+
     if (meta->a_rollname)
         rollName = meta->rollname;
 

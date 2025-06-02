@@ -1,249 +1,104 @@
+#include "image.h"
 #include "preferences.h"
-#include "window.h"
 #include "utils.h"
-#include <SDL_render.h>
+#include "windowHistogram.h"
 #include <chrono>
 #include <algorithm>
 #include <thread>
 #include <atomic>
 
-
-
-//--- Create SDL Texture ---//
+//--- Start Histogram ---//
 /*
-    Create a valid SDL texture with the given image
-    taking into account the image's rotation
-*/
-void mainWindow::createSDLTexture(image* actImage) {
+    Start the thread looping waiting
+    to process the histogram
+ */
 
-    if (!actImage)
-        return;
-    // For rotations 6 and 8 (90 degrees), we need to swap width and height
-    int textureWidth = (actImage->imRot == 6 || actImage->imRot == 8) ? actImage->height : actImage->width;
-    int textureHeight = (actImage->imRot == 6 || actImage->imRot == 8) ? actImage->width : actImage->height;
-/*
-    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING,
-                                                textureWidth, textureHeight);
-    if (texture) {
-        actImage->texture = texture;
-        actImage->sdlRotation = actImage->imRot;
-    }
-    else {
-        LOG_WARN("Unable to create SDL texture for image: {}", actImage->srcFilename);
-    }
-*/
-}
-
-//--- Update SDL Texture ---//
-/*
-    Update the image's SDL texture based on the Dispbuf.
-    Also queue up a separate thread to process the
-    image's histogram
-*/
-void mainWindow::updateSDLTexture(image* actImage) {
-
-    if (!actImage || !actImage->imageLoaded)
-        return;
-/*
-    if (actImage->texture == nullptr) {
-            createSDLTexture(actImage);
-    }
-    if (actImage->sdlRotation != actImage->imRot) {
-        if (actImage->texture) {
-            SDL_DestroyTexture((SDL_Texture*)actImage->texture);
-            actImage->texture = nullptr;
-        }
-        createSDLTexture(actImage);
-    }
-
-
-
-    void* pixelData = nullptr;
-    int pitch = 0;
-    if (SDL_LockTexture((SDL_Texture*)actImage->texture, nullptr, &pixelData, &pitch) != 0) {
-        LOG_ERROR("Unable to lock SDL texture for image: {}", actImage->srcFilename);
-        actImage->sdlUpdate = false;
-        return;
-    }
-
-    const int srcWidth = actImage->width;
-    const int srcHeight = actImage->height;
-    const int bytesPerPixel = 4; // Assuming RGBA with 4 bytes per pixel
-    const int srcRowBytes = srcWidth * bytesPerPixel;
-
-    if (!actImage->dispImgData) {
-        //LOG_WARN("Image needing update has no buffer! {}", actImage->srcFilename);
-        actImage->sdlUpdate = false;
-        SDL_UnlockTexture((SDL_Texture*)actImage->texture);
-        return;
-    }
-
-    // Histogram Processing
-    if (!actImage->histTex) {
-        SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING,
-                                                    HISTWIDTH, HISTHEIGHT);
-        if (texture) {
-            actImage->histTex = texture;
-        }
-        else {
-            LOG_WARN("Unable to create SDL texture for histogram: {}", actImage->srcFilename);
-            actImage->sdlUpdate = false;
-            SDL_UnlockTexture((SDL_Texture*)actImage->texture);
-            return;
-        }
-    }
-
-    void* hpixels;
-    int hpitch;
-    if (SDL_LockTexture((SDL_Texture*)actImage->histTex, nullptr, &hpixels, &hpitch) != 0) {
-        LOG_ERROR("Unable to lock SDL texture for histogram: {}", actImage->srcFilename);
-        actImage->sdlUpdate = false;
-        SDL_UnlockTexture((SDL_Texture*)actImage->texture);
-        return;
-    }
-    // Launch the thread for the histo calc
-    float histInt = appPrefs.prefs.histInt;
-    std::thread histoThread = std::thread([this, &actImage, &hpixels, &hpitch, histInt]{
-        updateSDLHistogram(actImage, hpixels, hpitch, histInt);
+void winHistogram::startHistogram() {
+    histStop = false;
+    histThread = std::thread([this]{
+        workThread();
     });
-
-
-    // Apply rotation based on imRot value
-     switch (actImage->imRot) {
-        case 1: // Normal (0 degrees)
-            for (int row = 0; row < srcHeight; ++row) {
-                const void* srcRow = static_cast<const uint8_t*>(actImage->dispImgData) + (row * srcRowBytes);
-                void* dstRow = static_cast<uint8_t*>(pixelData) + (row * pitch);
-                memcpy(dstRow, srcRow, srcRowBytes);
-            }
-            break;
-
-        case 6: // Left (90 degrees counterclockwise)
-            for (int y = 0; y < srcHeight; ++y) {
-                for (int x = 0; x < srcWidth; ++x) {
-                    // Destination coordinates (rotated)
-                    // x' = height - 1 - y, y' = x
-                    int destX = srcHeight - 1 - y;
-                    int destY = x;
-
-                    // Source pixel
-                    const uint8_t* srcPixel = static_cast<const uint8_t*>(actImage->dispImgData) +
-                                            (y * srcRowBytes) + (x * bytesPerPixel);
-
-                    // Destination pixel
-                    uint8_t* dstPixel = static_cast<uint8_t*>(pixelData) +
-                                        (destY * pitch) + (destX * bytesPerPixel);
-
-                    // Copy pixel data (RGBA)
-                    memcpy(dstPixel, srcPixel, bytesPerPixel);
-                }
-            }
-            break;
-
-        case 3: // Upside-down (180 degrees)
-            for (int y = 0; y < srcHeight; ++y) {
-                for (int x = 0; x < srcWidth; ++x) {
-                    // Destination coordinates (rotated)
-                    // x' = width - 1 - x, y' = height - 1 - y
-                    int destX = srcWidth - 1 - x;
-                    int destY = srcHeight - 1 - y;
-
-                    // Source pixel
-                    const uint8_t* srcPixel = static_cast<const uint8_t*>(actImage->dispImgData) +
-                                            (y * srcRowBytes) + (x * bytesPerPixel);
-
-                    // Destination pixel
-                    uint8_t* dstPixel = static_cast<uint8_t*>(pixelData) +
-                                        (destY * pitch) + (destX * bytesPerPixel);
-
-                    // Copy pixel data (RGBA)
-                    memcpy(dstPixel, srcPixel, bytesPerPixel);
-                }
-            }
-            break;
-
-        case 8: // Right (90 degrees clockwise)
-            for (int y = 0; y < srcHeight; ++y) {
-                for (int x = 0; x < srcWidth; ++x) {
-                    // Destination coordinates (rotated)
-                    // x' = y, y' = width - 1 - x
-                    int destX = y;
-                    int destY = srcWidth - 1 - x;
-
-                    // Source pixel
-                    const uint8_t* srcPixel = static_cast<const uint8_t*>(actImage->dispImgData) +
-                                            (y * srcRowBytes) + (x * bytesPerPixel);
-
-                    // Destination pixel
-                    uint8_t* dstPixel = static_cast<uint8_t*>(pixelData) +
-                                        (destY * pitch) + (destX * bytesPerPixel);
-
-                    // Copy pixel data (RGBA)
-                    memcpy(dstPixel, srcPixel, bytesPerPixel);
-                }
-            }
-            break;
-
-        default:
-            // For any other values, just do normal rendering
-            for (int row = 0; row < srcHeight; ++row) {
-                const void* srcRow = static_cast<const uint8_t*>(actImage->dispImgData) + (row * srcRowBytes);
-                void* dstRow = static_cast<uint8_t*>(pixelData) + (row * pitch);
-                memcpy(dstRow, srcRow, srcRowBytes);
-            }
-            break;
-        }
-        histoThread.join();
-        SDL_UnlockTexture((SDL_Texture*)actImage->histTex);
-        SDL_UnlockTexture((SDL_Texture*)actImage->texture);
-        actImage->sdlUpdate = false;
-        actImage->delDispBuf();
-        */
 }
 
-void mainWindow::updateHistogram() {
-    if (histRunning)
-        return; // Histogram already being worked on
-
-    if (!appPrefs.prefs.histEnable)
-        return; // Don't calculate the histogram if disabled
-    histRunning = true;
-    image* img = activeImage();
-    if (!img)
-        return;
-    float* imgPixels = nullptr;
-    int hWidth, hHeight;
-
-    gpu->getMipMapTexture(img, imgPixels, hWidth, hHeight);
-    if (!imgPixels)
-        return; // Something went wrong in the GL end
-
-    float* histPix = new float[HISTWIDTH * HISTHEIGHT * 4];
-    updateHistPixels(img, imgPixels, histPix, hWidth, hHeight, appPrefs.prefs.histInt);
-
-    gpu->setHistTexture(histPix);
-
-    if (histPix)
-        delete [] histPix;
-    if (imgPixels)
-        delete [] imgPixels;
-    histRunning = false;
-}
+//--- Stop Histogram ---//
 /*
-OOO
-Flag for histo needing update (take from param/render call)
-allocate buffer for histo (based on static size)
+    Flag the variable and notify the
+    thread to exit
+ */
+void winHistogram::stopHistogram() {
+    std::lock_guard<std::mutex> lock(mtx);
+    histStop = true;
+    cv.notify_one();
+    histThread.detach();
+}
 
-Access the level 2 mipmap from the texture (0.25x scale)
--Allocate buffer large enough (on gpu side)
--copy over
+//--- Process Image ---//
+/*
+    If histogram is processing already, bail.
+    Otherwise update the pointers to the gpu
+    and image, and notify the thread to process
+ */
+void winHistogram::processImage(image *_img, openglGPU *_gpu) {
+    std::lock_guard<std::mutex> lock(mtx);
+    if (!_img || !_img->needHist || !appPrefs.prefs.histEnable || procHist) {
+        return;
+    }
+        // Bad image
+        // Don't need an update
+        // Histogram disabled
+        // Already processing
 
-Run analysis process
+    // Set our image and GPU pointers
+    _imgProc = _img;
+    _gpuProc = _gpu;
+    procHist = true;
+    cv.notify_one();
+}
 
-process to histo buffer
-Send pointer to GPU to update histo buffer
-clear flag
-*/
+//--- Work Thread ---//
+/*
+    Main thread waiting for work to be
+    assigned for processing
+ */
+void winHistogram::workThread() {
+    std::unique_lock<std::mutex> lock(mtx);
+    while (!histStop) {
+        cv.wait(lock, [this] {return procHist || histStop;});
+
+        if (histStop) break;
+
+        lock.unlock();
+        updateHistogram();
+        _imgProc->needHist = false;
+        lock.lock();
+        procHist = false;
+    }
+}
+
+void winHistogram::updateHistogram() {
+
+    // Set the image needing to be pulled
+    _gpuProc->histObj.imgPtr = _imgProc;
+    // Flag that we need the current image data
+    _gpuProc->histObj.get = true;
+    // Wait while the main thread gets the image data for us
+    while (_gpuProc->histObj.get) {}
+
+    if (!_gpuProc->histObj.imgData) {
+        LOG_WARN("No image data in histo process!");
+        return; // Something went wrong in the GL end
+    }
+
+
+    _gpuProc->histObj.histData = new float[HISTWIDTH * HISTHEIGHT * 4];
+    updateHistPixels(_imgProc, _gpuProc->histObj.imgData, _gpuProc->histObj.histData, _gpuProc->histObj.imgW, _gpuProc->histObj.imgH, appPrefs.prefs.histInt);
+
+    // Flag that we've completed the histogram processing
+    _gpuProc->histObj.set = true;
+    // Wait while the main thread picks this up
+    while (_gpuProc->histObj.set) {}
+
+}
 
 
 //--- Calculate Histogram from RGBA ---//
@@ -359,7 +214,7 @@ void calculateHistogramFromRGBA(const float *rgba_buffer, int width,
 }
 
 //--- Update Histogram to Float Buffer ---//
-void mainWindow::updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier) {
+void winHistogram::updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier) {
 
     // Clamp intensity multiplier to valid range
     intensityMultiplier = std::clamp(intensityMultiplier, 0.0f, 1.0f);

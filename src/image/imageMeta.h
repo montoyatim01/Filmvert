@@ -30,7 +30,7 @@ struct imageMetadata {
     std::string scanner;
     std::string scanNotes;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(imageMetadata, fileName, rollName,
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(imageMetadata, fileName, rollName,
         frameNumber, cameraMake, cameraModel, lens, filmStock,
         focalLength, fNumber, exposureTime, dateTime, location,
         gps, notes, devProcess, chemMfg, devNotes, scanner, scanNotes);

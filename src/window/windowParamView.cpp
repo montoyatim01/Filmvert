@@ -32,10 +32,6 @@ void mainWindow::paramView() {
             if (ImGui::Button("Rotate Left")) {
                 if (validIm()) {
                     activeImage()->rotLeft();
-                    if (activeImage()->texture) {
-                        //SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
-                        //activeImage()->texture = nullptr;
-                    }
                     renderCall = true;
                     paramChange = true;
                 }
@@ -44,10 +40,6 @@ void mainWindow::paramView() {
             if (ImGui::Button("Rotate Right")) {
                 if (validIm()) {
                     activeImage()->rotRight();
-                    if (activeImage()->texture) {
-                        //SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
-                        //activeImage()->texture = nullptr;
-                    }
                     renderCall = true;
                     paramChange = true;
                 }
@@ -192,8 +184,8 @@ void mainWindow::paramView() {
 
             }
             if (validIm()) {
-                ImGui::Text("FPS: %.2f | Raw Res: %ix%i | Working Res: %ix%i",
-                    gpu->rdTimer.fps,
+                ImGui::Text("FPS: %7.2f | Raw Res: %ix%i | Working Res: %ix%i",
+                    fps,
                     activeImage()->rawWidth, activeImage()->rawHeight,
                     activeImage()->width, activeImage()->height);
             }

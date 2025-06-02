@@ -5,6 +5,8 @@
 #include "imageParams.h"
 #include "logger.h"
 #include "nlohmann/json.hpp"
+#include "structs.h"
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -79,7 +81,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta, true)) {
+                if (loadMetaFromStr(customMeta)) {
                     return;
                 }
             }
@@ -95,7 +97,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta, true)) {
+                if (loadMetaFromStr(customMeta)) {
                     return;
                 }
             }
@@ -114,7 +116,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta, true)) {
+                if (loadMetaFromStr(customMeta)) {
                     return;
                 }
             }
@@ -334,6 +336,25 @@ void image::writeXMPFile() {
     }
 }
 
+bool image::writeJSONFile() {
+    updateMetaStr();
+    try {
+        std::optional<nlohmann::json> met = getJSONMeta();
+        if (!met.has_value())
+            return false;
+        std::string jsonPath = rollPath + "/" + srcFilename + ".json";
+        std::ofstream file(jsonPath);
+        if (!file)
+            return false;
+        file << met.value().dump(4);
+        file.close();
+    } catch (const std::exception& e) {
+        LOG_ERROR("Error writing JSON file: {}", e.what());
+        return false;
+    }
+    return true;
+}
+
 //--- Load Metadata from String---//
 /*
     Attempt to load in and populate the inversion
@@ -344,214 +365,49 @@ void image::writeXMPFile() {
     metadata values (incomplete match possible)
 */
 
-bool image::loadMetaFromStr(const std::string& j, bool loadMeta) {
+bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt) {
+    imageParams *impParam = nullptr;
+    imageMetadata *impMeta = nullptr;
+    // Try importing Param JSON Object
     try {
-            // Parse JSON into class members
-            nlohmann::json jsonObject = nlohmann::json::parse(j);
-            imageParams tmpParam;
-            // Toss into temp param first so that if there's a failure
-            // nothing actually sticks (no partial params)
-            bool goodImgParm = true;
-            if (jsonObject.contains("filmvert")) {
-                nlohmann::json imgJson = jsonObject["filmvert"].get<nlohmann::json>();
-
-                if (imgJson.contains("sampleX") && imgJson["sampleX"].is_array()) {
-                    const auto& arr = imgJson["sampleX"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(2)); ++i) {
-                        tmpParam.sampleX[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("sampleY") && imgJson["sampleY"].is_array()) {
-                    const auto& arr = imgJson["sampleY"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(2)); ++i) {
-                        tmpParam.sampleY[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("baseColor") && imgJson["baseColor"].is_array()) {
-                    const auto& arr = imgJson["baseColor"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(3)); ++i) {
-                        tmpParam.baseColor[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("whitePoint") && imgJson["whitePoint"].is_array()) {
-                    const auto& arr = imgJson["whitePoint"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.whitePoint[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("blackPoint") && imgJson["blackPoint"].is_array()) {
-                    const auto& arr = imgJson["blackPoint"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.blackPoint[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("g_blackpoint") && imgJson["g_blackpoint"].is_array()) {
-                    const auto& arr = imgJson["g_blackpoint"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.g_blackpoint[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("g_whitepoint") && imgJson["g_whitepoint"].is_array()) {
-                    const auto& arr = imgJson["g_whitepoint"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.g_whitepoint[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("g_lift") && imgJson["g_lift"].is_array()) {
-                    const auto& arr = imgJson["g_lift"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.g_lift[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("g_gain") && imgJson["g_gain"].is_array()) {
-                    const auto& arr = imgJson["g_gain"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.g_gain[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("g_mult") && imgJson["g_mult"].is_array()) {
-                    const auto& arr = imgJson["g_mult"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.g_mult[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("g_offset") && imgJson["g_offset"].is_array()) {
-                    const auto& arr = imgJson["g_offset"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.g_offset[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("g_gamma") && imgJson["g_gamma"].is_array()) {
-                    const auto& arr = imgJson["g_gamma"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.g_gamma[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("cropBoxX") && imgJson["cropBoxX"].is_array()) {
-                    const auto& arr = imgJson["cropBoxX"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.cropBoxX[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("cropBoxY") && imgJson["cropBoxY"].is_array()) {
-                    const auto& arr = imgJson["cropBoxY"];
-                    for (size_t i = 0; i < std::min(arr.size(), size_t(4)); ++i) {
-                        tmpParam.cropBoxY[i] = arr[i].get<float>();
-                    }
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("blurAmount")){
-                    tmpParam.blurAmount = imgJson["blurAmount"].get<float>();
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("minX")){
-                    tmpParam.minX = imgJson["minX"].get<float>();
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("minY")){
-                    tmpParam.minY = imgJson["minY"].get<float>();
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("maxX")){
-                    tmpParam.maxX = imgJson["maxX"].get<float>();
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("maxY")){
-                    tmpParam.maxY = imgJson["maxY"].get<float>();
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("temp")){
-                    tmpParam.temp = imgJson["temp"].get<float>();
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("tint")){
-                    tmpParam.tint = imgJson["tint"].get<float>();
-                } else {
-                    goodImgParm = false;
-                }
-
-                if (imgJson.contains("rotation")){
-                    imRot = imgJson["rotation"].get<int>();
-                } else {
-                    //goodImgParm = false;
-                }
-
-            } else {
-                LOG_WARN("No parameters found in metadata!");
-                goodImgParm = false;
-            }
-
-            if (loadMeta) {
-                if (jsonObject.contains("metadata")) {
-                    imMeta = jsonObject["metadata"].get<imageMetadata>();
-                } else {
-                    LOG_WARN("No metadata found!");
-                }
-            }
-
-            if (goodImgParm) {
-                imgParam = tmpParam;
-                renderBypass = false;
-            }
-
-            return true;
-        } catch (const std::exception& e) {
-            LOG_WARN("Exception parsing metadata: {}", e.what());
-            return false;
+        // Parse JSON into class members
+        nlohmann::json jsonObject = nlohmann::json::parse(j);
+        if (jsonObject.contains("filmvert")) {
+            impParam = new imageParams;
+            *impParam = jsonObject["filmvert"].get<imageParams>();
+        } else {
+            LOG_WARN("No params found!");
         }
+    } catch (const std::exception& e) {
+        LOG_WARN("Exception parsing metadata: {}", e.what());
+    }
+
+    // Try importing Meta JSON Object
+    try {
+        nlohmann::json jsonObject = nlohmann::json::parse(j);
+            if (jsonObject.contains("metadata")) {
+                impMeta = new imageMetadata;
+                *impMeta = jsonObject["metadata"].get<imageMetadata>();
+            } else {
+                LOG_WARN("No metadata found!");
+            }
+    } catch (const std::exception& e) {
+        LOG_WARN("Exception parsing metadata: {}", e.what());
+    }
+    copyPaste opts;
+    if (impOpt == nullptr) {
+        // Toggle the initial false values to true
+        opts.analysisGlobal();
+        opts.gradeGlobal();
+        opts.metaGlobal();
+        LOG_INFO("Setting full params");
+    } else {
+        opts = *impOpt;
+    }
+    metaPaste(opts, impParam, impMeta);
+    if (impParam == nullptr && impMeta == nullptr)
+        return false;
+    return true;
 }
 
 //--- Import Image Metadata ---//
@@ -559,32 +415,181 @@ bool image::loadMetaFromStr(const std::string& j, bool loadMeta) {
     Import the params (if available) from the
     selected image
 */
-bool image::importImageMeta(std::string filename) {
-    try {
-        Exiv2::enableBMFF();
-        auto image = Exiv2::ImageFactory::open(filename);
-        if (!image) {
-            throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Could not open the image for metadata reading");
-        }
+bool image::importImageMeta(std::string filename, copyPaste* impOpt) {
+    std::filesystem::path imPath(filename);
+    if (imPath.extension().string() == ".json" ||
+        imPath.extension().string() == ".JSON") {
+        // Selected json file for import
+        std::ifstream file(filename);
+        std::string fileContents((std::istreambuf_iterator<char>(file)),
+                            std::istreambuf_iterator<char>());
+        return loadMetaFromStr(fileContents, impOpt);
+    } else {
+        try {
+            Exiv2::enableBMFF();
+            auto image = Exiv2::ImageFactory::open(filename);
+            if (!image) {
+                throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Could not open the image for metadata reading");
+            }
 
-        image->readMetadata();
+            image->readMetadata();
 
-        // Read EXIF Data into Image
-        Exiv2::ExifData exifData = image->exifData();
+            // Read EXIF Data into Image
+            Exiv2::ExifData exifData = image->exifData();
 
-        if (!exifData.empty()) {
-            if (auto fvMetaOpt = getExifValue<std::string>(exifData, "Exif.Image.ImageDescription"); fvMetaOpt.has_value()) {
-                std::string customMeta = saniJsonString(fvMetaOpt.value());
-                if (!customMeta.empty()) {
-                    // Run the meta loding function
-                    return loadMetaFromStr(customMeta, false);
+            if (!exifData.empty()) {
+                if (auto fvMetaOpt = getExifValue<std::string>(exifData, "Exif.Image.ImageDescription"); fvMetaOpt.has_value()) {
+                    std::string customMeta = saniJsonString(fvMetaOpt.value());
+                    if (!customMeta.empty()) {
+                        // Run the meta loding function
+                        return loadMetaFromStr(customMeta, impOpt);
+                    }
                 }
             }
-        }
 
-    } catch (const Exiv2::Error& e) {
-        LOG_ERROR("Exiv2 image exception: {}", e.what());
-        return false;
+        } catch (const Exiv2::Error& e) {
+            LOG_ERROR("Exiv2 image exception: {}", e.what());
+            return false;
+        }
     }
     return true;
+
+}
+
+
+void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* meta) {
+    bool metaChg = false;
+    if (params != nullptr) {
+        imageParams impParams = *params;
+        if (selectons.baseColor) {
+            imgParam.baseColor[0] = impParams.baseColor[0];
+            imgParam.baseColor[1] = impParams.baseColor[1];
+            imgParam.baseColor[2] = impParams.baseColor[2];
+            metaChg = true;
+        }
+        if (selectons.analysisBlur) {
+            imgParam.blurAmount = impParams.blurAmount;
+            metaChg = true;
+        }
+        if (selectons.temp) {
+            imgParam.temp = impParams.temp;
+            metaChg = true;
+        }
+        if (selectons.tint) {
+            imgParam.tint = impParams.tint;
+            metaChg = true;
+        }
+        for (int j = 0; j < 4; j++) {
+            if (selectons.cropPoints) {
+                imgParam.cropBoxX[j] = impParams.cropBoxX[j];
+                imgParam.cropBoxY[j] = impParams.cropBoxY[j];
+                metaChg = true;
+            }
+            if (selectons.analysis) {
+                imgParam.blackPoint[j] = impParams.blackPoint[j];
+                imgParam.whitePoint[j] = impParams.whitePoint[j];
+                metaChg = true;
+            }
+            if (selectons.bp) {
+                imgParam.g_blackpoint[j] = impParams.g_blackpoint[j];
+                metaChg = true;
+            }
+            if (selectons.wp) {
+                imgParam.g_whitepoint[j] = impParams.g_whitepoint[j];
+                metaChg = true;
+            }
+            if (selectons.lift) {
+                imgParam.g_lift[j] = impParams.g_lift[j];
+                metaChg = true;
+            }
+            if (selectons.gain) {
+                imgParam.g_gain[j] = impParams.g_gain[j];
+                metaChg = true;
+            }
+            if (selectons.mult) {
+                imgParam.g_mult[j] = impParams.g_mult[j];
+                metaChg = true;
+            }
+            if (selectons.offset) {
+                imgParam.g_offset[j] = impParams.g_offset[j];
+                metaChg = true;
+            }
+            if (selectons.gamma) {
+                imgParam.g_gamma[j] = impParams.g_gamma[j];
+                metaChg = true;
+            }
+        }
+        renderBypass |= metaChg;
+    }
+
+    if (meta != nullptr) {
+        imageMetadata impMeta = *meta;
+        //---Metadata
+        if (selectons.make) {
+            imMeta.cameraMake = impMeta.cameraMake;
+            metaChg = true;
+        }
+        if (selectons.model) {
+            imMeta.cameraModel = impMeta.cameraModel;
+            metaChg = true;
+        }
+        if (selectons.lens) {
+            imMeta.lens = impMeta.lens;
+            metaChg = true;
+        }
+        if (selectons.stock) {
+            imMeta.filmStock = impMeta.filmStock;
+            metaChg = true;
+        }
+        if (selectons.focal) {
+            imMeta.focalLength = impMeta.focalLength;
+            metaChg = true;
+        }
+        if (selectons.fstop) {
+            imMeta.fNumber = impMeta.fNumber;
+            metaChg = true;
+        }
+        if (selectons.exposure) {
+            imMeta.exposureTime = impMeta.exposureTime;
+            metaChg = true;
+        }
+        if (selectons.date) {
+            imMeta.dateTime = impMeta.dateTime;
+            metaChg = true;
+        }
+        if (selectons.location) {
+            imMeta.location = impMeta.location;
+            metaChg = true;
+        }
+        if (selectons.gps) {
+            imMeta.gps = impMeta.gps;
+            metaChg = true;
+        }
+        if (selectons.notes) {
+            imMeta.notes = impMeta.notes;
+            metaChg = true;
+        }
+        if (selectons.dev) {
+            imMeta.devProcess = impMeta.devProcess;
+            metaChg = true;
+        }
+        if (selectons.chem) {
+            imMeta.chemMfg = impMeta.chemMfg;
+            metaChg = true;
+        }
+        if (selectons.devnote) {
+            imMeta.devNotes = impMeta.devNotes;
+            metaChg = true;
+        }
+        if (selectons.scanner) {
+            imMeta.scanner = impMeta.scanner;
+            metaChg = true;
+        }
+        if (selectons.scannotes) {
+            imMeta.scanNotes = impMeta.scanNotes;
+            metaChg = true;
+        }
+    }
+
+    needMetaWrite |= metaChg;
 }

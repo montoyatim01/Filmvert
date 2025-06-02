@@ -18,6 +18,9 @@ struct preferenceSet {
     float histInt = 0.75;
     bool histEnable = true;
 
+    // Mouse settings
+    bool trackpadMode = true;
+
     // Performance Mode
     bool perfMode = true;
     int maxRes = 3000;
@@ -34,9 +37,9 @@ struct preferenceSet {
 
 
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(preferenceSet, undoLevels,
-        autoSave, autoSFreq, histInt, histEnable, perfMode,
-        maxRes, debayerMode, ocioPath, ocioExt, autoSort);
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(preferenceSet, undoLevels,
+        autoSave, autoSFreq, histInt, histEnable, trackpadMode,
+        perfMode, maxRes, debayerMode, ocioPath, ocioExt, autoSort);
 };
 
 class userPreferences {

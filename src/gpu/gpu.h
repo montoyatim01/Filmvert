@@ -23,6 +23,16 @@ struct gpuStat {
     int errorCode;
 };
 
+struct histFrame {
+    float* imgData = nullptr;
+    float* histData = nullptr;
+    int imgW = 0;
+    int imgH = 0;
+    image* imgPtr = nullptr;
+    bool get = false;
+    bool set = false;
+};
+
 class openglGPU {
     public:
         openglGPU();
@@ -39,11 +49,13 @@ class openglGPU {
 
         void getMipMapTexture(image* _img, float*& pixels, int &width, int &height);
         void setHistTexture(float* pixels);
+        void histoCheck();
 
         long long unsigned int histoTex(){return m_histoTex;}
 
         gpuTimer rdTimer;
         bool rendering = false;
+        histFrame histObj;
 
     private:
         gpuStat status;
@@ -52,8 +64,10 @@ class openglGPU {
         std::thread queueThread;
         std::deque<gpuQueue> renderQueue;
         std::mutex queueLock;
+        std::mutex histLock;
 
         image* prevIm;
+
         ocioSetting prevOCIO;
 
         unsigned long long imBufferSize;

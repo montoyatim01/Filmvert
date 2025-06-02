@@ -127,7 +127,7 @@ const std::string glsl_process(R"V0G0N(
         vec4 cool = vec4(0.0, 1.0, 2.0, 1.0);
         vec4 green = vec4(0.0, 1.5, 0.0, 1.0);
         vec4 mag = vec4(1.5, 0.0, 1.5, 1.0);
-        float temp = (1.0 * G_temp);
+        float temp = (-1.0 * G_temp);
         float tint = (0.75 * G_tint);
 
         // WB

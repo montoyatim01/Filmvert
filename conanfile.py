@@ -57,7 +57,6 @@ class FilmvertConan(ConanFile):
         self.requires("lcms/2.16")
         self.requires("fmt/10.2.1")
         self.requires("imgui/1.91.4")
-        self.requires("sdl/2.30.6")
         self.requires("spdlog/1.14.1")
         self.requires("nlohmann_json/3.11.3")
         self.requires("libraw/0.21.2")
@@ -73,10 +72,6 @@ class FilmvertConan(ConanFile):
         tc.generate()
 
     def imports(self):
-        self.copy("imgui_impl_sdlrenderer2.h", dst="bindings", src="res/bindings")
-        self.copy("imgui_impl_sdlrenderer2.cpp", dst="bindings", src="res/bindings")
-        self.copy("imgui_impl_sdl2.cpp", dst="bindings", src="res/bindings")
-        self.copy("imgui_impl_sdl2.h", dst="bindings", src="res/bindings")
         self.copy("imgui_impl_glfw.h", dst="bindings", src="res/bindings")
         self.copy("imgui_impl_glfw.cpp", dst="bindings", src="res/bindings")
         self.copy("imgui_impl_opengl3.h", dst="bindings", src="res/bindings")

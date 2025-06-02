@@ -226,7 +226,7 @@ void openglGPU::bufferCheck(image* _image)
     width = 0;
     height = 0;
 
-    if (glIsTexture(_image->glTexture) != GL_FALSE) {
+    /*if (glIsTexture(_image->glTexture) != GL_FALSE) {
         glBindTexture(GL_TEXTURE_2D, (GLuint)_image->glTexture);
         checkError("Input Texture Query");
 
@@ -234,52 +234,65 @@ void openglGPU::bufferCheck(image* _image)
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
         glBindTexture(GL_TEXTURE_2D, 0);
         checkError("Input Texture Dimension Access");
-    }
+    }*/
 
-    if (nWidth != width || nHeight != height ||
-        m_width != width || m_height != height) {
-        LOG_INFO("Resizing Buffer");
-        // Clean up old resources
-        if (m_inputTexture != 0) {
-            glDeleteTextures(1, &m_inputTexture);
-        }
-        checkError("Deleting Input Texture for resize");
-        if (_image->glTexture != 0) {
-            glDeleteTextures(1, (GLuint*)&_image->glTexture);
-        }
-        checkError("Deleting Output Texture for resize");
+
+    if (nWidth > m_width || nHeight > m_height) {
+        LOG_INFO("Resizing Input Buffer");
 
         // Create input texture
-        glGenTextures(1, &m_inputTexture);
+        if (glIsTexture(m_inputTexture) == GL_FALSE) {
+            glGenTextures(1, &m_inputTexture);
+            checkError("Generating Input Texture");
+        }
         glBindTexture(GL_TEXTURE_2D, m_inputTexture);
+        while( glGetError() != GL_NO_ERROR){} // Ignore errors for binding to input
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, nWidth, nHeight,
                      0, GL_RGBA, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
         checkError("Allocating Input Texture");
-
-        // Create output texture
-        glGenTextures(1, (GLuint*)&_image->glTexture);
-        glBindTexture(GL_TEXTURE_2D, _image->glTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, nWidth, nHeight,
-                     0, GL_RGBA, GL_FLOAT, nullptr);
-        //glTexStorage2D(GL_TEXTURE_2D, 2, GL_RGBA32F, nWidth, nHeight);
-        //glGenerateMipmap(GL_TEXTURE_2D);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        checkError("Allocating Output Texture");
-
-        // Create framebuffer
-        glGenFramebuffers(1, &m_framebuffer);
+        checkError("Setting Modes Input Texture");
         m_width = nWidth;
         m_height = nHeight;
     }
+
+        // Create output texture
+        if (_image->glTexture == 0 || !glIsTexture(_image->glTexture)) {
+            glGenTextures(1, (GLuint*)&_image->glTexture);
+            glBindTexture(GL_TEXTURE_2D, _image->glTexture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, nWidth, nHeight,
+                         0, GL_RGBA, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            checkError("Generating Initial Output Texture");
+        } else {
+            glBindTexture(GL_TEXTURE_2D, _image->glTexture);
+            int oWidth, oHeight;
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
+            checkError("Querying Output Texture");
+            if (oWidth < nWidth || oHeight < nHeight) {
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, nWidth, nHeight,
+                             0, GL_RGBA, GL_FLOAT, nullptr);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                checkError("Generating Fullsize Output Texture");
+            }
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        if (m_framebuffer == 0) {
+            // Create framebuffer
+            glGenFramebuffers(1, &m_framebuffer);
+        }
+
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
     checkError("Binding to Framebuffer for resize");
 
@@ -410,7 +423,7 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     if (!_image->imageLoaded)
         return; //We don't have our buffers yet
     auto start = std::chrono::steady_clock::now();
-
+    while( glGetError() != GL_NO_ERROR){} // Clear any errors from previous
     // Generate RenderParams struct
     renderParams _renderParams = img_to_param(_image);
 
@@ -423,8 +436,8 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     checkError("Geometry Setup");
 
     // Create Shaders
-    createShaders(ocioSet);
-    checkError("Shader Compilation");
+    //createShaders(ocioSet);
+    //checkError("Shader Compilation");
 
     // OCIO Check
     if (prevOCIO != ocioSet || prevIm != _image || _image->fullIm || _image->imgRst) {
@@ -474,9 +487,14 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     checkError("Render");
 
+    //while(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){}
+
     // Unbind
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glUseProgram(0);
     checkError("Unbind");
 
@@ -495,13 +513,13 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
         // Change to OpenGL image buffer
         //_image->allocDispBuf();
         //memcpy(_image->dispImgData, m_disp->contents(), dispSize);
-        //_image->sdlUpdate = true;
+        //_image->glUpdate = true;
     }
 
     if (!isInQueue(_image))
         _image->inRndQueue = false;
 
-
+    _image->needHist = true;
     auto end = std::chrono::steady_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -530,7 +548,7 @@ void openglGPU::copyToTex(GLuint textureID, int width, int height, float* rgbaDa
 
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &texW);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texH);
-    LOG_INFO("Copying to texture: TexDim: {}x{}, inputDim: {}x{}", texW, texH, width, height);
+    //LOG_INFO("Copying to texture: TexDim: {}x{}, inputDim: {}x{}", texW, texH, width, height);
 
     // Upload the data to the existing texture
     glTexSubImage2D(GL_TEXTURE_2D, 0,          // target, level
@@ -558,14 +576,18 @@ void openglGPU::copyFromTexFull(GLuint textureID, int width, int height, float* 
 }
 
 void openglGPU::getMipMapTexture(image* _img, float*& pixels, int &width, int &height) {
-    if (!_img)
+    if (!_img) {
+        LOG_WARN("No image for histogram processing!");
         return;
-    if (glIsTexture(_img->glTexture) == GL_FALSE)
+    }
+    if (glIsTexture(_img->glTexture) == GL_FALSE) {
+        LOG_WARN("Image doesn't have an active GL Texture yet!");
         return;
+    }
     int gWidth = 0;
     int gHeight = 0;
     glBindTexture(GL_TEXTURE_2D, _img->glTexture);
-    // Use MipMap 2 (0.25x res)
+    // Use MipMap 0 (1x res)
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &gWidth);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &gHeight);
 
@@ -585,6 +607,10 @@ void openglGPU::getMipMapTexture(image* _img, float*& pixels, int &width, int &h
 }
 
 void openglGPU::setHistTexture(float* pixels) {
+    if (!pixels) {
+        LOG_WARN("No Histogram Pixels!");
+        return;
+    }
     glBindTexture(GL_TEXTURE_2D, m_histoTex);
 
     // Upload the data to the existing texture
@@ -598,4 +624,23 @@ void openglGPU::setHistTexture(float* pixels) {
     checkError("Copying Histogram");
 
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void openglGPU::histoCheck() {
+    if (histObj.get) {
+        histLock.lock();
+        getMipMapTexture(histObj.imgPtr, histObj.imgData, histObj.imgW, histObj.imgH);
+        histObj.get = false;
+        histLock.unlock();
+    }
+    if (histObj.set) {
+        histLock.lock();
+        setHistTexture(histObj.histData);
+        if (histObj.imgData)
+            delete [] histObj.imgData;
+        if (histObj.histData)
+            delete [] histObj.histData;
+        histObj.set = false;
+        histLock.unlock();
+    }
 }

@@ -93,34 +93,6 @@ int mainWindow::openWindow()
 
     //--------------------------------------------------------------//
 
-    /*
-    // Setup SDL
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
-    {
-        //printf("Error: %s\n", SDL_GetError());
-        LOG_CRITICAL("Error initializing SDL context: {}", SDL_GetError());
-        return -1;
-    }
-
-    #ifdef SDL_HINT_IME_SHOW_UI
-        SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
-    #endif
-
-    // Create window with SDL_Renderer graphics context
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE);
-    SDL_Window* window = SDL_CreateWindow("Filmvert", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1600, 1000, window_flags);
-    if (window == nullptr)
-    {
-        LOG_CRITICAL("Error creating window: {}", SDL_GetError());
-        return -1;
-    }
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-    if (renderer == nullptr)
-    {
-      LOG_CRITICAL("Error creating SDL renderer");
-        return -1;
-    }
-    */
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -130,8 +102,8 @@ int mainWindow::openWindow()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Platform/Renderer backends
-        ImGui_ImplGlfw_InitForOpenGL(window, true);
-        ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
 
     //Font Loading
     auto fs = cmrc::assets::get_filesystem();
@@ -176,9 +148,6 @@ int mainWindow::openWindow()
         return -1;
     }
 
-    // Initialie the OCIO metal kernel
-    //mtlGPU->initOCIOKernels(dispOCIO);
-
     // Initialize GL Processor
     gpu = new openglGPU();
     // Initialize GL Kernels
@@ -199,10 +168,6 @@ int mainWindow::openWindow()
     ImGui::StyleColorsDark();
     imguistyle();
 
-    // Setup Platform/Renderer backends
-    //ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-    //ImGui_ImplSDLRenderer2_Init(renderer);
-
     // Clear all text buffers initially
     std::memset(ackMsg, 0, sizeof(ackMsg));
     std::memset(ackError, 0, sizeof(ackError));
@@ -216,6 +181,8 @@ int mainWindow::openWindow()
     int returnValue = -1;
     int loopCounter = 0;
     firstImage = true;
+    histo.startHistogram();
+    auto start = std::chrono::steady_clock::now();
     while (!done)
     {
         // Poll and handle events (inputs, window resize, etc.)
@@ -223,39 +190,15 @@ int mainWindow::openWindow()
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
         // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
         // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-        /*SDL_Event event;
-        while (SDL_PollEvent(&event))
-        {
-            ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT) {
-                if (unsavedChanges()) {
-                    // Don't quit immediately
-                    unsavedPopTrigger = true;
-                    closeMd = c_app;
-                } else {
-                    done = true;
-                }
-            }
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)){
-                if (unsavedChanges()) {
-                    // Don't quit immediately
-                    unsavedPopTrigger = true;
-                    closeMd = c_app;
-                } else {
-                    done = true;
-                }
-            }
+        auto end = std::chrono::steady_clock::now();
+        auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        if (fpsFlag) {
+            fps = 1000.0f / (float)dur.count();
+            fpsFlag = false;
         }
-        if (loopCounter % 120 == 0) {
-            // Only check periodically
-            if (unsavedChanges()) {
-                setSDLWindowModified(window, true);
-            } else {
-                setSDLWindowModified(window, false);
-            }
-            saveUI();
-            loopCounter = 0;
-        }*/
+
+        start = std::chrono::steady_clock::now();
+
         if (glfwWindowShouldClose(window)) {
             if (unsavedChanges()) {
                 // Don't quit immediately
@@ -293,11 +236,7 @@ int mainWindow::openWindow()
             saveUI();
             loopCounter = 0;
         }
-        //SDL_GetWindowSize(window, &winWidth, &winHeight);
 
-        // Start the Dear ImGui frame
-        //ImGui_ImplSDLRenderer2_NewFrame();
-        //ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
         // Menu bar
@@ -317,7 +256,7 @@ int mainWindow::openWindow()
 
         if (renderCall && !isExporting) {
             imgRender();
-            updateHistogram();
+            fpsFlag = true;
         }
         renderCall = false;
 
@@ -349,6 +288,7 @@ int mainWindow::openWindow()
         shortcutsPopup();
         ackPopup();
         analyzePopup();
+        importImMatchPopup();
 
         // Check analyze timeout?
 
@@ -370,15 +310,13 @@ int mainWindow::openWindow()
 
         // Render one image from the queue
         gpu->processQueue();
+        // Process the histogram
+        histo.processImage(activeImage(), gpu);
+        // Main thread gpu check queue
+        gpu->histoCheck();
 
-        /*
-        SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        //SDL_SetRenderDrawColor(renderer, (Uint8)(windowCL.x * 255), (Uint8)(windowCL.y * 255), (Uint8)(windowCL.z * 255), (Uint8)(windowCL.w * 255));
-        SDL_RenderClear(renderer);
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
-        SDL_RenderPresent(renderer);
-        */
     }
+    histo.stopHistogram();
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
@@ -387,12 +325,5 @@ int mainWindow::openWindow()
 
     glfwDestroyWindow(window);
     glfwTerminate();
-    /*ImGui_ImplSDLRenderer2_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-    ImGui::DestroyContext();
-
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();*/
     return returnValue;
 }

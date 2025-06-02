@@ -132,7 +132,11 @@ void mainWindow::imageMetaPostEdit() {
     if (metaEdit.a_chem)
         activeImage()->imMeta.chemMfg = metaEdit.chem;
     if (metaEdit.a_devnotes)
-        activeImage()->imMeta.devProcess = metaEdit.devnotes;
+        activeImage()->imMeta.devNotes = metaEdit.devnotes;
+    if (metaEdit.a_scanner)
+        activeImage()->imMeta.scanner = metaEdit.scanner;
+    if (metaEdit.a_scannotes)
+        activeImage()->imMeta.scanNotes = metaEdit.scannotes;
 
     activeImage()->needMetaWrite = true;
 

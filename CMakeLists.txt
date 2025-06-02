@@ -25,7 +25,6 @@ find_package(exiv2 REQUIRED)
 find_package(fmt REQUIRED)
 target_compile_definitions( fmt::fmt INTERFACE FMT_HEADER_ONLY)
 find_package(spdlog REQUIRED)
-find_package(SDL2 REQUIRED CONFIG)
 find_package(imgui REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -54,9 +53,6 @@ include_directories(src/window)
 include_directories("${CMAKE_BINARY_DIR}/bindings")
 
 
-if (APPLE)
-    include_directories("/usr/local/include/metal-cpp")
-endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/CMakeRC.cmake)
 
@@ -89,28 +85,6 @@ elseif (UNIX)
 endif()
 
 
-
-
-if (APPLE)
-    add_custom_target(make-metallib DEPENDS default.metallib)
-
-    add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/Filmvert.air"
-        COMMAND xcrun -sdk macosx metal -std=macos-metal2.4 -mmacos-version-min=12.0 -ffast-math -DMETAL=1 -c ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/Filmvert.metal -o "${CMAKE_BINARY_DIR}/Filmvert.air"
-        DEPENDS src/gpu/Filmvert.metal src/renderParams.h
-    )
-    add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/default.metallib"
-        COMMAND xcrun -sdk macosx metallib "${CMAKE_BINARY_DIR}/Filmvert.air" -o "${CMAKE_BINARY_DIR}/default.metallib"
-        DEPENDS "${CMAKE_BINARY_DIR}/Filmvert.air"
-    )
-    # Custom target to copy the metallib
-    add_custom_target(copy-metallib ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_BINARY_DIR}/default.metallib"
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets/default.metallib"
-    DEPENDS "${CMAKE_BINARY_DIR}/default.metallib"
-)
-endif()
-
 cmrc_add_resource_library(resources
 ALIAS assets::rc
 NAMESPACE assets
@@ -118,7 +92,6 @@ assets/fonts/Roboto-Black.ttf
 assets/fonts/Roboto-Bold.ttf
 assets/fonts/Roboto-Regular.ttf
 assets/fonts/JetBrainsMono-Regular.ttf
-#assets/default.metallib
 assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio
 assets/studio-config-v3.0.0_aces-v2.0_ocio-v2.4.ocio
 )
@@ -183,7 +156,6 @@ if (APPLE)
                   "-framework Metal"
                   glfw
                   GLEW::GLEW
-                  SDL2::SDL2-static
                   imgui::imgui
                   spdlog::spdlog_header_only
                   assets::rc
@@ -197,7 +169,6 @@ elseif (WIN32)
     target_link_libraries(Filmvert wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
         glfw
         GLEW::GLEW
-        SDL2::SDL2-static
         imgui::imgui
         spdlog::spdlog_header_only
         assets::rc
@@ -211,7 +182,6 @@ elseif (UNIX)
     target_link_libraries(Filmvert
         glfw
         GLEW::GLEW
-        SDL2::SDL2-static
         imgui::imgui
         spdlog::spdlog_header_only
         assets::rc
@@ -227,8 +197,3 @@ target_compile_definitions(Filmvert PRIVATE
     BUILD_DATE="${BUILD_DATE}"
     GIT_COMMIT_HASH="${GIT_COMMIT_HASH}"
 )
-
-
-#if (APPLE)
-#    add_dependencies(Filmvert make-metallib)
-#endif()

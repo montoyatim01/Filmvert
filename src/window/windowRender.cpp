@@ -37,7 +37,7 @@ void mainWindow::rollRender() {
 /*
     Loop through all rolls/images to determine
     if any have been rendered and are in need of
-    SDL texture updating.
+    GL texture updating.
 
     Also check through all of the rolls to
     see if any are in need of dumping for
@@ -45,17 +45,20 @@ void mainWindow::rollRender() {
 */
 void mainWindow::rollRenderCheck() {
 
-    // Scan through all images needing SDL updates
+    // Scan through all images needing GL updates
     // after being rendered (queued by import)
     for (int r = 0; r < activeRolls.size(); r++) {
         for (int i = 0; i < activeRolls[r].rollSize(); i++) {
             image *img = getImage(r, i);
-            if (img && img->imageLoaded && img->sdlUpdate)
-                updateSDLTexture(img);
+            if (img && img->imageLoaded && img->needRndr) {
+                imgRender(img);
+                img->needRndr = false;
+            }
+
         }
     }
 
-    // Scan through all rolls checking if an SDL update is queued
+    // Scan through all rolls checking if an GL update is queued
     // If no, and if we're not on the selected roll
     // Dump the roll
     for (int r = 0; r < activeRolls.size(); r++) {
@@ -68,7 +71,7 @@ void mainWindow::rollRenderCheck() {
             image* im = getImage(r, i);
             if (!im)
                 continue;
-            if (im->sdlUpdate || gpu->isInQueue(im)) {
+            if (im->glUpdate || gpu->isInQueue(im)) {
                 imRendering = true;
             }
 
@@ -76,7 +79,7 @@ void mainWindow::rollRenderCheck() {
         if (!imRendering && r != selRoll &&
             activeRolls[r].rollLoaded &&
             !activeRolls[r].imagesLoading) {
-                // If there are no SDL updates needed
+                // If there are no GL updates needed
                 // And this is not the active roll
                 // And this roll is fully loaded
                 // And there are not images loading

@@ -52,7 +52,7 @@ void userPreferences::saveToFile() {
 
 
     } catch (const std::exception& e) {
-        LOG_WARN("Unable to import preferences file: {}", e.what());
+        LOG_WARN("Unable to export preferences file: {}", e.what());
         return;
     }
 }

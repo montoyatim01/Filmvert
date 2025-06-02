@@ -32,7 +32,7 @@ bool mainWindow::openJSON() {
     if (selection.size() > 0) {
         if (validRoll()) {
             if(activeRoll()->importRollMetaJSON(selection[0])) {
-                rollRender();
+                //rollRender();
                 return true;
             } else {
                 std::strcpy(ackError, "Failed to parse metadata file!");
@@ -45,11 +45,18 @@ bool mainWindow::openJSON() {
 }
 
 bool mainWindow::openImageMeta() {
-    auto selection = ShowFileOpenDialog(false);
+    imgMetImp = ShowFileOpenDialog(false);
 
-    if (selection.size() > 0) {
+    if (imgMetImp.size() > 0) {
+        return true;
+    }
+    return false;
+}
+
+bool mainWindow::setImpImage() {
+    if (imgMetImp.size() > 0) {
         if (validIm()) {
-            if (activeImage()->importImageMeta(selection[0])) {
+            if (activeImage()->importImageMeta(imgMetImp[0], &metImpOpt)) {
                 imgRender();
                 return true;
             } else {

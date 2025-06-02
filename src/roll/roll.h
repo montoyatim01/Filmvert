@@ -16,6 +16,19 @@
 #include <cstring>
 #include <fstream>
 
+struct MetaImpSet {
+    image* img;
+    bool selected;
+    std::string imName;
+    std::string json;
+
+    MetaImpSet(image* _img, bool sel, std::string _imName, std::string _json)
+    : img(_img),
+    selected(sel),
+    imName(_imName),
+    json(_json){}
+};
+
 
 class filmRoll {
 
@@ -52,6 +65,8 @@ class filmRoll {
     bool exportRollMetaJSON();
     bool exportRollCSV();
     bool importRollMetaJSON(const std::string& jsonFile);
+    void applyRollMetaJSON(bool params, copyPaste impOpt);
+    bool applySelMetaJSON(std::string inFile, copyPaste impOpt);
     void rollMetaPreEdit(metaBuff* meta);
     void rollMetaPostEdit(metaBuff* meta);
 
@@ -64,8 +79,9 @@ class filmRoll {
 
 
 
-
-
+    // vector for importing JSON metadata
+    // and linking to images
+    std::vector<MetaImpSet> metaImp;
 
     bool imagesLoading = false;
     bool rollLoaded = false;

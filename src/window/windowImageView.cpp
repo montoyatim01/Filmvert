@@ -1,3 +1,4 @@
+#include "preferences.h"
 #include "window.h"
 #include "windowUtils.h"
 #include <imgui.h>
@@ -477,7 +478,7 @@ void mainWindow::imageView() {
                 dispScale;
 
             // Inside the mouse wheel condition:
-            if (ImGui::GetIO().MouseWheel != 0 && (ImGui::GetIO().KeyShift || ImGui::GetIO().KeyAlt)) {
+            if (ImGui::GetIO().MouseWheel != 0 && (ImGui::GetIO().KeyShift || ImGui::GetIO().KeyAlt || !appPrefs.prefs.trackpadMode)) {
                 // Store the mouse position relative to the image before zooming
                 float mouseXRatio = mousePosInImage.x / activeImage()->width;
                 float mouseYRatio = mousePosInImage.y / activeImage()->height;
@@ -513,7 +514,7 @@ void mainWindow::imageView() {
                 currentlyInteracting = true;
             }
 
-            if ((ImGui::GetIO().MouseWheel != 0 || ImGui::GetIO().MouseWheelH != 0) && !ImGui::GetIO().KeyShift && !ImGui::GetIO().KeyAlt) {
+            if ((ImGui::GetIO().MouseWheel != 0 || ImGui::GetIO().MouseWheelH != 0) && !ImGui::GetIO().KeyShift && !ImGui::GetIO().KeyAlt && appPrefs.prefs.trackpadMode) {
                 scroll.x = ImGui::GetScrollX() - (ImGui::GetIO().MouseWheelH * 12);
                 scroll.y = ImGui::GetScrollY() - (ImGui::GetIO().MouseWheel * 12);
                 ImGui::SetScrollX(scroll.x);
@@ -556,6 +557,19 @@ void mainWindow::imageView() {
             }
         }
         calculateVisible();
+    } // If ValidIm
+    if (gradeBypass) {
+        // Get the current window and draw list
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+        // Calculate position relative to the visible window area
+        ImVec2 windowPos = ImGui::GetWindowPos();
+        ImVec2 textPos = ImVec2(windowPos.x + 5, windowPos.y + 5); // 10px from left, 30px from top
+
+        // Draw the text directly to the draw list so it's always visible
+        ImU32 textColor = IM_COL32(255, 0, 0, 255); // Red color
+        drawList->AddText(textPos, textColor, "GRADE BYPASS");
     }
     ImGui::End();
 

@@ -7,6 +7,14 @@
     pressed any of the assigned hotkeys.
 */
 void mainWindow::checkHotkeys() {
+    if (unsavedPopTrigger || globalMetaPopTrig ||
+        localMetaPopTrig || preferencesPopTrig ||
+        ackPopTrig || anaPopTrig || shortPopTrig ||
+        imMatchPopTrig) {
+            // Don't handle any of the key combos
+            // if we have windows open already!
+            return;
+        }
 
     // Open Image(s) (Cmd + O)
     if (ImGui::IsKeyChordPressed(ImGuiKey_O | ImGuiMod_Ctrl)) {
@@ -73,6 +81,44 @@ void mainWindow::checkHotkeys() {
         }
     }
 
+    // Close Image (Cmd + W)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_W | ImGuiMod_Ctrl)) {
+        if (validRoll()) {
+            if (activeRoll()->imagesLoading) {
+                std::strcpy(ackMsg, "Cannot close selected image(s) while there are images loading!");
+                ackPopTrig = true;
+            } else {
+                if (activeRoll()->unsavedIndividual()) {
+                    closeMd = c_selIm;
+                    unsavedPopTrigger = true;
+                } else {
+                    activeRoll()->closeSelected();
+                }
+            }
+        }
+    }
+
+    // Close Roll (Cmd + Shift + W)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_W | ImGuiMod_Shift | ImGuiMod_Ctrl)) {
+        if (validRoll()) {
+            // Check if roll is loading first
+            if (activeRoll()->imagesLoading) {
+                std::strcpy(ackMsg, "Cannot close roll while images are loading!");
+                ackPopTrig = true;
+            } else {
+                // Check if unsaved, prompt
+                if (activeRoll()->unsavedImages()) {
+                    // We have unsaved images, prompt user
+                    closeMd = c_roll;
+                    unsavedPopTrigger = true;
+
+                } else {
+                    removeRoll();
+                }
+            }
+        }
+    }
+
     // Preferences (Cmd + ,)
     if (ImGui::IsKeyChordPressed(ImGuiKey_Comma | ImGuiMod_Ctrl)) {
         // Preferences
@@ -87,10 +133,6 @@ void mainWindow::checkHotkeys() {
     if (ImGui::IsKeyChordPressed(ImGuiKey_LeftBracket | ImGuiMod_Ctrl)) {
         if (validIm()) {
             activeImage()->rotLeft();
-            if (activeImage()->texture) {
-                //SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
-                activeImage()->texture = nullptr;
-            }
             renderCall = true;
             paramUpdate();
         }
@@ -102,10 +144,6 @@ void mainWindow::checkHotkeys() {
     if (ImGui::IsKeyChordPressed(ImGuiKey_RightBracket | ImGuiMod_Ctrl)) {
         if (validIm()) {
             activeImage()->rotRight();
-            if (activeImage()->texture) {
-                //SDL_DestroyTexture((SDL_Texture*)activeImage()->texture);
-                activeImage()->texture = nullptr;
-            }
             renderCall = true;
             paramUpdate();
         }

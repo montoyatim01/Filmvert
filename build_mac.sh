@@ -38,6 +38,7 @@ do
   conan export conan-recipes/opencolorio
 
   mkdir -p $BUILD_DIR/$arch
+  # Build conan packages
   CONAN_CMAKE_SYSTEM_PROCESSOR=$arch conan install -if $BUILD_DIR/$arch \
     -pr:b default \
     -pr:h darwin-$arch \
@@ -45,15 +46,7 @@ do
     -s build_type=$BUILD_TYPE \
     -b missing .
 
-  #Build metal libarary and copy to assets
-  CONAN_CMAKE_SYSTEM_PROCESSOR=$arch cmake \
-    -B $BUILD_DIR/$arch -S $SOURCE_DIR \
-    -DCMAKE_TOOLCHAIN_FILE="$BUILD_DIR/$arch/conan_toolchain.cmake" \
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-  cmake --build $BUILD_DIR/$arch --target make-metallib --config $BUILD_TYPE || exit 255
-  cp $BUILD_DIR/$arch/default.metallib assets/default.metallib
-
-
+  # Build main program
   CONAN_CMAKE_SYSTEM_PROCESSOR=$arch cmake \
     -B $BUILD_DIR/$arch -S $SOURCE_DIR \
     -DCMAKE_TOOLCHAIN_FILE="$BUILD_DIR/$arch/conan_toolchain.cmake" \
