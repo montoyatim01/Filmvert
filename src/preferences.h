@@ -24,6 +24,7 @@ struct preferenceSet {
     // Performance Mode
     bool perfMode = true;
     int maxRes = 3000;
+    int rollTimeout = 30;
 
     // Debayer Mode
     int debayerMode = 10;

@@ -74,13 +74,13 @@ class mainWindow
         openglGPU* gpu = nullptr;
         winHistogram histo;
         bool renderCall = false;
-        float fps;
+        float fps = 0;
 
         // Window Layout
         ImVec2 imageWinSize;
         float thumbHeight = 290;
-        int winWidth;
-        int winHeight;
+        int winWidth = 0;
+        int winHeight = 0;
         ImVec2 cursorPos;
         float dispScale = 1.0f;
         ImVec2 dispSize;
@@ -92,6 +92,7 @@ class mainWindow
         bool rollChange = false;
         bool histRunning = false;
         bool wantClose = false;
+        image* prevIm;
 
         std::deque<filmRoll> activeRolls;
         int selRoll = 0;
@@ -101,7 +102,7 @@ class mainWindow
 
         //int selIm = -1;
         ImGuiSelectionBasicStorage selection;
-        unsigned int cpColorspace;
+        unsigned int cpColorspace = 0;
 
         // UI Toggles
         bool cropDisplay = true;
@@ -189,7 +190,7 @@ class mainWindow
         bool isExporting = false;
         int exportImgCount = 0;
         int exportProcCount = 0;
-        unsigned int elapsedTime;
+        unsigned int elapsedTime = 0;
 
         // Views
         void menuBar();

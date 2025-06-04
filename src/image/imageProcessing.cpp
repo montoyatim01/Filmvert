@@ -281,10 +281,13 @@ void image::resizeProxy() {
         rawImgData, rawWidth, rawHeight, 0,
         tmpOutData, newWidth, newHeight, 0, 4, 0, 0, 0, 0);
 
+    // We want to resize the raw image data buffer
+    // to only be as big as the new smaller image
     if (rawImgData)
         delete [] rawImgData;
     rawImgData = new float[newWidth * newHeight * 4];
 
+    // Copy back from the temp buffer to the raw image buffer
     memcpy(rawImgData, tmpOutData, newWidth * newHeight * 4 * sizeof(float));
     width = newWidth;
     height = newHeight;

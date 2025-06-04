@@ -9,8 +9,30 @@
     the roll
 */
 void filmRoll::clearBuffers(bool remove) {
-    if (imagesLoading)
+    if (imagesLoading) {
+        rollDumpTimer = std::chrono::steady_clock::now();
         return; // User is jumping back and forth between rolls
+    }
+    if (!remove) {
+        // Only check the time if we're not trying to remove
+        if (!rollDumpCall) {
+            // We have not previously called for a roll dump
+            // Start the timer and set our flag
+            rollDumpCall = true;
+            rollDumpTimer = std::chrono::steady_clock::now();
+            return;
+        } else {
+            // Check the time, return if too soon
+            auto now = std::chrono::steady_clock::now();
+            auto dur = std::chrono::duration_cast<std::chrono::seconds>(now - rollDumpTimer);
+            if (dur.count() < 30) {
+                // We haven't hit the limit, keep the buffers for now
+                return;
+            }
+            LOG_INFO("Clearing the {} buffers!", rollName);
+        }
+    }
+
     if (!appPrefs.prefs.perfMode && !remove)
         return; // User does not have performance mode enabled
     for (int i = 0; i < images.size(); i++) {
@@ -25,14 +47,18 @@ void filmRoll::clearBuffers(bool remove) {
     the image data back from disk
 */
 void filmRoll::loadBuffers() {
+    rollDumpTimer = std::chrono::steady_clock::now();
+    rollDumpCall = false;
+    if (rollLoaded) {
+        return;
+    }
     imagesLoading = true;
     std::thread([this]() {
         auto start = std::chrono::steady_clock::now();
-        ThreadPool pool(std::thread::hardware_concurrency());
         std::vector<std::future<void>> futures;
 
         for (image& img : images) {
-            futures.push_back(pool.submit([&img]() {
+            futures.push_back(tPool->submit([&img]() {
                 img.loadBuffers();
             }));
         }
@@ -42,7 +68,7 @@ void filmRoll::loadBuffers() {
         }
         auto end = std::chrono::steady_clock::now();
         auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        LOG_INFO("-----------Roll Load Time-----------");
+        LOG_INFO("-----------{} Roll Load Time-----------", rollName);
         LOG_INFO("{:*>8}μs | {:*>8}ms", dur.count(), dur.count()/1000);
         imagesLoading = false; // Set only after all are done
         rollLoaded = true;
@@ -56,12 +82,11 @@ void filmRoll::loadBuffers() {
 */
 void filmRoll::checkBuffers() {
     std::thread([this]() {
-        ThreadPool pool(std::thread::hardware_concurrency());
         std::vector<std::future<void>> futures;
 
         for (image& img : images) {
             if (!img.imageLoaded) {
-                futures.push_back(pool.submit([&img]() {
+                futures.push_back(tPool->submit([&img]() {
                     img.loadBuffers();
                 }));
             }

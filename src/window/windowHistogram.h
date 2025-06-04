@@ -5,6 +5,7 @@
 #include <mutex>
 #include <thread>
 #include <queue>
+#include <atomic>
 
 #include "image.h"
 #include "gpu.h"
@@ -18,7 +19,9 @@ class winHistogram {
     void startHistogram();
     void stopHistogram();
 
-    void processImage(image* _img, openglGPU* _gpu);
+    void setGPU(openglGPU* _gpu){_gpuProc = _gpu;};
+
+    void processImage(image* _img);
 
 private:
     std::thread histThread;

@@ -38,11 +38,11 @@ struct image {
     imageMetadata imMeta;
 
     // Core information
-    unsigned int nChannels;
-    unsigned int width;
-    unsigned int height;
-    unsigned int rawWidth;
-    unsigned int rawHeight;
+    unsigned int nChannels = 0;
+    unsigned int width = 0;
+    unsigned int height = 0;
+    unsigned int rawWidth = 0;
+    unsigned int rawHeight = 0;
     bool isRawImage = false;
     bool isDataRaw = false;
 
@@ -76,8 +76,8 @@ struct image {
     bool needHist = false;
 
     // Display/Render flags
-    bool renderBypass;
-    bool gradeBypass;
+    bool renderBypass = true;
+    bool gradeBypass = false;
 
 
     // GL Display
@@ -117,14 +117,14 @@ struct image {
 
     // imageMeta.cpp
     void readMetaFromFile();
-    bool loadMetaFromStr(const std::string& j, copyPaste* impOpt = nullptr);
+    bool loadMetaFromStr(const std::string& j, copyPaste* impOpt = nullptr, bool init = false);
     std::optional<nlohmann::json> getJSONMeta();
     void updateMetaStr();
     void writeXMPFile();
     bool writeJSONFile();
     bool writeExpMeta(std::string filename);
     bool importImageMeta(std::string filename, copyPaste* impOpt = nullptr);
-    void metaPaste(copyPaste selectons, imageParams* params, imageMetadata* meta);
+    void metaPaste(copyPaste selectons, imageParams* params, imageMetadata* meta, bool init = false);
 
     // image.cpp
     void rotLeft();

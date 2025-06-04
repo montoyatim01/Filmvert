@@ -4,6 +4,9 @@
 #include <atomic>
 #include "threadPool.h"
 
+// Global Threadpool
+ThreadPool *tPool;
+
 ThreadPool::ThreadPool(size_t numThreads) {
     for (size_t i = 0; i < numThreads; ++i)
         workers.emplace_back([this]() { this->workerLoop(); });

@@ -83,6 +83,12 @@ class filmRoll {
     // and linking to images
     std::vector<MetaImpSet> metaImp;
 
+    // Timer for checking if it's been
+    // enough time since request for roll-dump
+    // for us to actually dump it (prevents rapid dump/reload)
+    std::chrono::time_point<std::chrono::steady_clock> rollDumpTimer;
+    bool rollDumpCall = false;
+
     bool imagesLoading = false;
     bool rollLoaded = false;
     bool selected = false;

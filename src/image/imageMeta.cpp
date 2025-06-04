@@ -81,7 +81,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta)) {
+                if (loadMetaFromStr(customMeta, nullptr, true)) {
                     return;
                 }
             }
@@ -97,7 +97,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta)) {
+                if (loadMetaFromStr(customMeta, nullptr, true)) {
                     return;
                 }
             }
@@ -116,7 +116,7 @@ void image::readMetaFromFile() {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
             if (!customMeta.empty()) {
                 // Run the meta loding function
-                if (loadMetaFromStr(customMeta)) {
+                if (loadMetaFromStr(customMeta, nullptr, true)) {
                     return;
                 }
             }
@@ -365,7 +365,7 @@ bool image::writeJSONFile() {
     metadata values (incomplete match possible)
 */
 
-bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt) {
+bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt, bool init) {
     imageParams *impParam = nullptr;
     imageMetadata *impMeta = nullptr;
     // Try importing Param JSON Object
@@ -400,11 +400,11 @@ bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt) {
         opts.analysisGlobal();
         opts.gradeGlobal();
         opts.metaGlobal();
-        LOG_INFO("Setting full params");
+        //LOG_INFO("Setting full params");
     } else {
         opts = *impOpt;
     }
-    metaPaste(opts, impParam, impMeta);
+    metaPaste(opts, impParam, impMeta, init);
     if (impParam == nullptr && impMeta == nullptr)
         return false;
     return true;
@@ -457,7 +457,7 @@ bool image::importImageMeta(std::string filename, copyPaste* impOpt) {
 }
 
 
-void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* meta) {
+void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* meta, bool init) {
     bool metaChg = false;
     if (params != nullptr) {
         imageParams impParams = *params;
@@ -519,7 +519,7 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
                 metaChg = true;
             }
         }
-        renderBypass |= metaChg;
+        renderBypass = !metaChg;
     }
 
     if (meta != nullptr) {
@@ -590,6 +590,6 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
             metaChg = true;
         }
     }
-
-    needMetaWrite |= metaChg;
+    if (!init)
+        needMetaWrite |= metaChg;
 }

@@ -50,11 +50,19 @@ int main(void)
 // -* remove legacy SDL code/variables
 // -* Metadata paste doesn't trigger save required?
 // -* Use same import window for image import (select meta or params)
-// -- Cycling quickly between rolls (with a lot loaded) slows it way down
-// -- Cycling quickly between rolls that are loading (while closing them) causes a crash, resizeproxy thread
-// -- Close roll/Image shortcut (Cmd + W?)
-// -- Check esc hotkey in popups to close them!
+// -* Cycling quickly between rolls (with a lot loaded) slows it way down
+// -* Cycling quickly between rolls that are loading (while closing them) causes a crash, resizeproxy thread
+// -* Close roll/Image shortcut (Cmd + W?)
+// -* Check esc hotkey in popups to close them!
 //
+
+/*
+- Added "Roll Timeout". Rolls will wait a set time before unloading
+- Addressed an issue where cycling between many rolls would hammer the system
+- Addressed crashes related to the histogram
+- Addressed an issue where the histogram wouldn't update when changing images
+- Set sane defaults for all variables
+ */
 
 /*
 - Significantly improved histogram performance

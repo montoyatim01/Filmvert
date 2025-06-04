@@ -47,4 +47,6 @@ auto ThreadPool::submit(Func&& func, Args&&... args)
     return result;
 }
 
+extern ThreadPool *tPool;
+
 #endif

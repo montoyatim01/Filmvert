@@ -188,11 +188,10 @@ void mainWindow::importImagePopup() {
                 completedTasks = 0;
                 totalTasks = importFiles.size();
                 activeRolls[impRoll].imagesLoading = true;
-                ThreadPool pool(std::thread::hardware_concurrency());
                 std::vector<std::future<IndexedResult>> futures;
                 for (size_t i = 0; i < importFiles.size(); ++i) {
                         const std::string& file = importFiles[i];
-                        futures.push_back(pool.submit([file, i, this]() -> IndexedResult {
+                        futures.push_back(tPool->submit([file, i, this]() -> IndexedResult {
                             auto result = readImage(file, rawSet, importOCIO);
                             ++completedTasks; // Increment counter when done
                             return IndexedResult{i, std::move(result)};
@@ -321,11 +320,10 @@ void mainWindow::importRollPopup() {
                     //impRoll = activeRolls.size() - 1;
                     activeRolls[thisRoll].imagesLoading = true;
                     // Launch the thread pool
-                    ThreadPool pool(std::thread::hardware_concurrency());
                     std::vector<std::future<IndexedResult>> futures;
                     for (size_t i = 0; i < images.size(); ++i) {
                             const std::string& file = images[i];
-                            futures.push_back(pool.submit([file, i, this]() -> IndexedResult {
+                            futures.push_back(tPool->submit([file, i, this]() -> IndexedResult {
                                 auto result = readImage(file, rawSet, importOCIO);
                                 ++completedTasks; // Increment counter when done
                                 return IndexedResult{i, std::move(result)};
@@ -1163,10 +1161,14 @@ void mainWindow::preferencesPopup() {
         ImGui::Text("Roll Performance Mode");
         ImGui::Checkbox("###02", &appPrefs.prefs.perfMode);
         ImGui::SetItemTooltip("Scale resolution down for optimal interaction speed.\nWill also unload non-active rolls to save memory usage.\nUnloaded rolls are re-loaded when active.");
-        ImGui::SameLine();
-        ImGui::DragInt("Max Res", &appPrefs.prefs.maxRes, 10.0f, 1000, 5000, "%d", 0);
-        ImGui::SetItemTooltip("Set the maximum resolution on the long side for images\non import. Exported images are rendered in full resolution.");
-
+        if (appPrefs.prefs.perfMode) {
+            ImGui::SameLine();
+            ImGui::DragInt("Max Res", &appPrefs.prefs.maxRes, 10.0f, 1000, 5000, "%d", 0);
+            ImGui::SetItemTooltip("Set the maximum resolution on the long side for images\non import. Exported images are rendered in full resolution.");
+            ImGui::Text("Roll Timeout");
+            ImGui::InputInt("###pf1", &appPrefs.prefs.rollTimeout);
+            ImGui::SetItemTooltip("Rolls sent to the background will wait this amount of time before unloading.\nThis prevents excessive disk/CPU usage when jumping between rolls.");
+        }
         ImGui::Separator();
         ImGui::Text("Debayer Mode");
         ImGui::InputInt("###db1", &appPrefs.prefs.debayerMode);

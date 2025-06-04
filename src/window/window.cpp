@@ -1,7 +1,9 @@
 #include "window.h"
+#include "gpu.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "structs.h"
+#include "threadPool.h"
 
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
@@ -153,6 +155,9 @@ int mainWindow::openWindow()
     // Initialize GL Kernels
     gpu->initialize(dispOCIO);
 
+    // Setup Threadpool
+    tPool = new ThreadPool(std::thread::hardware_concurrency());
+
     // Load in user preferences
     appPrefs.loadFromFile();
 
@@ -181,6 +186,7 @@ int mainWindow::openWindow()
     int returnValue = -1;
     int loopCounter = 0;
     firstImage = true;
+    histo.setGPU(gpu);
     histo.startHistogram();
     auto start = std::chrono::steady_clock::now();
     while (!done)
@@ -260,6 +266,13 @@ int mainWindow::openWindow()
         // Hotkeys
         checkHotkeys();
 
+        if (validIm()) {
+            if (activeImage() != prevIm && activeImage()->imageLoaded) {
+                prevIm = activeImage();
+                renderCall = true;
+            }
+        }
+
         if (renderCall && !isExporting) {
             imgRender();
             fpsFlag = true;
@@ -316,8 +329,12 @@ int mainWindow::openWindow()
 
         // Render one image from the queue
         gpu->processQueue();
-        // Process the histogram
-        histo.processImage(activeImage(), gpu);
+        if (validIm()) {
+            // Process the histogram
+            image* hImg = activeImage();
+            histo.processImage(hImg);
+        }
+
         // Main thread gpu check queue
         gpu->histoCheck();
 

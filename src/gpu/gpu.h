@@ -20,7 +20,7 @@
 struct gpuStat {
     bool error = false;
     std::string errString;
-    int errorCode;
+    int errorCode = 0;
 };
 
 struct histFrame {
@@ -56,6 +56,7 @@ class openglGPU {
         gpuTimer rdTimer;
         bool rendering = false;
         histFrame histObj;
+        std::mutex histLock;
 
     private:
         gpuStat status;
@@ -64,13 +65,13 @@ class openglGPU {
         std::thread queueThread;
         std::deque<gpuQueue> renderQueue;
         std::mutex queueLock;
-        std::mutex histLock;
+
 
         image* prevIm;
 
         ocioSetting prevOCIO;
 
-        unsigned long long imBufferSize;
+        unsigned long long imBufferSize = 0;
         unsigned int m_width = 0;
         unsigned int m_height = 0;
 

@@ -830,7 +830,7 @@ auto durE = std::chrono::duration_cast<std::chrono::microseconds>(e1 - d1);
 auto durF = std::chrono::duration_cast<std::chrono::microseconds>(f1 - e1);
 auto durG = std::chrono::duration_cast<std::chrono::microseconds>(end - f1);
 auto durH = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-LOG_INFO("-----------Debayer Time-----------");
+//LOG_INFO("-----------Debayer Time-----------");
 //LOG_INFO("Open:     {:*>8}μs | {:*>8}ms", durA.count(), durA.count()/1000);
 //LOG_INFO("Unpack:   {:*>8}μs | {:*>8}ms", durB.count(), durB.count()/1000);
 //LOG_INFO("Process:  {:*>8}μs | {:*>8}ms", durC.count(), durC.count()/1000);
@@ -838,7 +838,7 @@ LOG_INFO("-----------Debayer Time-----------");
 //LOG_INFO("Pad:      {:*>8}μs | {:*>8}ms", durE.count(), durE.count()/1000);
 //LOG_INFO("Disp:     {:*>8}μs | {:*>8}ms", durF.count(), durF.count()/1000);
 //LOG_INFO("Clear:    {:*>8}μs | {:*>8}ms", durG.count(), durG.count()/1000);
-LOG_INFO("Total:    {:*>8}μs | {:*>8}ms", durH.count(), durH.count()/1000);
+//LOG_INFO("Total:    {:*>8}μs | {:*>8}ms", durH.count(), durH.count()/1000);
 //LOG_INFO("----------------------------------");
     return img;
 }

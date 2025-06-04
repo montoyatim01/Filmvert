@@ -606,20 +606,18 @@ void openglGPU::setHistTexture(float* pixels) {
 }
 
 void openglGPU::histoCheck() {
+    histLock.lock();
     if (histObj.get) {
-        histLock.lock();
         getMipMapTexture(histObj.imgPtr, histObj.imgData, histObj.imgW, histObj.imgH);
         histObj.get = false;
-        histLock.unlock();
     }
     if (histObj.set) {
-        histLock.lock();
         setHistTexture(histObj.histData);
         if (histObj.imgData)
             delete [] histObj.imgData;
         if (histObj.histData)
             delete [] histObj.histData;
         histObj.set = false;
-        histLock.unlock();
     }
+    histLock.unlock();
 }

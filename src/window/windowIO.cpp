@@ -101,11 +101,10 @@ void mainWindow::exportImages() {
     exportThread = std::thread{[this]() {
         expStart = std::chrono::steady_clock::now();
 
-        ThreadPool pool(std::thread::hardware_concurrency());
         std::vector<std::future<void>> futures;
 
         for (int i = 0; i < activeRollSize(); i++) {
-            futures.push_back(pool.submit([this, i]() {
+            futures.push_back(tPool->submit([this, i]() {
                 if (!isExporting) { // If user has cancelled
                     exportPopup = false; // Bail out
                     return;
@@ -168,14 +167,13 @@ LOG_INFO("Exporting {} Files", exportImgCount);
     exportThread = std::thread{[this]() {
         expStart = std::chrono::steady_clock::now();
 
-        ThreadPool pool(std::thread::hardware_concurrency());
         std::vector<std::future<void>> futures;
 
         for (int r = 0; r < activeRolls.size(); r++) {
             if (activeRolls[r].selected) {
                 for (int i = 0; i < activeRolls[r].rollSize(); i++) {
                     //LOG_INFO("Exporting {} Image from {} Roll", i, r);
-                    futures.push_back(pool.submit([this, r, i]() {
+                    futures.push_back(tPool->submit([this, r, i]() {
                         if (!isExporting) { // If user has cancelled
                             exportPopup = false; // Bail out
                             return;
