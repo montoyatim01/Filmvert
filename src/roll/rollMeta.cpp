@@ -23,7 +23,7 @@ bool filmRoll::exportRollMetaJSON() {
         }
         j[rollName.c_str()] = jRoll;
         std::string jDump = j.dump(4);
-        std::string outPath = rollPath + "/" + rollName + ".json";
+        std::string outPath = rollPath + "/" + rollName + ".fvi";
         std::ofstream jsonFile(outPath, std::ios::out | std::ios::trunc);
         if (!jsonFile) {
             LOG_ERROR("Unable to open JSON file for roll metadata export!");

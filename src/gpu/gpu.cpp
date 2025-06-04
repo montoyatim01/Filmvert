@@ -23,6 +23,8 @@ openglGPU::~openglGPU() {
     glDeleteFramebuffers(1, &fbo);
     glDeleteVertexArrays(1, &quadVAO);
     glDeleteProgram(m_shaderProgram);
+    if (histObj.histData)
+        delete [] histObj.histData;
 }
 
 bool openglGPU::initialize(ocioSetting &ocioSet) {
@@ -55,6 +57,8 @@ bool openglGPU::initialize(ocioSetting &ocioSet) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+    // Set up out histogram buffer
+    histObj.histData = new float[HISTWIDTH * HISTHEIGHT * 4];
     m_initialized = true;
     return true;
 }
@@ -606,7 +610,8 @@ void openglGPU::setHistTexture(float* pixels) {
 }
 
 void openglGPU::histoCheck() {
-    histLock.lock();
+    if (!histLock.try_lock()) // Don't get caught up waiting
+        return;
     if (histObj.get) {
         getMipMapTexture(histObj.imgPtr, histObj.imgData, histObj.imgW, histObj.imgH);
         histObj.get = false;
@@ -615,8 +620,6 @@ void openglGPU::histoCheck() {
         setHistTexture(histObj.histData);
         if (histObj.imgData)
             delete [] histObj.imgData;
-        if (histObj.histData)
-            delete [] histObj.histData;
         histObj.set = false;
     }
     histLock.unlock();

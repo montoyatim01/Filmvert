@@ -57,6 +57,11 @@ int main(void)
 //
 
 /*
+- Change from json file extension to fvi
+- Histogram fixes
+ */
+
+/*
 - Added "Roll Timeout". Rolls will wait a set time before unloading
 - Addressed an issue where cycling between many rolls would hammer the system
 - Addressed crashes related to the histogram

@@ -8,6 +8,7 @@
 #include <OpenColorIO/oglapphelpers/glsl.h>
 
 #include <GL/glew.h>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -47,6 +48,10 @@ class openglGPU {
         void clearError();
         std::string getError();
 
+        void startHist();
+        void stopHist();
+        void procHistIm(image* img);
+
         void getMipMapTexture(image* _img, float*& pixels, int &width, int &height);
         void setHistTexture(float* pixels);
         void histoCheck();
@@ -55,8 +60,6 @@ class openglGPU {
 
         gpuTimer rdTimer;
         bool rendering = false;
-        histFrame histObj;
-        std::mutex histLock;
 
     private:
         gpuStat status;
@@ -75,7 +78,19 @@ class openglGPU {
         unsigned int m_width = 0;
         unsigned int m_height = 0;
 
+        // Histogram
+        std::thread histThread;
+        std::mutex histLock;
+        std::mutex histNoteLock;
+        std::condition_variable cv;
+        bool procHist = false;
+        bool histStop = true;
+        histFrame histObj;
 
+        // histogram.cpp
+        void workThread();
+        void updateHistogram();
+        void updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier);
 
         void initBuffers();
 

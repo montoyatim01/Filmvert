@@ -1,12 +1,5 @@
-#include "image.h"
-#include "logger.h"
-#include "preferences.h"
+#include "gpu.h"
 #include "utils.h"
-#include "windowHistogram.h"
-#include <chrono>
-#include <algorithm>
-#include <thread>
-#include <atomic>
 
 //--- Start Histogram ---//
 /*
@@ -14,7 +7,7 @@
     to process the histogram
  */
 
-void winHistogram::startHistogram() {
+void openglGPU::startHist() {
     histStop = false;
     histThread = std::thread([this]{
         workThread();
@@ -26,8 +19,8 @@ void winHistogram::startHistogram() {
     Flag the variable and notify the
     thread to exit
  */
-void winHistogram::stopHistogram() {
-    std::lock_guard<std::mutex> lock(mtx);
+void openglGPU::stopHist() {
+    std::lock_guard<std::mutex> lock(histNoteLock);
     histStop = true;
     cv.notify_one();
     histThread.detach();
@@ -39,23 +32,21 @@ void winHistogram::stopHistogram() {
     Otherwise update the pointers to the gpu
     and image, and notify the thread to process
  */
-void winHistogram::processImage(image* _img) {
-    if (!_img) {
+void openglGPU::procHistIm(image* img) {
+    if (!img) {
         LOG_WARN("Cannot process histogram, bad pointers!");
         return;
     }
 
-    std::lock_guard<std::mutex> lock(mtx);
-    if(!_img->needHist || !appPrefs.prefs.histEnable || procHist) {
+    std::lock_guard<std::mutex> lock(histNoteLock);
+    if(!img->needHist || !appPrefs.prefs.histEnable || procHist) {
         return;
     }
         // Bad image pointer
-        // Bad GPU pointer
         // Don't need an update
         // Histogram disabled
         // Already processing
-
-    _imgProc = _img;
+    histObj.imgPtr = img;
     procHist = true;
     cv.notify_one();
 }
@@ -65,61 +56,56 @@ void winHistogram::processImage(image* _img) {
     Main thread waiting for work to be
     assigned for processing
  */
-void winHistogram::workThread() {
-    std::unique_lock<std::mutex> lock(mtx);
+void openglGPU::workThread() {
+
     while (!histStop) {
+        std::unique_lock<std::mutex> lock(histNoteLock);
         cv.wait(lock, [this] {return procHist || histStop;});
 
         if (histStop) return;
 
 
-        if (_imgProc) {
+        if (histObj.imgPtr) {
             updateHistogram();
-            _imgProc->needHist = false;
+            histObj.imgPtr->needHist = false;
         } else {
 
         }
+        procHist = false;
         lock.unlock();
 
-        lock.lock();
-        procHist = false;
     }
 }
 
-void winHistogram::updateHistogram() {
-    if (!_gpuProc) {
-        return;
-    }
+void openglGPU::updateHistogram() {
+
     // Use the GPU lock
-    _gpuProc->histLock.lock();
-    // Set the image needing to be pulled
-    _gpuProc->histObj.imgPtr = _imgProc;
+    histLock.lock();
 
     // Flag that we need the current image data
-    _gpuProc->histObj.get = true;
+    histObj.get = true;
 
     // Use the GPU Unlock
-    _gpuProc->histLock.unlock();
+    histLock.unlock();
 
     // Wait while the main thread gets the image data for us
-    while (_gpuProc->histObj.get) {}
+    while (histObj.get) {}
 
-    if (!_gpuProc->histObj.imgData) {
+    if (!histObj.imgData) {
         return; // Something went wrong in the GL end
     }
 
     // Use the GPU lock
-    _gpuProc->histLock.lock();
-    _gpuProc->histObj.histData = new float[HISTWIDTH * HISTHEIGHT * 4];
+    histLock.lock();
 
-    updateHistPixels(_imgProc, _gpuProc->histObj.imgData, _gpuProc->histObj.histData, _gpuProc->histObj.imgW, _gpuProc->histObj.imgH, appPrefs.prefs.histInt);
+    updateHistPixels(histObj.imgPtr, histObj.imgData, histObj.histData, histObj.imgW, histObj.imgH, appPrefs.prefs.histInt);
 
     // Flag that we've completed the histogram processing
-    _gpuProc->histObj.set = true;
+    histObj.set = true;
     // GPU Unlock
-    _gpuProc->histLock.unlock();
+    histLock.unlock();
     // Wait while the main thread picks this up
-    while (_gpuProc->histObj.set) {}
+    while (histObj.set) {}
 
 }
 
@@ -241,7 +227,7 @@ void calculateHistogramFromRGBA(const float *rgba_buffer, int width,
 }
 
 //--- Update Histogram to Float Buffer ---//
-void winHistogram::updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier) {
+void openglGPU::updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier) {
 
     if (!img || !imgPixels || !histPixels) {
         return;

@@ -205,7 +205,9 @@ void mainWindow::paramView() {
                 else
                     statusText += "| BG Rolls Loading...";
             }
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(75,75,75,255));
             ImGui::Text("%s", statusText.c_str());
+            ImGui::PopStyleColor();
             if (validIm()) {
                 if (appPrefs.prefs.histEnable)
                     ImGui::Image(reinterpret_cast<ImTextureID>(gpu->histoTex()), ImVec2(ImGui::GetWindowWidth(), 128));

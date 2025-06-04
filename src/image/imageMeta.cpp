@@ -342,7 +342,7 @@ bool image::writeJSONFile() {
         std::optional<nlohmann::json> met = getJSONMeta();
         if (!met.has_value())
             return false;
-        std::string jsonPath = rollPath + "/" + srcFilename + ".json";
+        std::string jsonPath = rollPath + "/" + srcFilename + ".fvi";
         std::ofstream file(jsonPath);
         if (!file)
             return false;
@@ -417,8 +417,8 @@ bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt, bool init) 
 */
 bool image::importImageMeta(std::string filename, copyPaste* impOpt) {
     std::filesystem::path imPath(filename);
-    if (imPath.extension().string() == ".json" ||
-        imPath.extension().string() == ".JSON") {
+    if (imPath.extension().string() == ".fvi" ||
+        imPath.extension().string() == ".FVI") {
         // Selected json file for import
         std::ifstream file(filename);
         std::string fileContents((std::istreambuf_iterator<char>(file)),

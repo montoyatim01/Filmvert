@@ -38,7 +38,6 @@
 #include "roll.h"
 #include "structs.h"
 #include "threadPool.h"
-#include "windowHistogram.h"
 #include "windowUtils.h"
 
 // Declared functions from macOSFile.mm
@@ -72,7 +71,6 @@ class mainWindow
 
     private:
         openglGPU* gpu = nullptr;
-        winHistogram histo;
         bool renderCall = false;
         float fps = 0;
 

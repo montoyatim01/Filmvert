@@ -186,8 +186,7 @@ int mainWindow::openWindow()
     int returnValue = -1;
     int loopCounter = 0;
     firstImage = true;
-    histo.setGPU(gpu);
-    histo.startHistogram();
+    gpu->startHist();
     auto start = std::chrono::steady_clock::now();
     while (!done)
     {
@@ -332,14 +331,14 @@ int mainWindow::openWindow()
         if (validIm()) {
             // Process the histogram
             image* hImg = activeImage();
-            histo.processImage(hImg);
+            gpu->procHistIm(hImg);
         }
 
         // Main thread gpu check queue
         gpu->histoCheck();
 
     }
-    histo.stopHistogram();
+    gpu->stopHist();
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
