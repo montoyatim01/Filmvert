@@ -4,8 +4,8 @@
 //--- Thumbnail View Routine ---//
 void mainWindow::thumbView() {
     ImGui::SetNextWindowPos(ImVec2(0,imageWinSize.y + 25));
-    ImGui::SetNextWindowSize(ImVec2(winWidth,winHeight - imageWinSize.y));
-    ImGui::Begin("Thumbnails", 0, ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
+    ImGui::SetNextWindowSize(ImVec2(winWidth,(winHeight - imageWinSize.y) - 25));
+    ImGui::Begin("Thumbnails", 0, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
             {
 
                 //Multi-Select
@@ -149,10 +149,10 @@ void mainWindow::thumbView() {
 
                             ImGui::EndGroup();
                             ImGui::PopID();
-                            ImGui::SameLine();
+                            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.x);
                     }
                 }
-
+                ImGui::NewLine();
                 ms_io = ImGui::EndMultiSelect();
                 selection.ApplyRequests(ms_io);
 

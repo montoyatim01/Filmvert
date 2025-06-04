@@ -574,7 +574,12 @@ void openglGPU::getMipMapTexture(image* _img, float*& pixels, int &width, int &h
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &gWidth);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &gHeight);
 
-    pixels = new float[gWidth * gHeight * 4];
+    if (gWidth * gHeight * 4 > histObj.bufferSize || !pixels) {
+        histObj.bufferSize = gWidth * gHeight * 4;
+        if (pixels)
+            delete [] pixels;
+        pixels = new float[histObj.bufferSize];
+    }
 
     // Read texture data directly
     glGetTexImage(GL_TEXTURE_2D,    // target
@@ -618,8 +623,6 @@ void openglGPU::histoCheck() {
     }
     if (histObj.set) {
         setHistTexture(histObj.histData);
-        if (histObj.imgData)
-            delete [] histObj.imgData;
         histObj.set = false;
     }
     histLock.unlock();

@@ -305,7 +305,8 @@ void mainWindow::importRollPopup() {
                         if (dir_entry.is_regular_file()) {
                             //Found an image in root of selection
                             if (dir_entry.path().extension().string() != ".xmp" &&
-                                dir_entry.path().extension().string() != ".fvi")
+                                dir_entry.path().extension().string() != ".fvi" &&
+                                dir_entry.path().extension().string() != ".json")
                                 // Ignore files we make that are definitely not images
                                 images.push_back(dir_entry.path().string());
                         }

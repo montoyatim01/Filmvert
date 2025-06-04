@@ -269,6 +269,7 @@ int mainWindow::openWindow()
             if (activeImage() != prevIm && activeImage()->imageLoaded) {
                 prevIm = activeImage();
                 renderCall = true;
+                activeImage()->needHist = true; // Update the histogram on an image swap
             }
         }
 

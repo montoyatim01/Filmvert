@@ -29,6 +29,7 @@ struct histFrame {
     float* histData = nullptr;
     int imgW = 0;
     int imgH = 0;
+    int64_t bufferSize = 0;
     image* imgPtr = nullptr;
     bool get = false;
     bool set = false;
