@@ -91,6 +91,7 @@ class mainWindow
         bool histRunning = false;
         bool wantClose = false;
         image* prevIm;
+        preferenceSet tmpPrefs;
 
         std::deque<filmRoll> activeRolls;
         int selRoll = 0;
@@ -108,6 +109,7 @@ class mainWindow
         bool sampleVisible = false;
         bool gradeBypass = false;
         bool fpsFlag = false;
+        bool toggleProxy = false;
 
         // Copy/Paste
         imageParams copyParams;

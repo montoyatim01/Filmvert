@@ -365,16 +365,16 @@ void mainWindow::importRollPopup() {
                         }
                     }
 
-
+                    activeRolls[thisRoll].rollLoaded = false;
                     if (r == 0) {
                         // Only do this for the first roll
                         selRoll = thisRoll;
                         dispImpRollPop = false; //Finish the rest of the processing in BG
                         totalTasks = importFiles.size();
                         completedTasks = 1;
+                        activeRolls[thisRoll].rollLoaded = true;
                     }
                     activeRolls[thisRoll].selIm = activeRolls[thisRoll].rollSize() > 0 ? 0 : -1;
-                    activeRolls[thisRoll].rollLoaded = true;
                     activeRolls[thisRoll].imagesLoading = false;
                     activeRolls[thisRoll].rollPath = importFiles[r];
 
@@ -1140,39 +1140,39 @@ void mainWindow::preferencesPopup() {
 
         // Undo Levels
         ImGui::Text("Undo Levels");
-        ImGui::InputInt("###00a", &appPrefs.prefs.undoLevels);
+        ImGui::InputInt("###00a", &tmpPrefs.undoLevels);
 
         ImGui::Separator();
 
         // Auto-save
         ImGui::Text("Auto-save");
-        ImGui::Checkbox("###01", &appPrefs.tmpAutoSave);
-        if (appPrefs.tmpAutoSave) {
+        ImGui::Checkbox("###01", &tmpPrefs.autoSave);
+        if (tmpPrefs.autoSave) {
             ImGui::SameLine();
-            ImGui::InputInt("Frequency (seconds)", &appPrefs.prefs.autoSFreq);
+            ImGui::InputInt("Frequency (seconds)", &tmpPrefs.autoSFreq);
         }
 
         ImGui::Separator();
         ImGui::Text("Trackpad Mode");
-        ImGui::Checkbox("###CB", &appPrefs.prefs.trackpadMode);
+        ImGui::Checkbox("###CB", &tmpPrefs.trackpadMode);
         ImGui::SetItemTooltip("When enabled, two finger scroll will navigate the image viewer.\nUse Shift or Alt/Option to zoom in/out.");
         ImGui::Separator();
 
         // Performance Mode
         ImGui::Text("Roll Performance Mode");
-        ImGui::Checkbox("###02", &appPrefs.prefs.perfMode);
+        ImGui::Checkbox("###02", &tmpPrefs.perfMode);
         ImGui::SetItemTooltip("Scale resolution down for optimal interaction speed.\nWill also unload non-active rolls to save memory usage.\nUnloaded rolls are re-loaded when active.");
-        if (appPrefs.prefs.perfMode) {
+        if (tmpPrefs.perfMode) {
             ImGui::SameLine();
-            ImGui::DragInt("Max Res", &appPrefs.prefs.maxRes, 10.0f, 1000, 5000, "%d", 0);
+            ImGui::DragInt("Max Res", &tmpPrefs.maxRes, 10.0f, 1000, 5000, "%d", 0);
             ImGui::SetItemTooltip("Set the maximum resolution on the long side for images\non import. Exported images are rendered in full resolution.");
             ImGui::Text("Roll Timeout");
-            ImGui::InputInt("###pf1", &appPrefs.prefs.rollTimeout);
+            ImGui::InputInt("###pf1", &tmpPrefs.rollTimeout);
             ImGui::SetItemTooltip("Rolls sent to the background will wait this amount of time before unloading.\nThis prevents excessive disk/CPU usage when jumping between rolls.");
         }
         ImGui::Separator();
         ImGui::Text("Debayer Mode");
-        ImGui::InputInt("###db1", &appPrefs.prefs.debayerMode);
+        ImGui::InputInt("###db1", &tmpPrefs.debayerMode);
         ImGui::SetItemTooltip("Set the debayer mode on export/when not using Performance Mode.\n0: Bilinear\n1: VNG\n2: PPG\n3: AHD\n4: DCB\n5: PL_AHD\n6: AFD\n7: VCD\n8: VCD + AHD\n9: LMMSE\n10: AMaZE\n11: DHT\n12: AP_AHD");
         ImGui::Separator();
 
@@ -1189,8 +1189,8 @@ void mainWindow::preferencesPopup() {
                     badOcioText = true;
                 } else {
                     badOcioText = false;
-                    appPrefs.prefs.ocioPath = selection[0];
-                    std::strcpy(ocioPath, appPrefs.prefs.ocioPath.c_str());
+                    tmpPrefs.ocioPath = selection[0];
+                    std::strcpy(ocioPath, tmpPrefs.ocioPath.c_str());
                 }
             }
         }
@@ -1216,12 +1216,12 @@ void mainWindow::preferencesPopup() {
         if (ImGui::Button("Save")) {
             if (ocioSel == 0) {
                 ocioProc.setIntActive();
-                appPrefs.prefs.ocioExt = false;
+                tmpPrefs.ocioExt = false;
             } else {
                 ocioProc.setExtActive();
-                appPrefs.prefs.ocioExt = true;
+                tmpPrefs.ocioExt = true;
             }
-            appPrefs.prefs.autoSave = appPrefs.tmpAutoSave;
+            appPrefs.prefs = tmpPrefs;
             std::memset(ocioPath, 0, sizeof(ocioPath));
             appPrefs.saveToFile();
             preferencesPopTrig = false;

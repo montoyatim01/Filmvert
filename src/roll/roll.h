@@ -46,7 +46,7 @@ class filmRoll {
     void selectAll();
     void clearSelection();
 
-    bool unsavedImages();
+    bool unsavedImages() const;
     bool unsavedIndividual();
 
     bool sortRoll();

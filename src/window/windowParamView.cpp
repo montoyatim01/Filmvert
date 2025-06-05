@@ -34,6 +34,7 @@ void mainWindow::paramView() {
                     activeImage()->rotLeft();
                     renderCall = true;
                     paramChange = true;
+                    activeRoll()->rollUpState();
                 }
             }
             ImGui::SameLine();
@@ -42,6 +43,7 @@ void mainWindow::paramView() {
                     activeImage()->rotRight();
                     renderCall = true;
                     paramChange = true;
+                    activeRoll()->rollUpState();
                 }
             }
             ImGui::SameLine();
@@ -189,7 +191,11 @@ void mainWindow::paramView() {
                     activeImage()->rawWidth, activeImage()->rawHeight,
                     activeImage()->width, activeImage()->height);
             }
-
+            ImGui::Checkbox("Proxy", &toggleProxy);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20);
+            renderCall |= ImGui::SliderFloat("###pxy", &appPrefs.prefs.proxyRes, 0.05f, 0.8f);
+            ImGui::SameLine();
             std::string statusText;
             if (gpu->rendering)
                 statusText += "Rendering... ";

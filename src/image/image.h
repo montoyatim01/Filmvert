@@ -73,7 +73,8 @@ struct image {
     bool needRndr = false;
     bool imgRst = false;
     bool minSel = false;
-    bool needHist = false;
+    bool reloading = false;
+    uint64_t histQueue = 0;
 
     // Display/Render flags
     bool renderBypass = true;
@@ -82,6 +83,7 @@ struct image {
 
     // GL Display
     long long unsigned int glTexture = 0;
+    long long unsigned int glTextureSm = 0;
 
     void* histTex = nullptr;
     bool glUpdate = false;

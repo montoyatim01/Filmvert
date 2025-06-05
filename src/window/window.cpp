@@ -186,7 +186,6 @@ int mainWindow::openWindow()
     int returnValue = -1;
     int loopCounter = 0;
     firstImage = true;
-    gpu->startHist();
     auto start = std::chrono::steady_clock::now();
     while (!done)
     {
@@ -269,7 +268,6 @@ int mainWindow::openWindow()
             if (activeImage() != prevIm && activeImage()->imageLoaded) {
                 prevIm = activeImage();
                 renderCall = true;
-                activeImage()->needHist = true; // Update the histogram on an image swap
             }
         }
 
@@ -329,17 +327,8 @@ int mainWindow::openWindow()
 
         // Render one image from the queue
         gpu->processQueue();
-        if (validIm()) {
-            // Process the histogram
-            image* hImg = activeImage();
-            gpu->procHistIm(hImg);
-        }
-
-        // Main thread gpu check queue
-        gpu->histoCheck();
 
     }
-    gpu->stopHist();
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();

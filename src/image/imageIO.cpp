@@ -282,6 +282,7 @@ bool image::debayerImage(bool fullRes, int quality) {
             resizeProxy();
 
         imageLoaded = true;
+        needRndr = true;
         // Clean up
         LibRaw::dcraw_clear_mem(processedImage);
         rawProcessor->recycle();
@@ -336,6 +337,7 @@ bool image::oiioReload() {
 
     ocioProc.processImage(rawImgData, width, height, intOCIOSet);
     imageLoaded = true;
+    needRndr = true;
     return true;
 
 }
@@ -455,6 +457,7 @@ bool image::dataReload() {
 
     ocioProc.processImage(rawImgData, width, height, intOCIOSet);
     imageLoaded = true;
+    needRndr = true;
     return true;
 }
 
@@ -732,10 +735,13 @@ std::variant<image, std::string> readRawImage(std::string imagePath, bool backgr
         return "Error opening file";
     }
     if (background) {
-        img.width = rawProcessor->imgdata.sizes.width;
-        img.height = rawProcessor->imgdata.sizes.height;
-        img.rawWidth = rawProcessor->imgdata.sizes.width;
-        img.rawHeight = rawProcessor->imgdata.sizes.height;
+        int rwidth = rawProcessor->imgdata.sizes.width;
+        int rHeight = rawProcessor->imgdata.sizes.height;
+
+        img.width = appPrefs.prefs.perfMode ? rwidth / 2 : rwidth;
+        img.height = appPrefs.prefs.perfMode ? rHeight / 2 : rHeight;
+        img.rawWidth = appPrefs.prefs.perfMode ? rwidth / 2 : rwidth;
+        img.rawHeight = appPrefs.prefs.perfMode ? rHeight / 2 : rHeight;
         img.nChannels = rawProcessor->imgdata.idata.colors;
         if (appPrefs.prefs.perfMode)
             img.calcProxyDim();

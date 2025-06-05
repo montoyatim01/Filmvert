@@ -45,18 +45,14 @@ class openglGPU {
         bool isInQueue(image* _image);
         void processQueue();
         void clearImBuffer(image* img);
+        void clearSmBuffer(image* img);
 
         bool getStatus();
         void clearError();
         std::string getError();
 
-        void startHist();
-        void stopHist();
-        void procHistIm(image* img);
 
-        void getMipMapTexture(image* _img, float*& pixels, int &width, int &height);
-        void setHistTexture(float* pixels);
-        void histoCheck();
+
 
         long long unsigned int histoTex(){return m_histoTex;}
 
@@ -69,6 +65,7 @@ class openglGPU {
         bool enableQueue = false;
         std::thread queueThread;
         std::deque<gpuQueue> renderQueue;
+        std::deque<image*> histQueue;
         std::mutex queueLock;
 
 
@@ -88,10 +85,12 @@ class openglGPU {
         bool procHist = false;
         bool histStop = true;
         histFrame histObj;
+        uint64_t histBufSize = 0;
+        float* histPixels = nullptr;
+        float* imgPixels = nullptr;
 
         // histogram.cpp
-        void workThread();
-        void updateHistogram();
+        void procHistIm(image* img);
         void updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier);
 
         void initBuffers();
@@ -115,7 +114,8 @@ class openglGPU {
 
         void copyToTex(GLuint textureID, int width, int height, float* rgbaData);
         void copyFromTexFull(GLuint textureID, int width, int height, float* rgbaData);
-
+        void getHistTexture(image* _img, float*& pixels, int &width, int &height);
+        void setHistTexture(float* pixels);
 
         OCIO::OpenGLBuilderRcPtr ocioBuilder;
 

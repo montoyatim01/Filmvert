@@ -51,7 +51,7 @@ const std::string glsl_baseColor(R"V0G0N(
     }
 )V0G0N");
 
-// --- Base Color Process Only --- //
+// --- Full kernel --- //
 const std::string glsl_process(R"V0G0N(
 
     // Input from vertex shader
@@ -76,6 +76,7 @@ const std::string glsl_process(R"V0G0N(
 
     // Output
     out vec4 fragColor;
+    out vec4 fragColorSm;
 
     //---LOG---//
     vec4 JPLogtoLin(vec4 inputPixel)
@@ -165,6 +166,7 @@ const std::string glsl_process(R"V0G0N(
         vec4 gradedPixel = imgProcess(inputPixel);
         gradedPixel.w = 1.0;
         fragColor = OCIOFUNC(gradedPixel);
+        fragColorSm = fragColor;
     }
 )V0G0N");
 #endif

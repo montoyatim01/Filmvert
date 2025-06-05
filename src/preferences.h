@@ -36,11 +36,14 @@ struct preferenceSet {
     // Auto-sort on import
     bool autoSort = true;
 
+    float proxyRes = 0.35f;
+
 
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(preferenceSet, undoLevels,
         autoSave, autoSFreq, histInt, histEnable, trackpadMode,
-        perfMode, maxRes, rollTimeout, debayerMode, ocioPath, ocioExt, autoSort);
+        perfMode, maxRes, rollTimeout, debayerMode, ocioPath,
+        ocioExt, autoSort, proxyRes);
 };
 
 class userPreferences {

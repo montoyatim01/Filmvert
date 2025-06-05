@@ -1,114 +1,24 @@
 #include "gpu.h"
 #include "utils.h"
 
-//--- Start Histogram ---//
-/*
-    Start the thread looping waiting
-    to process the histogram
- */
-
-void openglGPU::startHist() {
-    histStop = false;
-    histThread = std::thread([this]{
-        workThread();
-    });
-}
-
-//--- Stop Histogram ---//
-/*
-    Flag the variable and notify the
-    thread to exit
- */
-void openglGPU::stopHist() {
-    std::lock_guard<std::mutex> lock(histNoteLock);
-    histStop = true;
-    cv.notify_one();
-    histThread.detach();
-}
-
 //--- Process Image ---//
 /*
-    If histogram is processing already, bail.
-    Otherwise update the pointers to the gpu
-    and image, and notify the thread to process
+    Process the histogram based on
+    the provided image
  */
 void openglGPU::procHistIm(image* img) {
     if (!img) {
         LOG_WARN("Cannot process histogram, bad pointers!");
         return;
     }
-
-    std::lock_guard<std::mutex> lock(histNoteLock);
-    if(!img->needHist || !appPrefs.prefs.histEnable || procHist) {
-        return;
-    }
-        // Bad image pointer
-        // Don't need an update
-        // Histogram disabled
-        // Already processing
-    histObj.imgPtr = img;
-    procHist = true;
-    cv.notify_one();
-}
-
-//--- Work Thread ---//
-/*
-    Main thread waiting for work to be
-    assigned for processing
- */
-void openglGPU::workThread() {
-
-    while (!histStop) {
-        std::unique_lock<std::mutex> lock(histNoteLock);
-        cv.wait(lock, [this] {return procHist || histStop;});
-
-        if (histStop) return;
-
-
-        if (histObj.imgPtr) {
-            updateHistogram();
-            histObj.imgPtr->needHist = false;
-        } else {
-
-        }
-        procHist = false;
-        lock.unlock();
-
-    }
-}
-
-void openglGPU::updateHistogram() {
-
-    // Use the GPU lock
-    histLock.lock();
-
-    // Flag that we need the current image data
-    histObj.get = true;
-
-    // Use the GPU Unlock
-    histLock.unlock();
-
-    // Wait while the main thread gets the image data for us
-    while (histObj.get) {}
-
-    if (!histObj.imgData) {
-        return; // Something went wrong in the GL end
-    }
-
-    // Use the GPU lock
-    histLock.lock();
-
-    updateHistPixels(histObj.imgPtr, histObj.imgData, histObj.histData, histObj.imgW, histObj.imgH, appPrefs.prefs.histInt);
-
-    // Flag that we've completed the histogram processing
-    histObj.set = true;
-    // GPU Unlock
-    histLock.unlock();
-    // Wait while the main thread picks this up
-    while (histObj.set) {}
+    int hWidth = 0;
+    int hHeight = 0;
+    getHistTexture(img, imgPixels, hWidth, hHeight);
+    updateHistPixels(img, imgPixels, histPixels, hWidth, hHeight, appPrefs.prefs.histInt);
+    setHistTexture(histPixels);
+    return;
 
 }
-
 
 //--- Calculate Histogram from RGBA ---//
 void calculateHistogramFromRGBA(const float *rgba_buffer, int width,

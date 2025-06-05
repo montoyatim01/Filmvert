@@ -29,7 +29,7 @@ bool filmRoll::clearBuffers(bool remove) {
                 // We haven't hit the limit, keep the buffers for now
                 return false;
             }
-            LOG_INFO("Clearing the {} buffers!", rollName);
+            //LOG_INFO("Clearing the {} buffers!", rollName);
         }
     }
 

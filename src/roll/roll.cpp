@@ -70,7 +70,7 @@ void filmRoll::clearSelection() {
     Determine whether there are any images
     with unsaved changes
 */
-bool filmRoll::unsavedImages() {
+bool filmRoll::unsavedImages() const {
     for (int i = 0; i < images.size(); i++) {
         if (images[i].needMetaWrite)
             return true;

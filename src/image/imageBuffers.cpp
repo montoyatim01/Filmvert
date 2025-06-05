@@ -112,6 +112,7 @@ void image::clearBuffers() {
 void image::loadBuffers() {
     if (imageLoaded)
         return;
+    reloading = true;
     allocProcBuf();
     allocDispBuf();
     if (isRawImage) {

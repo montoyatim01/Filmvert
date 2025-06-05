@@ -3,6 +3,7 @@
 #include "glslKernels.h"
 
 #include "ocioProcessor.h"
+#include "preferences.h"
 #include "structs.h"
 
 #include <GLFW/glfw3.h>
@@ -58,7 +59,7 @@ bool openglGPU::initialize(ocioSetting &ocioSet) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     // Set up out histogram buffer
-    histObj.histData = new float[HISTWIDTH * HISTHEIGHT * 4];
+    histPixels = new float[HISTWIDTH * HISTHEIGHT * 4];
     m_initialized = true;
     return true;
 }
@@ -226,7 +227,7 @@ void openglGPU::bufferCheck(image* _image)
     unsigned int nWidth = _image->fullIm ? _image->rawWidth : _image->width;
     unsigned int nHeight = _image->fullIm ? _image->rawHeight : _image->height;
 
-    if (nWidth > m_width || nHeight > m_height) {
+    if (nWidth != m_width || nHeight != m_height) {
         LOG_INFO("Resizing Input Buffer");
 
         // Create input texture
@@ -248,39 +249,73 @@ void openglGPU::bufferCheck(image* _image)
         m_height = nHeight;
     }
 
-        // Create output texture
-        if (_image->glTexture == 0 || !glIsTexture(_image->glTexture)) {
-            glGenTextures(1, (GLuint*)&_image->glTexture);
-            glBindTexture(GL_TEXTURE_2D, _image->glTexture);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, nWidth, nHeight,
+    // Create output texture
+    if (_image->glTexture == 0 || !glIsTexture(_image->glTexture)) {
+        glGenTextures(1, (GLuint*)&_image->glTexture);
+        glBindTexture(GL_TEXTURE_2D, _image->glTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
+                     0, GL_RGBA, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        checkError("Generating Initial Output Texture");
+    } else {
+        glBindTexture(GL_TEXTURE_2D, _image->glTexture);
+        int oWidth, oHeight;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
+        checkError("Querying Output Texture");
+        if (oWidth < nWidth || oHeight < nHeight) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
                          0, GL_RGBA, GL_FLOAT, nullptr);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            checkError("Generating Initial Output Texture");
-        } else {
-            glBindTexture(GL_TEXTURE_2D, _image->glTexture);
-            int oWidth, oHeight;
-            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
-            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
-            checkError("Querying Output Texture");
-            if (oWidth < nWidth || oHeight < nHeight) {
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, nWidth, nHeight,
-                             0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                checkError("Generating Fullsize Output Texture");
-            }
+            checkError("Generating Fullsize Output Texture");
         }
-        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
 
-        if (m_framebuffer == 0) {
-            // Create framebuffer
-            glGenFramebuffers(1, &m_framebuffer);
+    // Create small output texture
+    float scaleFactor = appPrefs.prefs.proxyRes;
+    if (_image->glTextureSm == 0 || !glIsTexture(_image->glTextureSm)) {
+        glGenTextures(1, (GLuint*)&_image->glTextureSm);
+        glBindTexture(GL_TEXTURE_2D, _image->glTextureSm);
+        int smWidth = (int)((float)nWidth * scaleFactor);
+        int smHeight = (int)((float)nHeight * scaleFactor);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, smWidth, smHeight,
+                     0, GL_RGBA, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        checkError("Generating Initial Output Texture");
+    } else {
+        glBindTexture(GL_TEXTURE_2D, _image->glTextureSm);
+        int oWidth, oHeight;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
+        checkError("Querying Output Texture");
+        int smWidth = (int)((float)nWidth * scaleFactor);
+        int smHeight = (int)((float)nHeight * scaleFactor);
+        if (oWidth != smWidth || oHeight != smHeight) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, smWidth, smHeight,
+                         0, GL_RGBA, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            checkError("Generating Small Output Texture");
         }
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    if (m_framebuffer == 0) {
+        // Create framebuffer
+        glGenFramebuffers(1, &m_framebuffer);
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
     checkError("Binding to Framebuffer for resize");
@@ -290,6 +325,10 @@ void openglGPU::bufferCheck(image* _image)
                                GL_TEXTURE_2D, _image->glTexture, 0);
 
     checkError("Attaching Output to Framebuffer");
+
+    GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0};
+    glDrawBuffers(1, drawBuffers);
+    checkError("Setting Draw Buffers");
 
     // Check framebuffer completeness
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -307,7 +346,12 @@ void openglGPU::clearImBuffer(image* img) {
         glDeleteTextures(1, (GLuint*)&img->glTexture);
         img->glTexture = 0;
     }
-
+}
+void openglGPU::clearSmBuffer(image* img) {
+    if (glIsTexture(img->glTextureSm)) {
+        glDeleteTextures(1, (GLuint*)&img->glTextureSm);
+        img->glTextureSm = 0;
+    }
 }
 
 void openglGPU::updateUniforms(renderParams params) {
@@ -419,6 +463,8 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
         return;
     if (!_image->imageLoaded)
         return; //We don't have our buffers yet
+    if (!_image->rawImgData)
+        return;
     auto start = std::chrono::steady_clock::now();
     while( glGetError() != GL_NO_ERROR){} // Clear any errors from previous
     // Generate RenderParams struct
@@ -484,21 +530,35 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     checkError("Render");
 
+    GLuint smallFBO;
+    glGenFramebuffers(1, &smallFBO);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_framebuffer);  // Source: full texture
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, smallFBO);       // Dest: small texture
+
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_2D, _image->glTextureSm, 0);
+
+    int smallWidth = (int)((float)_renderParams.width * appPrefs.prefs.proxyRes);
+    int smallHeight = (int)((float)_renderParams.height * appPrefs.prefs.proxyRes);
+
+    glBlitFramebuffer(0, 0, _renderParams.width, _renderParams.height,
+                     0, 0, smallWidth, smallHeight,
+                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+    glDeleteFramebuffers(1, &smallFBO);
+
     //while(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){}
 
     // Unbind
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+    //glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+    //glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, 0, 0);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glUseProgram(0);
     checkError("Unbind");
-
-    // Update MipMaps
-    //glBindTexture(GL_TEXTURE_2D, _image->glTexture);
-    //glGenerateMipmap(GL_TEXTURE_2D);
-    //checkError("Mipmap");
 
     // Copy Completed Image
     if (_image->fullIm) {
@@ -516,7 +576,9 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     if (!isInQueue(_image))
         _image->inRndQueue = false;
 
-    _image->needHist = true;
+    if (_image->selected)
+        procHistIm(_image);
+    _image->reloading = false;
     auto end = std::chrono::steady_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -566,27 +628,27 @@ void openglGPU::copyFromTexFull(GLuint textureID, int width, int height, float* 
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void openglGPU::getMipMapTexture(image* _img, float*& pixels, int &width, int &height) {
+void openglGPU::getHistTexture(image* _img, float*& pixels, int &width, int &height) {
     if (!_img) {
         LOG_WARN("No image for histogram processing!");
         return;
     }
-    if (glIsTexture(_img->glTexture) == GL_FALSE) {
+    if (glIsTexture(_img->glTextureSm) == GL_FALSE) {
         LOG_WARN("Image doesn't have an active GL Texture yet!");
         return;
     }
     int gWidth = 0;
     int gHeight = 0;
-    glBindTexture(GL_TEXTURE_2D, _img->glTexture);
+    glBindTexture(GL_TEXTURE_2D, _img->glTextureSm);
     // Use MipMap 0 (1x res)
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &gWidth);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &gHeight);
 
-    if (gWidth * gHeight * 4 > histObj.bufferSize || !pixels) {
-        histObj.bufferSize = gWidth * gHeight * 4;
+    if (gWidth * gHeight * 4 > histBufSize || !pixels) {
+        histBufSize = gWidth * gHeight * 4;
         if (pixels)
             delete [] pixels;
-        pixels = new float[histObj.bufferSize];
+        pixels = new float[histBufSize];
     }
 
     // Read texture data directly
@@ -620,18 +682,4 @@ void openglGPU::setHistTexture(float* pixels) {
     checkError("Copying Histogram");
 
     glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-void openglGPU::histoCheck() {
-    if (!histLock.try_lock()) // Don't get caught up waiting
-        return;
-    if (histObj.get) {
-        getMipMapTexture(histObj.imgPtr, histObj.imgData, histObj.imgW, histObj.imgH);
-        histObj.get = false;
-    }
-    if (histObj.set) {
-        setHistTexture(histObj.histData);
-        histObj.set = false;
-    }
-    histLock.unlock();
 }

@@ -54,7 +54,16 @@ int main(void)
 // -* Cycling quickly between rolls that are loading (while closing them) causes a crash, resizeproxy thread
 // -* Close roll/Image shortcut (Cmd + W?)
 // -* Check esc hotkey in popups to close them!
-//
+// -* Rotation doesn't rollup
+
+/*
+- Image params/metadata save out as .fvi files
+- Images now render 'proxy' buffers that are available regardless of roll load state
+- Histogram now renders alongside the image render from the proxy buffer
+- Addressed issues with the selection state of the thumbnails
+- Image rotation now correctly adds to the undo state
+*/
+
 
 /*
 - Rolls now completely unload in the background (saving vram)

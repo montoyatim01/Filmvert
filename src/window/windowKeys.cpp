@@ -1,3 +1,4 @@
+#include "preferences.h"
 #include "window.h"
 #include <imgui.h>
 
@@ -132,6 +133,7 @@ void mainWindow::checkHotkeys() {
         if (appPrefs.prefs.ocioExt)
             ocioSel = 1;
         preferencesPopTrig = true;
+        tmpPrefs = appPrefs.prefs;
     }
 
     // Rotate Left (Cmd + [)
@@ -140,6 +142,7 @@ void mainWindow::checkHotkeys() {
             activeImage()->rotLeft();
             renderCall = true;
             paramUpdate();
+            activeRoll()->rollUpState();
         }
 
 
@@ -151,6 +154,7 @@ void mainWindow::checkHotkeys() {
             activeImage()->rotRight();
             renderCall = true;
             paramUpdate();
+            activeRoll()->rollUpState();
         }
 
     }

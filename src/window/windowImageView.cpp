@@ -33,8 +33,15 @@ void mainWindow::imageView() {
             displayWidth = activeImage()->width;
             displayHeight = activeImage()->height;
         }
-        dispSize = ImVec2(dispScale * displayWidth,
-                        dispScale * displayHeight);
+        float effecDisp = dispScale;
+        if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading) {
+        } else {
+            displayWidth = (int)((float)displayWidth * appPrefs.prefs.proxyRes);
+            displayHeight = (int)((float)displayHeight * appPrefs.prefs.proxyRes);
+            effecDisp = dispScale / appPrefs.prefs.proxyRes;
+        }
+        dispSize = ImVec2(effecDisp * displayWidth,
+                        effecDisp * displayHeight);
 
         cursorPos.x = (ImGui::GetWindowSize().x - dispSize.x) * 0.5f;
         cursorPos.y = (ImGui::GetWindowSize().y - dispSize.y) * 0.5f;
@@ -77,14 +84,24 @@ void mainWindow::imageView() {
             }
 
             // Draw the rotated quad
-            draw_list->AddImageQuad(
-                reinterpret_cast<ImTextureID>(activeImage()->glTexture),
-                canvas_pos, // top-left
-                ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y), // top-right
-                ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y + dispSize.y), // bottom-right
-                ImVec2(canvas_pos.x, canvas_pos.y + dispSize.y), // bottom-left
-                uv0, uv1, uv2, uv3
-            );
+            if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading)
+                draw_list->AddImageQuad(
+                    reinterpret_cast<ImTextureID>(activeImage()->glTexture),
+                    canvas_pos, // top-left
+                    ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y), // top-right
+                    ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y + dispSize.y), // bottom-right
+                    ImVec2(canvas_pos.x, canvas_pos.y + dispSize.y), // bottom-left
+                    uv0, uv1, uv2, uv3
+                );
+            else
+                draw_list->AddImageQuad(
+                    reinterpret_cast<ImTextureID>(activeImage()->glTextureSm),
+                    canvas_pos, // top-left
+                    ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y), // top-right
+                    ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y + dispSize.y), // bottom-right
+                    ImVec2(canvas_pos.x, canvas_pos.y + dispSize.y), // bottom-left
+                    uv0, uv1, uv2, uv3
+                );
 
             // Reserve space in ImGui layout
             ImGui::Dummy(dispSize);
@@ -526,8 +543,8 @@ void mainWindow::imageView() {
                 int iWidth = activeImage()->imRot == 6 || activeImage()->imRot == 8 ? activeImage()->height : activeImage()->width;
                 int iHeight = activeImage()->imRot == 6 || activeImage()->imRot == 8 ? activeImage()->width : activeImage()->height;
                 // Pressed the z key, reset zoom
-                float scaleX = ImGui::GetWindowSize().x / (iWidth + ((float)iWidth * 0.1f));
-                float scaleY = ImGui::GetWindowSize().y / (iHeight + ((float)iHeight * 0.1f));
+                float scaleX = ImGui::GetWindowSize().x / (iWidth + ((float)iWidth * 0.01f));
+                float scaleY = ImGui::GetWindowSize().y / (iHeight + ((float)iHeight * 0.01f));
 
                 dispScale = scaleX > scaleY ? scaleY : scaleX;
                 currentlyInteracting = true;

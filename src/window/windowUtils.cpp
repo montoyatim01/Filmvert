@@ -260,6 +260,7 @@ void mainWindow::removeRoll() {
         activeRolls[delRoll].clearBuffers(true);
         for (auto &img : activeRolls[delRoll].images) {
             gpu->clearImBuffer(&img);
+            gpu->clearSmBuffer(&img);
         }
         activeRolls.erase(activeRolls.begin() + delRoll);
         for (int i = 0; i < activeRolls.size(); i++) {

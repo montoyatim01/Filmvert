@@ -1,6 +1,7 @@
 #include "logger.h"
 //#include "metalGPU.h"
 #include "ocioProcessor.h"
+#include "preferences.h"
 #include "structs.h"
 #include "window.h"
 #include <cstring>
@@ -97,6 +98,7 @@ void mainWindow::menuBar() {
                 if (appPrefs.prefs.ocioExt)
                     ocioSel = 1;
                 preferencesPopTrig = true;
+                tmpPrefs = appPrefs.prefs;
             }
 
             ImGui::Separator();
@@ -298,9 +300,20 @@ void mainWindow::menuBar() {
             ImGui::EndMenu();
         }
 
+        std::vector<std::string> rollNames;  // Store the actual strings
         std::vector<const char*> rollPointers;
+
         for (const auto& item : activeRolls) {
-            rollPointers.push_back(item.rollName.c_str());
+            std::string rollName = "";
+            if (item.unsavedImages())
+                rollName += "*";
+            rollName += item.rollName;
+            rollNames.push_back(rollName);  // Store the string
+        }
+
+        // Now create pointers to the stored strings
+        for (const auto& name : rollNames) {
+            rollPointers.push_back(name.c_str());
         }
         //--- Roll Selector
                 ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetWindowWidth() * 0.05f));

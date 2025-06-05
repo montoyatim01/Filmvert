@@ -79,6 +79,7 @@ void mainWindow::openRolls() {
     // Do something with selection
     //int activePos = activeRollSize();
     if (selection.size() > 0) {
+        std::sort(selection.begin(), selection.end());
         dispImpRollPop = true;
         importFiles = selection;
         checkForRaw();
