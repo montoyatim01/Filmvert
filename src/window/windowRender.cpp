@@ -84,7 +84,7 @@ void mainWindow::rollRenderCheck() {
                 // And this roll is fully loaded
                 // And there are not images loading
                 if (appPrefs.prefs.perfMode) {
-                    activeRolls[r].clearBuffers();
+                    clearRoll(&activeRolls[r]);
                 }
 
             }

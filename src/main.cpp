@@ -57,6 +57,13 @@ int main(void)
 //
 
 /*
+- Rolls now completely unload in the background (saving vram)
+- Images will only load metadata if loading in the background (saving resources)
+- Addressed an issue where the Roll Timeout setting wouldn't save/take effect
+- Addressed an issue where Pakon raw files wouldn't load metadata
+*/
+
+/*
 - Change from json file extension to fvi
 - Histogram fixes
  */

@@ -8,10 +8,10 @@
     the user has performance mode enabled, or is removing
     the roll
 */
-void filmRoll::clearBuffers(bool remove) {
+bool filmRoll::clearBuffers(bool remove) {
     if (imagesLoading) {
         rollDumpTimer = std::chrono::steady_clock::now();
-        return; // User is jumping back and forth between rolls
+        return false; // User is jumping back and forth between rolls
     }
     if (!remove) {
         // Only check the time if we're not trying to remove
@@ -20,25 +20,26 @@ void filmRoll::clearBuffers(bool remove) {
             // Start the timer and set our flag
             rollDumpCall = true;
             rollDumpTimer = std::chrono::steady_clock::now();
-            return;
+            return false;
         } else {
             // Check the time, return if too soon
             auto now = std::chrono::steady_clock::now();
             auto dur = std::chrono::duration_cast<std::chrono::seconds>(now - rollDumpTimer);
-            if (dur.count() < 30) {
+            if (dur.count() < appPrefs.prefs.rollTimeout) {
                 // We haven't hit the limit, keep the buffers for now
-                return;
+                return false;
             }
             LOG_INFO("Clearing the {} buffers!", rollName);
         }
     }
 
     if (!appPrefs.prefs.perfMode && !remove)
-        return; // User does not have performance mode enabled
+        return false; // User does not have performance mode enabled
     for (int i = 0; i < images.size(); i++) {
         images[i].clearBuffers();
     }
     rollLoaded = false;
+    return true;
 }
 
 //--- Load Buffers ---//

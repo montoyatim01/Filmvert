@@ -324,8 +324,8 @@ void mainWindow::importRollPopup() {
                     std::vector<std::future<IndexedResult>> futures;
                     for (size_t i = 0; i < images.size(); ++i) {
                             const std::string& file = images[i];
-                            futures.push_back(tPool->submit([file, i, this]() -> IndexedResult {
-                                auto result = readImage(file, rawSet, importOCIO);
+                            futures.push_back(tPool->submit([file, i, r, this]() -> IndexedResult {
+                                auto result = readImage(file, rawSet, importOCIO, r == 0 ? false : true);
                                 ++completedTasks; // Increment counter when done
                                 return IndexedResult{i, std::move(result)};
                             }));

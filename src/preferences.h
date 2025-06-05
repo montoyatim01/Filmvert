@@ -40,7 +40,7 @@ struct preferenceSet {
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(preferenceSet, undoLevels,
         autoSave, autoSFreq, histInt, histEnable, trackpadMode,
-        perfMode, maxRes, debayerMode, ocioPath, ocioExt, autoSort);
+        perfMode, maxRes, rollTimeout, debayerMode, ocioPath, ocioExt, autoSort);
 };
 
 class userPreferences {

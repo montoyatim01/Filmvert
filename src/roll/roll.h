@@ -52,7 +52,7 @@ class filmRoll {
     bool sortRoll();
 
     // rollBuffers.cpp
-    void clearBuffers(bool remove = false);
+    bool clearBuffers(bool remove = false);
     void loadBuffers();
     void checkBuffers();
     void closeSelected();

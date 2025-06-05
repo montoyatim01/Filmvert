@@ -44,6 +44,7 @@ class openglGPU {
         bool initialize(ocioSetting &ocioSet);
         bool isInQueue(image* _image);
         void processQueue();
+        void clearImBuffer(image* img);
 
         bool getStatus();
         void clearError();

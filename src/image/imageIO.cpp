@@ -474,19 +474,19 @@ bool image::dataReload() {
     Function returns a valid image object set up based
     on the type of image loaded, otherwise an error string
 */
-std::variant<image, std::string> readImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet) {
+std::variant<image, std::string> readImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet, bool background) {
     // Attempt data raw
-    auto drIm = readDataImage(imagePath, rawSet, ocioSet);
+    auto drIm = readDataImage(imagePath, rawSet, ocioSet, background);
     if (std::holds_alternative<image>(drIm))
         return std::get<image>(drIm);
 
     // Attempt camera raw
-    auto crIm = readRawImage(imagePath);
+    auto crIm = readRawImage(imagePath, background);
     if (std::holds_alternative<image>(crIm))
         return std::get<image>(crIm);
 
     // Finally, attempt OpenImageIO
-    return readImageOIIO(imagePath, ocioSet);
+    return readImageOIIO(imagePath, ocioSet, background);
 }
 
 //---Read File Raw Image---//
@@ -499,7 +499,7 @@ std::variant<image, std::string> readImage(std::string imagePath, rawSetting raw
     returns an image object if successful, error string otherwise
 */
 
-std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet) {
+std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet, bool background) {
 
     std::filesystem::path imgP(imagePath);
     if (imgP.extension().string() == ".raw" ||
@@ -533,6 +533,21 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
             } else {
                 // We've got the wrong dimensions
                 throw std::runtime_error("Error: Incorrect dimensions for RAW file! Skipping");
+            }
+            // Image size is good
+            if (background) {
+                // We don't want to actually load the image. Just
+                // fill in the struct and return
+                img.renderBypass = true;
+                img.imageLoaded = false;
+                if (appPrefs.prefs.perfMode)
+                    img.calcProxyDim();
+                img.setCrop();
+                img.readMetaFromFile();
+                img.intOCIOSet = ocioSet;
+                img.isDataRaw = true;
+                img.isRawImage = false;
+                return img;
             }
 
             img.rawImgData = new float[img.width * img.height * 4];
@@ -656,6 +671,7 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
             if (appPrefs.prefs.perfMode)
                 img.resizeProxy();
             img.setCrop();
+            img.readMetaFromFile();
             img.intOCIOSet = ocioSet;
             ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
             img.imageLoaded = true;
@@ -686,7 +702,7 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
 
     Returns an image object if successful, error string otherwise
 */
-std::variant<image, std::string> readRawImage(std::string imagePath) {
+std::variant<image, std::string> readRawImage(std::string imagePath, bool background) {
     auto start = std::chrono::steady_clock::now();
     image img;
 
@@ -715,6 +731,25 @@ std::variant<image, std::string> readRawImage(std::string imagePath) {
         LOG_ERROR("{}", libraw_strerror(result));
         return "Error opening file";
     }
+    if (background) {
+        img.width = rawProcessor->imgdata.sizes.width;
+        img.height = rawProcessor->imgdata.sizes.height;
+        img.rawWidth = rawProcessor->imgdata.sizes.width;
+        img.rawHeight = rawProcessor->imgdata.sizes.height;
+        img.nChannels = rawProcessor->imgdata.idata.colors;
+        if (appPrefs.prefs.perfMode)
+            img.calcProxyDim();
+        img.setCrop();
+        // Read metadata
+        img.readMetaFromFile();
+        // Clean up
+        rawProcessor->recycle();
+        img.imageLoaded = false;
+        img.isDataRaw = false;
+        img.isRawImage = true;
+        return img;
+    }
+
 auto a1 = std::chrono::steady_clock::now();
     // Unpack the raw data
     result = rawProcessor->unpack();
@@ -852,7 +887,7 @@ auto durH = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
     Returns an image object if successful, error string otherwise
 */
-std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSetting ocioSet) {
+std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSetting ocioSet, bool background) {
     image img;
 
     OIIO::ImageInput::unique_ptr inputImage;
@@ -894,7 +929,20 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
     img.imgParam.cropBoxY[3] = img.height * 0.9;
     img.renderBypass = true;
 
-    LOG_INFO("Reading in image with size: {}x{}x{}", img.width, img.height, img.nChannels);
+    if (background) {
+        if (appPrefs.prefs.perfMode)
+            img.calcProxyDim();
+        img.setCrop();
+        img.readMetaFromFile();
+
+        img.intOCIOSet = ocioSet;
+        img.imageLoaded = false;
+        img.isDataRaw = false;
+        img.isRawImage = false;
+        return img;
+    }
+
+    //LOG_INFO("Reading in image with size: {}x{}x{}", img.width, img.height, img.nChannels);
 
     img.rawImgData = new float[img.width * img.height * 4];
     if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)img.rawImgData))

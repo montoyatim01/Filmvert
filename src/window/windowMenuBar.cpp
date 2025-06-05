@@ -313,7 +313,7 @@ void mainWindow::menuBar() {
                         if (selRoll != i) {
                             activeRolls[i].selected = false;
                             if (appPrefs.prefs.perfMode)
-                                activeRolls[i].clearBuffers();
+                                clearRoll(&activeRolls[i]);
                         }
                         if (selRoll == i) {
                             activeRolls[i].loadBuffers();

@@ -254,6 +254,22 @@ void image::setMinMax() {
     }
 }
 
+//--- Calculate Proxy ---//
+/*
+    Helper function to calculate image
+    dimensions if performance mode is enabled
+*/
+void image::calcProxyDim() {
+    if (std::max(rawWidth, rawHeight) < appPrefs.prefs.maxRes)
+        return; // Our image is small enough, don't resize
+    unsigned int newWidth, newHeight;
+    float ratio = rawWidth > rawHeight ? (float)appPrefs.prefs.maxRes / (float)rawWidth : (float)appPrefs.prefs.maxRes / (float)rawHeight;
+
+    newWidth = rawWidth * ratio;
+    newHeight = rawHeight * ratio;
+    return;
+}
+
 //--- Resize Proxy ---//
 /*
     Resize the input image to the maximum

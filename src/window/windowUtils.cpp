@@ -232,6 +232,22 @@ void mainWindow::paramUpdate() {
     metaRefresh = true;
 }
 
+//--- Clear Buffers ---//
+/*
+    Helper function to clear a roll's buffers
+    and also delete the gl buffer associated with it
+ */
+ void mainWindow::clearRoll(filmRoll* roll) {
+    if (roll) {
+        bool cleared = roll->clearBuffers();
+        if (cleared) {
+            for (auto& img : roll->images) {
+                gpu->clearImBuffer(&img);
+            }
+        }
+    }
+ }
+
 //--- Remove Roll ---//
 /*
     Remove the current roll
@@ -242,12 +258,16 @@ void mainWindow::removeRoll() {
         int delRoll = selRoll;
         selRoll = activeRolls.size() > 1 ? selRoll == 0 ? 0 : selRoll-1 : selRoll-1;
         activeRolls[delRoll].clearBuffers(true);
+        for (auto &img : activeRolls[delRoll].images) {
+            gpu->clearImBuffer(&img);
+        }
         activeRolls.erase(activeRolls.begin() + delRoll);
         for (int i = 0; i < activeRolls.size(); i++) {
             if (selRoll != i) {
                 activeRolls[i].selected = false;
                 if (appPrefs.prefs.perfMode)
-                    activeRolls[i].clearBuffers();
+                    clearRoll(&activeRolls[i]);
+
             }
             if (selRoll == i) {
                 activeRolls[i].loadBuffers();

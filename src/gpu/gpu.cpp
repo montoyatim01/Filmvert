@@ -302,6 +302,14 @@ void openglGPU::bufferCheck(image* _image)
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void openglGPU::clearImBuffer(image* img) {
+    if (glIsTexture(img->glTexture)) {
+        glDeleteTextures(1, (GLuint*)&img->glTexture);
+        img->glTexture = 0;
+    }
+
+}
+
 void openglGPU::updateUniforms(renderParams params) {
     glUniform1i(m_uniforms.inputTexture, 0);
     glUniform4fv(m_uniforms.baseColor, 1, params.baseColor);

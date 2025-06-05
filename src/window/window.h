@@ -205,6 +205,7 @@ class mainWindow
         image* getImage(int roll, int index);
         int activeRollSize();
         void paramUpdate();
+        void clearRoll(filmRoll* roll);
         void removeRoll();
         void checkForRaw();
         void testFirstRawFile();

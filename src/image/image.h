@@ -137,15 +137,16 @@ struct image {
     void blurImage();
     void processMinMax();
     void setMinMax();
+    void calcProxyDim();
     void resizeProxy();
 
 };
 
 // imageIO.cpp
-std::variant<image, std::string> readImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet);
-std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet);
-std::variant<image, std::string> readRawImage(std::string imagePath);
-std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSetting ocioSet);
+std::variant<image, std::string> readImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet, bool background = false);
+std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting rawSet, ocioSetting ocioSet, bool background = false);
+std::variant<image, std::string> readRawImage(std::string imagePath, bool background = false);
+std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSetting ocioSet, bool background = false);
 
 // image.cpp
 renderParams img_to_param(image* _img);
