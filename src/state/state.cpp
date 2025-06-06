@@ -151,7 +151,10 @@ void userState::redoState() {
     Size of the state
 */
 int userState::stateSize() {
-    return std::min(metaStates.size(), paramStates.size());
+  if (metaStates.size() < paramStates.size())
+      return metaStates.size();
+  else
+      return paramStates.size();
 }
 
 //--- Undo Available ---//

@@ -1,6 +1,12 @@
 #ifndef _LOGGER_H
 #define _LOGGER_H
 
+#if defined (WIN32)
+//#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shlobj.h>
+#endif
+
 #include <string>
 
 #include "spdlog/spdlog.h"

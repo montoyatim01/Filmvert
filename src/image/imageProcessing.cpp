@@ -3,7 +3,7 @@
 #include "preferences.h"
 #include "utils.h"
 #include "lancir.h"
-#include <strings.h>
+#include <string>
 
 //---Process Base Color---//
 /*

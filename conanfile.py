@@ -54,12 +54,15 @@ class FilmvertConan(ConanFile):
 
     def requirements(self):
         self.requires("libpng/1.6.44")
+        self.requires("openexr/3.2.3")
+        self.requires("jasper/4.2.4")
         self.requires("lcms/2.16")
         self.requires("fmt/10.2.1")
         self.requires("imgui/1.91.4")
         self.requires("spdlog/1.14.1")
         self.requires("nlohmann_json/3.11.3")
         self.requires("libraw/0.21.2")
+        self.requires("opencolorio/2.4.2")
         self.requires("openimageio/2.5.16.0")
         self.requires("opencolorio/2.4.2")
         self.requires("minizip-ng/4.0.6")

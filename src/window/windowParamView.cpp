@@ -216,7 +216,7 @@ void mainWindow::paramView() {
             ImGui::PopStyleColor();
             if (validIm()) {
                 if (appPrefs.prefs.histEnable)
-                    ImGui::Image(reinterpret_cast<ImTextureID>(gpu->histoTex()), ImVec2(ImGui::GetWindowWidth(), 128));
+                    ImGui::Image(static_cast<ImTextureID>(gpu->histoTex()), ImVec2(ImGui::GetWindowWidth(), 128));
             }
         } ImGui::EndChild();
 

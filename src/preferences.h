@@ -1,6 +1,12 @@
 #ifndef _preferences_h_
 #define _preferences_h_
 
+#if defined (WIN32)
+//#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shlobj.h>
+#endif
+
 #include "nlohmann/json.hpp"
 
 #include <string>

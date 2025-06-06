@@ -87,7 +87,7 @@ void mainWindow::imageView() {
             // Draw the rotated quad
             if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading)
                 draw_list->AddImageQuad(
-                    reinterpret_cast<ImTextureID>(activeImage()->glTexture),
+                    static_cast<ImTextureID>(activeImage()->glTexture),
                     canvas_pos, // top-left
                     ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y), // top-right
                     ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y + dispSize.y), // bottom-right
@@ -96,7 +96,7 @@ void mainWindow::imageView() {
                 );
             else
                 draw_list->AddImageQuad(
-                    reinterpret_cast<ImTextureID>(activeImage()->glTextureSm),
+                    static_cast<ImTextureID>(activeImage()->glTextureSm),
                     canvas_pos, // top-left
                     ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y), // top-right
                     ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y + dispSize.y), // bottom-right

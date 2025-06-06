@@ -235,7 +235,7 @@ void ocioProcessor::processImage(float *img, unsigned int width,
 
     for (unsigned int t = 0; t < numThreads; ++t) {
       unsigned int yStart = t * rowsPerThread;
-      unsigned int yEnd = std::min(height, yStart + rowsPerThread);
+      unsigned int yEnd = height > yStart + rowsPerThread ? yStart + rowsPerThread : height;
 
       if (yStart >= yEnd)
         continue;
