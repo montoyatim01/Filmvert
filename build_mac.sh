@@ -45,6 +45,8 @@ do
     --build=missing \
     -s build_type=$BUILD_TYPE \
     -b missing .
+# Collect the licenses for all the dependencies
+python3 "licenses.py" $BUILD_DIR/$arch
 
   # Build main program
   CONAN_CMAKE_SYSTEM_PROCESSOR=$arch cmake \

@@ -14,7 +14,7 @@ void mainWindow::paramView() {
     {
         ImVec2 ctrlSize = ImGui::GetWindowSize();
         int histHeight = appPrefs.prefs.histEnable ? 128 : 0;
-        int histSecHeight = histHeight;
+        int histSecHeight = histHeight + 4;
         histSecHeight += (ImGui::CalcTextSize("Text").y * 4);
         histSecHeight += (ImGui::GetStyle().FramePadding.y * 4);
         //histSecHeight += (ImGui::GetStyle().ItemInnerSpacing.y * 4);
@@ -191,11 +191,11 @@ void mainWindow::paramView() {
                     activeImage()->rawWidth, activeImage()->rawHeight,
                     activeImage()->width, activeImage()->height);
             }
-            ImGui::Checkbox("Proxy", &toggleProxy);
+            /*ImGui::Checkbox("Proxy", &toggleProxy);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20);
             renderCall |= ImGui::SliderFloat("###pxy", &appPrefs.prefs.proxyRes, 0.05f, 0.8f);
-            ImGui::SameLine();
+            ImGui::SameLine();*/
             std::string statusText;
             if (gpu->rendering)
                 statusText += "Rendering... ";

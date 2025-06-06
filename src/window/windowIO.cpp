@@ -1,9 +1,99 @@
 //#include "metalGPU.h"
 #include "ocioProcessor.h"
 #include "window.h"
+#include <OpenImageIO/imageio.h>
+#include <OpenImageIO/filesystem.h>
 #include <chrono>
 #include <filesystem>
 
+//--- Load Logo Texture ---//
+/*
+    Load the logo image and create an
+    OpenGL texture with it for display
+    in the application
+*/
+void mainWindow::loadLogoTexture(std::optional<cmrc::file> logoIm) {
+    // Create a buffer from the embedded data
+    std::vector<unsigned char> imageData(logoIm->begin(), logoIm->end());
+
+    auto in = OIIO::ImageInput::create("png");
+    if (! in  ||  ! in->supports ("ioproxy")) {
+        LOG_ERROR("OpenImageIO Logo Read Error");
+        return;
+    }
+    OIIO::Filesystem::IOMemReader memreader(imageData);  // I/O proxy object
+
+    auto input = OIIO::ImageInput::open("logo.png", nullptr, &memreader);
+    if (!input)
+    {
+        LOG_ERROR("Failed to create ImageInput: " + OIIO::geterror());
+        return;
+    }
+
+    // Get image specification
+    const OIIO::ImageSpec& spec = input->spec();
+    int width = spec.width;
+    int height = spec.height;
+    int channels = spec.nchannels;
+
+    // Allocate buffer for pixel data
+    std::vector<unsigned char> pixels(width * height * channels);
+
+    // Read the image data
+    if (!input->read_image(OIIO::TypeDesc::UINT8, pixels.data()))
+    {
+        LOG_ERROR("Failed to read image data: " + input->geterror());
+        input->close();
+        return;
+    }
+
+    input->close();
+    // Generate OpenGL texture
+    glGenTextures(1, (GLuint*)&logoTex);
+    glBindTexture(GL_TEXTURE_2D, logoTex);
+
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // Determine format based on number of channels
+    GLenum format;
+    switch (channels)
+    {
+        case 1: format = GL_RED; break;
+        case 2: format = GL_RG; break;
+        case 3: format = GL_RGB; break;
+        case 4: format = GL_RGBA; break;
+        default:
+            LOG_ERROR("Unsupported number of channels: " + std::to_string(channels));
+            glDeleteTextures(1, (GLuint*)&logoTex);
+            logoTex = 0;
+            return;
+    }
+
+    // Upload texture data to GPU
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, pixels.data());
+
+    // Generate mipmaps if desired
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // Unbind texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Check for OpenGL errors
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR)
+    {
+        LOG_ERROR("OpenGL error while creating texture: " + std::to_string(error));
+        glDeleteTextures(1, (GLuint*)&logoTex);
+        logoTex = 0;
+        return;
+    }
+
+    return;
+}
 
 //--- Open Images ---//
 /*

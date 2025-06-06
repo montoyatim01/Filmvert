@@ -4,3 +4,4 @@ hooks*
 compile_commands.json
 CMakeUserPresets.json
 .cache
+src/licenses.h

@@ -86,6 +86,7 @@ assets/fonts/Roboto-Regular.ttf
 assets/fonts/JetBrainsMono-Regular.ttf
 assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio
 assets/studio-config-v3.0.0_aces-v2.0_ocio-v2.4.ocio
+assets/logo.png
 )
 set_property(TARGET resources PROPERTY POSITION_INDEPENDENT_CODE ON)
 

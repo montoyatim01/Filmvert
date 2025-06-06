@@ -69,3 +69,4 @@ class FilmvertConan(ConanFile):
         self.copy("imgui_impl_opengl3_loader.cpp", dst="bindings", src="res/bindings")
         self.copy("imgui_demo.cpp", dst="bindings", src="res/src")
         self.copy("imgui_widgets.cpp", dst="bindings", src="res/src")
+        self.copy("license*", dst="licenses", folder=True, ignore_case=True)

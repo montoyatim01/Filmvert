@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 #include <csignal>
+#include <cmrc/cmrc.hpp>  //read embedded stuff
 
 //ImGui
 
@@ -39,6 +40,7 @@
 #include "structs.h"
 #include "threadPool.h"
 #include "windowUtils.h"
+#include "licenses.h"
 
 // Declared functions from macOSFile.mm
 std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canChooseDirectories = false);
@@ -83,6 +85,8 @@ class mainWindow
         float dispScale = 1.0f;
         ImVec2 dispSize;
         ImVec2 scroll;
+
+        unsigned long long logoTex = 0;
 
         // Program state
         bool done = false;
@@ -131,6 +135,7 @@ class mainWindow
         closeMode closeMd;
         bool shortPopTrig = false;
         bool imMatchPopTrig = false;
+        bool aboutPopTrig = false;
         bool ImMatchRoll = false;
         bool badOcioText = false;
         char ackMsg[512];
@@ -234,6 +239,7 @@ class mainWindow
         void calculateVisible();
 
         // windowIO.cpp
+        void loadLogoTexture(std::optional<cmrc::file> logoIm);
         void openImages();
         bool openJSON();
         bool openImageMeta();
@@ -276,10 +282,10 @@ class mainWindow
         void analyzePopup();
         void shortcutsPopup();
         void importImMatchPopup();
+        void aboutPopup();
 
         void copyIntoParams();
         void pasteIntoParams();
 };
-
 
 #endif

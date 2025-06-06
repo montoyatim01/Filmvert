@@ -4,6 +4,10 @@
 #include <string>
 #include <array>
 
+#define VERMAJOR 1
+#define VERMINOR 0
+#define VERPATCH 0
+
 struct copyPaste {
 
     //---Analysis

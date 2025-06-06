@@ -1,5 +1,6 @@
 #include "window.h"
 #include "gpu.h"
+#include "licenses.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "structs.h"
@@ -15,11 +16,13 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <stdlib.h>
-#include <cmrc/cmrc.hpp>  //read embedded stuff
+
 
 CMRC_DECLARE(assets);
 
 #define IMGUI_ENABLE_FREETYPE
+
+std::string licText;
 
 
 static void glfw_error_callback(int error, const char* description)
@@ -169,6 +172,21 @@ int mainWindow::openWindow()
         }
     }
 
+    // Load in logo file
+    auto logoFile = fs.open("assets/logo.png");
+    if (!logoFile) {
+        LOG_ERROR("Error opening Logo File!");
+    } else {
+        loadLogoTexture(logoFile);
+    }
+
+    // Load in licenses text
+    for (auto &lic : licenses::all_licenses) {
+        licText += "------------" + lic.first + "------------\n";
+        licText += lic.second;
+        licText += "\n\n";
+    }
+
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     imguistyle();
@@ -306,6 +324,7 @@ int mainWindow::openWindow()
         ackPopup();
         analyzePopup();
         importImMatchPopup();
+        aboutPopup();
 
         // Check analyze timeout?
 

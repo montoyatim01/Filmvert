@@ -52,6 +52,8 @@ For full documentation on all features and workflows, take a look at the project
 
 - Cmake 3.18 or greater
 
+- Python 3
+
 - (Windows) [Git Bash](https://gitforwindows.org/)
 
 Simply execute the build script based on your platform, using either 'Debug' or 'Release' to specify the build type.

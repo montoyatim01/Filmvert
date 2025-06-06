@@ -290,11 +290,8 @@ void mainWindow::menuBar() {
                 shortPopTrig = true;
             }
 
-            if (ImGui::MenuItem("User Guide")) {
-
-            }
             if (ImGui::MenuItem("About")) {
-                demoWin = true;
+                aboutPopTrig = true;
             }
 
             ImGui::EndMenu();

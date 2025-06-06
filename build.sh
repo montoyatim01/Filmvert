@@ -40,6 +40,7 @@ set -x
     -s build_type=$BUILD_TYPE \
     -b missing .
 
+python3 "licenses.py" $BUILD_DIR
 
   CONAN_CMAKE_SYSTEM_PROCESSOR=x86_64 cmake \
     -B $BUILD_DIR -S $SOURCE_DIR \

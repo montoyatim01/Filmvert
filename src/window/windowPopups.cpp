@@ -9,6 +9,9 @@
 #include <cstring>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include "licenses.h"
+
+
 
 //--- Import Raw Settings ---//
 /*
@@ -1560,6 +1563,74 @@ void mainWindow::importImMatchPopup() {
         }
 
         ImGui::Spacing();
+        ImGui::EndPopup();
+    }
+}
+
+//--- About Popup ---//
+/*
+    Popup for displaying all available
+    hotkeys in the application.
+*/
+void mainWindow::aboutPopup() {
+    if (aboutPopTrig)
+        ImGui::OpenPopup("About Filmvert");
+    if (aboutPopTrig)
+        ImGui::SetNextWindowSize(ImVec2(650, 460), ImGuiCond_Always);
+    if (ImGui::BeginPopupModal("About Filmvert", NULL, ImGuiWindowFlags_NoResize)) {
+        float windowWidth = ImGui::GetWindowSize().x;
+        float logoWidth = 128.0f;
+        ImGui::SetCursorPosX((windowWidth - logoWidth) * 0.5f);
+        ImGui::Image(static_cast<ImTextureID>(logoTex), ImVec2(logoWidth,logoWidth));
+
+        const char* filmvertText = "Filmvert";
+        float filmvertTextWidth = ImGui::CalcTextSize(filmvertText).x;
+        ImGui::SetCursorPosX((windowWidth - filmvertTextWidth) * 0.5f);
+        ImGui::Text("Filmvert");
+
+        std::string versionText = fmt::format("Version {}.{}.{}", VERMAJOR, VERMINOR, VERPATCH);
+        float versionTextWidth = ImGui::CalcTextSize(versionText.c_str()).x;
+        ImGui::SetCursorPosX((windowWidth - versionTextWidth) * 0.5f);
+        ImGui::Text("Version %i.%i.%i", VERMAJOR, VERMINOR, VERPATCH);
+
+        std::string hashFmt = fmt::format("{:.8}",GIT_COMMIT_HASH);
+        std::string buildText = fmt::format("Build {}-{}", hashFmt, BUILD_DATE);
+        float buildTextWidth = ImGui::CalcTextSize(buildText.c_str()).x;
+        ImGui::SetCursorPosX((windowWidth - buildTextWidth) * 0.5f);
+        ImGui::Text("Build %s-%s", hashFmt.c_str(), BUILD_DATE);
+
+        const char* copyrightText = "Copyright 2025 Timothy Montoya.";
+        float copyrightTextWidth = ImGui::CalcTextSize(copyrightText).x;
+        ImGui::SetCursorPosX((windowWidth - copyrightTextWidth) * 0.5f);
+        ImGui::Text("Copyright 2025 Timothy Montoya.");
+
+        const char* licenseText = "Distributed under MIT license.";
+        float licenseTextWidth = ImGui::CalcTextSize(licenseText).x;
+        ImGui::SetCursorPosX((windowWidth - licenseTextWidth) * 0.5f);
+        ImGui::Text("Distributed under MIT license.");
+        ImGui::Spacing();
+
+        const char* copyText = "Copyright notices for included libraries:";
+        float copyWidth = ImGui::CalcTextSize(copyText).x;
+        ImGui::SetCursorPosX((windowWidth - copyWidth) * 0.5f);
+        ImGui::Text("Copyright notices for included libraries:");
+        ImGui::BeginChild("###Cpy", ImVec2(windowWidth - 32, 128));
+        ImGui::PushID("LIC");
+        ImGui::SetWindowFontScale(0.75);
+        ImGui::Text("%s", licText.c_str());
+        ImGui::PopID();
+        ImGui::EndChild();
+
+        float okayButtonWidth = ImGui::CalcTextSize("Okay").x;
+        ImGui::SetCursorPosX((windowWidth - okayButtonWidth) * 0.5f);
+        if (ImGui::Button("Okay")) {
+            aboutPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            aboutPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
         ImGui::EndPopup();
     }
 }
