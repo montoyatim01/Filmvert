@@ -53,8 +53,9 @@ class OpenColorIOConan(ConanFile):
 
     def requirements(self):
         self.requires("expat/[>=2.6.2 <3]")
-        self.requires("glew/[>=2.1.0]")
-        self.requires("freeglut/[>=3.2.2]")
+        if self.settings.os == "Windows":
+            self.requires("glew/[>=2.1.0]")
+            self.requires("freeglut/[>=3.2.2]")
         if Version(self.version) < "2.2.0":
             self.requires("openexr/2.5.7")
         else:

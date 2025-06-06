@@ -13,32 +13,19 @@ else:
      spdlog_options = {
         "spdlog*:header_only": True
     }
-if platform.system() == "Linux":
-    openimageio_options = {
-    "openimageio*:with_opencv": False,
-    "openimageio*:with_ffmpeg": False,
-    "openimageio*:with_libheif": False,
-    "openimageio*:with_hdf5": False,
-    "openimageio*:with_tbb": False,
-    "openimageio*:with_ptex": False,
-    "openimageio*:shared": True,
-    "openimageio*:with_libjpeg" : "libjpeg",
-    "openimageio*:with_openjpeg" : False,
-    "openimageio*:with_raw" : True
-    }
-else:
-    openimageio_options = {
-    "openimageio*:with_opencv": False,
-    "openimageio*:with_ffmpeg": False,
-    "openimageio*:with_libheif": False,
-    "openimageio*:with_hdf5": False,
-    "openimageio*:with_tbb": False,
-    "openimageio*:with_ptex": False,
-    "openimageio*:shared": False,
-    "openimageio*:with_libjpeg" : "libjpeg",
-    "openimageio*:with_openjpeg" : False,
-    "openimageio*:with_raw" : True
-    }
+
+openimageio_options = {
+"openimageio*:with_opencv": False,
+"openimageio*:with_ffmpeg": False,
+"openimageio*:with_libheif": False,
+"openimageio*:with_hdf5": False,
+"openimageio*:with_tbb": False,
+"openimageio*:with_ptex": False,
+"openimageio*:shared": False,
+"openimageio*:with_libjpeg" : "libjpeg",
+"openimageio*:with_openjpeg" : False,
+"openimageio*:with_raw" : True
+}
 minizip_options = {
     "minizip-ng*:with_libcomp": False
 }
@@ -64,7 +51,6 @@ class FilmvertConan(ConanFile):
         self.requires("libraw/0.21.2")
         self.requires("opencolorio/2.4.2")
         self.requires("openimageio/2.5.16.0")
-        self.requires("opencolorio/2.4.2")
         self.requires("minizip-ng/4.0.6")
         self.requires("exiv2/0.28.2")
         self.requires("glfw/3.4")

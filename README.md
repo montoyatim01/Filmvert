@@ -7,11 +7,16 @@
 A roll-based film inversion software with a simple repeatable workflow.
 </div>
 Features:
+
 - Lossless floating point operation
+
 - Highly customizeable, repeatable inversion parameters
+
 - Wide support for input image formats (Camera RAW, Pakon, TIFF/DNG)
+
 - Metadata tagging, import and export
 
+<!-- Put Screenshot Here -->
 
 ## ⚡️ Quick start
 Download the latest release from the [Releases Page](https://github.com/montoyatim01/Filmvert/releases) and install to your Applications folder.
@@ -41,9 +46,44 @@ Further, the **Grade** options can be used to set a quick grade on an image.
 For full documentation on all features and workflows, take a look at the project wiki.
 
 ## 🚚 Building from source
--- Conan 1.66.0
--- Cmake 3.28?
+**Requirements**
 
+- Conan 1.66.0
+
+- Cmake 3.18 or greater
+
+- (Windows) [Git Bash](https://gitforwindows.org/)
+
+Simply execute the build script based on your platform, using either 'Debug' or 'Release' to specify the build type.
+```./build.sh Release```
+
+If you get a warning about missing conan profiles, run the command:
+```conan profile new default --detect```
+to generate default profiles
 
 ## ⚠️ License
-GNU GPL
+The application is licensed under the [MIT License](https://opensource.org/licenses/MIT):
+
+Copyright &copy; 2025 Timothy Montoya
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## ‼️ Troubleshooting
+Feel free to submit a GitHub issue for any recurring problem or bug.
+
+When submitting an issue, please include the following:
+- The Filmvert log file.
+By default, Filmvert creates a log file at the following location:
+macOS: ```/Users/Shared/Filmvert/Filmvert.log```
+Windows: ```C:/ProgramData/Filmvert/Filmvert.log```
+Linux: ```~/.local/Filmvert/Filmvert.log```
+
+- System specifications (os version, graphics card, driver version, etc).
+
+- Steps to reproduce the issue
+
+- Any applicable crash log (for macOS, click 'Send to Apple' to get the print out of the crash log, copy & paste into a text file).

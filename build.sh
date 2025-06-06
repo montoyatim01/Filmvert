@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Build debug version for Mac and install locally
-
 set -e
 
 BUILD_TYPE=${1:-Debug}
@@ -48,4 +46,3 @@ set -x
     -DCMAKE_TOOLCHAIN_FILE="$BUILD_DIR/$arch/conan_toolchain.cmake" \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
   cmake --build $BUILD_DIR --target Filmvert --config $BUILD_TYPE -j8 || exit 255
-
