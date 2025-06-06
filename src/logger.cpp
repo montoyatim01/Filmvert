@@ -39,7 +39,9 @@ std::shared_ptr<spdlog::logger>& glLog::GetLogger() {
 
 
         #else
-        std::string logPath = "/usr/local/Filmvert";
+        char* homeDir = getenv("HOME");
+        std::string homeStr = homeDir;
+        std::string logPath = homeStr + "/.local/Filmvert";
         logPath += std::string("/Filmvert.log");
         auto maxSize = 1024 * 1024 * 5;
         auto maxFiles = 4;

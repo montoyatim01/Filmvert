@@ -89,8 +89,11 @@ std::string userPreferences::getPrefFile() {
 
 
     #else
-
-    return "/usr/local/Filmvert/fv_pref.json";
+    char* homeDir = getenv("HOME");
+    std::string homeStr = homeDir;
+    homeStr += "/.local/Filmvert/";
+    homeStr += "fv_pref.json";
+    return homeStr;
 
     #endif
 }
