@@ -5,3 +5,6 @@ compile_commands.json
 CMakeUserPresets.json
 .cache
 src/licenses.h
+linuxBuild
+macOSBuild
+*sign.sh

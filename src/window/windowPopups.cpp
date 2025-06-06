@@ -1599,12 +1599,12 @@ void mainWindow::aboutPopup() {
         ImGui::SetCursorPosX((windowWidth - buildTextWidth) * 0.5f);
         ImGui::Text("Build %s-%s", hashFmt.c_str(), BUILD_DATE);
 
-        const char* copyrightText = "Copyright 2025 Timothy Montoya.";
+        const char* copyrightText = "Copyright 2025 Timothy Montoya";
         float copyrightTextWidth = ImGui::CalcTextSize(copyrightText).x;
         ImGui::SetCursorPosX((windowWidth - copyrightTextWidth) * 0.5f);
         ImGui::Text("Copyright 2025 Timothy Montoya.");
 
-        const char* licenseText = "Distributed under MIT license.";
+        const char* licenseText = "Distributed under MIT license";
         float licenseTextWidth = ImGui::CalcTextSize(licenseText).x;
         ImGui::SetCursorPosX((windowWidth - licenseTextWidth) * 0.5f);
         ImGui::Text("Distributed under MIT license.");

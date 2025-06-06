@@ -27,7 +27,7 @@ set -x
 
 #rm -r $HOME/.conan/data/imgui
 
-for arch in arm64
+for arch in arm64 x86_64
 do
 
   if [ $BUILD_TYPE == Release ]; then
@@ -56,3 +56,7 @@ python3 "licenses.py" $BUILD_DIR/$arch
   cmake --build $BUILD_DIR/$arch --target Filmvert --config $BUILD_TYPE -j8 || exit 255
 
 done
+
+## Stitch binaries together for universal build
+cp -r $BUILD_DIR/arm64/bin/Filmvert.app $BUILD_DIR/
+lipo $BUILD_DIR/arm64/bin/Filmvert.app/Contents/MacOS/Filmvert $BUILD_DIR/x86_64/bin/Filmvert.app/Contents/MacOS/Filmvert -create -output $BUILD_DIR/Filmvert.app/Contents/MacOS/Filmvert

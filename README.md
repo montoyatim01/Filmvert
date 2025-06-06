@@ -14,12 +14,14 @@ Features:
 
 - Wide support for input image formats (Camera RAW, Pakon, TIFF/DNG)
 
+- Fully color managed with [OpenColorIO](https://github.com/AcademySoftwareFoundation/OpenColorIO) integration
+
 - Metadata tagging, import and export
 
 <!-- Put Screenshot Here -->
 
 ## ⚡️ Quick start
-Download the latest release from the [Releases Page](https://github.com/montoyatim01/Filmvert/releases) and install to your Applications folder.
+Download the latest release from the [Releases Page](https://github.com/montoyatim01/Filmvert/releases).
 
 ### Loading Images/Rolls
 Load in images by selecting a few individual images, or an entire directory's worth at once. Filmvert operates per-roll, so directories will import as rolls. Individual images will need to be added to a roll.

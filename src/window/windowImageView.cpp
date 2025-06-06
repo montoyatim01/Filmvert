@@ -605,7 +605,7 @@ void mainWindow::imageView() {
             float textPosX = (curWinSize.x / 2) - (txtSize.x / 2);
             float textPosY = (curWinSize.y - txtSize.y);
 
-            ImVec2 textPos = ImVec2(windowPos.x + textPosX - 10, windowPos.y + textPosY); // 10px from left, 30px from top
+            ImVec2 textPos = ImVec2(windowPos.x + textPosX - 10, windowPos.y + textPosY - 20); // 10px from left, 30px from top
             int txtAlpha = ((float)ratingFrameCount / 60.0) * 255.0f;
             txtAlpha = ratingFrameCount > 59 ? 255 : txtAlpha;
             // Draw the text directly to the draw list so it's always visible
