@@ -57,6 +57,16 @@ int main(void)
 // -* Rotation doesn't rollup
 
 /*
+- Image rating possible now
+- Cleanup variables
+- XMP embedding on export for all but jpg files
+- Hotkeys for moving forward/backward images
+- Rolls with unsaved images show an asterisk in the roll name
+- Fixed an issue with image scaling after export
+*/
+
+
+/*
 - Image params/metadata save out as .fvi files
 - Images now render 'proxy' buffers that are available regardless of roll load state
 - Histogram now renders alongside the image render from the proxy buffer

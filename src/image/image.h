@@ -34,8 +34,7 @@ struct image {
     bool hasSCXMP = false;
     bool needMetaWrite = false;
     std::string jsonMeta;
-    int imRot = 1;
-    imageMetadata imMeta;
+    imageMetadata imgMeta;
 
     // Core information
     unsigned int nChannels = 0;

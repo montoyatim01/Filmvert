@@ -74,7 +74,7 @@ void image::readMetaFromFile() {
     // Attempt to load in the film values based on the metadata in the exif
     if (!exifData.empty()) {
         if (auto rotOpt = getExifValue<int>(exifData, "Exif.Image.Orientation"); rotOpt.has_value()) {
-            imRot = rotOpt.value();
+            imgParam.rotation = rotOpt.value();
         }
         // Try the internal EXIF data
         if (auto fvMetaOpt = getExifValue<std::string>(exifData, "Exif.Image.ImageDescription"); fvMetaOpt.has_value()) {
@@ -91,7 +91,10 @@ void image::readMetaFromFile() {
     // Then try the internal XMP data
     if (!intxmpData.empty()) {
         if (auto rotOpt = getXmpValue<int>(intxmpData, "Xmp.tiff.Orientation"); rotOpt.has_value()) {
-            imRot = rotOpt.value();
+            imgParam.rotation = rotOpt.value();
+        }
+        if (auto rateOpt = getXmpValue<int>(intxmpData, "Xmp.xmp.Rating"); rateOpt.has_value()) {
+            imgMeta.rating = rateOpt.value();
         }
         if(auto fvMetaOpt = getXmpValue<std::string>(intxmpData, "Xmp.dc.description"); fvMetaOpt.has_value()) {
             std::string customMeta = saniJsonString(fvMetaOpt.value());
@@ -109,7 +112,10 @@ void image::readMetaFromFile() {
     // Lastly try the sidecar file
     if (!scxmpData.empty()) {
         if (auto rotOpt = getXmpValue<int>(scxmpData, "Xmp.tiff.Orientation"); rotOpt.has_value()) {
-            imRot = rotOpt.value();
+            imgParam.rotation = rotOpt.value();
+        }
+        if (auto rateOpt = getXmpValue<int>(scxmpData, "Xmp.xmp.Rating"); rateOpt.has_value()) {
+            imgMeta.rating = rateOpt.value();
         }
 
         if(auto fvMetaOpt = getXmpValue<std::string>(scxmpData, "Xmp.dc.description"); fvMetaOpt.has_value()) {
@@ -139,14 +145,16 @@ void image::readMetaFromFile() {
 bool image::writeExpMeta(std::string filename) {
     updateMetaStr();
     exifData["Exif.Image.ImageDescription"] = jsonMeta;
-    exifData["Exif.Image.Orientation"] = imRot;
+    exifData["Exif.Image.Orientation"] = imgParam.rotation;
     if (hasSCXMP) {
         scxmpData["Xmp.dc.description"] = jsonMeta;
-        scxmpData["Xmp.tiff.Orientation"] = imRot;
+        scxmpData["Xmp.tiff.Orientation"] = imgParam.rotation;
+        scxmpData["Xmp.xmp.Rating"] = imgMeta.rating;
     }
     else {
         intxmpData["Xmp.dc.description"] = jsonMeta;
-        intxmpData["Xmp.tiff.Orientation"] = imRot;
+        intxmpData["Xmp.tiff.Orientation"] = imgParam.rotation;
+        scxmpData["Xmp.xmp.Rating"] = imgMeta.rating;
     }
 
     try {
@@ -179,16 +187,21 @@ bool image::writeExpMeta(std::string filename) {
                 destExif[key] = i->value();
             }
         }
+        destExif["Exif.Image.Rating"] = imgMeta.rating;
 
         // Set the new Exif data
         image->setExifData(destExif);
 
-        // Set the new XMP data
-        /*if (hasSCXMP) {
-            image->setXmpData(scxmpData);
-        } else {
-            image->setXmpData(intxmpData);
-        }*/
+        std::filesystem::path imagePath(filename);
+        if (imagePath.extension().string() != ".jpg") {
+            // Set the new XMP data
+            if (hasSCXMP) {
+                image->setXmpData(scxmpData);
+            } else {
+                image->setXmpData(intxmpData);
+            }
+        }
+
 
         // Write the metadata back to the image file
         image->writeMetadata();
@@ -255,9 +268,9 @@ std::optional<nlohmann::json> image::getJSONMeta() {
 
         fvParams["temp"] = imgParam.temp;
         fvParams["tint"] = imgParam.tint;
-        fvParams["rotation"] = imRot;
+        fvParams["rotation"] = imgParam.rotation;
 
-        metaParams = imMeta;
+        metaParams = imgMeta;
 
         j["filmvert"] = fvParams;
         j["metadata"] = metaParams;
@@ -306,11 +319,13 @@ void image::writeXMPFile() {
     updateMetaStr();
     if (hasSCXMP) {
         scxmpData["Xmp.dc.description"] = jsonMeta;
-        scxmpData["Xmp.tiff.Orientation"] = imRot;
+        scxmpData["Xmp.tiff.Orientation"] = imgParam.rotation;
+        scxmpData["Xmp.xmp.Rating"] = imgMeta.rating;
     }
     else {
         intxmpData["Xmp.dc.description"] = jsonMeta;
-        intxmpData["Xmp.tiff.Orientation"] = imRot;
+        intxmpData["Xmp.tiff.Orientation"] = imgParam.rotation;
+        intxmpData["Xmp.xmp.Rating"] = imgMeta.rating;
     }
 
 
@@ -526,67 +541,67 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
         imageMetadata impMeta = *meta;
         //---Metadata
         if (selectons.make) {
-            imMeta.cameraMake = impMeta.cameraMake;
+            imgMeta.cameraMake = impMeta.cameraMake;
             metaChg = true;
         }
         if (selectons.model) {
-            imMeta.cameraModel = impMeta.cameraModel;
+            imgMeta.cameraModel = impMeta.cameraModel;
             metaChg = true;
         }
         if (selectons.lens) {
-            imMeta.lens = impMeta.lens;
+            imgMeta.lens = impMeta.lens;
             metaChg = true;
         }
         if (selectons.stock) {
-            imMeta.filmStock = impMeta.filmStock;
+            imgMeta.filmStock = impMeta.filmStock;
             metaChg = true;
         }
         if (selectons.focal) {
-            imMeta.focalLength = impMeta.focalLength;
+            imgMeta.focalLength = impMeta.focalLength;
             metaChg = true;
         }
         if (selectons.fstop) {
-            imMeta.fNumber = impMeta.fNumber;
+            imgMeta.fNumber = impMeta.fNumber;
             metaChg = true;
         }
         if (selectons.exposure) {
-            imMeta.exposureTime = impMeta.exposureTime;
+            imgMeta.exposureTime = impMeta.exposureTime;
             metaChg = true;
         }
         if (selectons.date) {
-            imMeta.dateTime = impMeta.dateTime;
+            imgMeta.dateTime = impMeta.dateTime;
             metaChg = true;
         }
         if (selectons.location) {
-            imMeta.location = impMeta.location;
+            imgMeta.location = impMeta.location;
             metaChg = true;
         }
         if (selectons.gps) {
-            imMeta.gps = impMeta.gps;
+            imgMeta.gps = impMeta.gps;
             metaChg = true;
         }
         if (selectons.notes) {
-            imMeta.notes = impMeta.notes;
+            imgMeta.notes = impMeta.notes;
             metaChg = true;
         }
         if (selectons.dev) {
-            imMeta.devProcess = impMeta.devProcess;
+            imgMeta.devProcess = impMeta.devProcess;
             metaChg = true;
         }
         if (selectons.chem) {
-            imMeta.chemMfg = impMeta.chemMfg;
+            imgMeta.chemMfg = impMeta.chemMfg;
             metaChg = true;
         }
         if (selectons.devnote) {
-            imMeta.devNotes = impMeta.devNotes;
+            imgMeta.devNotes = impMeta.devNotes;
             metaChg = true;
         }
         if (selectons.scanner) {
-            imMeta.scanner = impMeta.scanner;
+            imgMeta.scanner = impMeta.scanner;
             metaChg = true;
         }
         if (selectons.scannotes) {
-            imMeta.scanNotes = impMeta.scanNotes;
+            imgMeta.scanNotes = impMeta.scanNotes;
             metaChg = true;
         }
     }

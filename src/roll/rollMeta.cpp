@@ -53,28 +53,29 @@ bool filmRoll::exportRollCSV() {
     csvFile << "FrameNumber,FileName,CameraMake,CameraModel,Lens,FilmStock,";
     csvFile << "FocalLength,fNumber,ExposureTime,RollName,Date/Time,Location,";
     csvFile << "GPS,Notes,DevelopmentProcess,ChemicalManufacturer,";
-    csvFile << "DevelopmentNotes,Scanner,ScanNotes\n";
+    csvFile << "DevelopmentNotes,Scanner,ScanNotes,Rating\n";
 
     for (int i = 0; i < images.size(); i++) {
-        csvFile << images[i].imMeta.frameNumber << ",";
+        csvFile << images[i].imgMeta.frameNumber << ",";
         csvFile << images[i].srcFilename << ",";
-        csvFile << images[i].imMeta.cameraMake << ",";
-        csvFile << images[i].imMeta.cameraModel << ",";
-        csvFile << images[i].imMeta.lens << ",";
-        csvFile << images[i].imMeta.filmStock << ",";
-        csvFile << images[i].imMeta.focalLength << ",";
-        csvFile << images[i].imMeta.fNumber << ",";
-        csvFile << images[i].imMeta.exposureTime << ",";
-        csvFile << images[i].imMeta.rollName << ",";
-        csvFile << images[i].imMeta.dateTime << ",";
-        csvFile << images[i].imMeta.location << ",";
-        csvFile << images[i].imMeta.gps << ",";
-        csvFile << images[i].imMeta.notes << ",";
-        csvFile << images[i].imMeta.devProcess << ",";
-        csvFile << images[i].imMeta.chemMfg << ",";
-        csvFile << images[i].imMeta.devNotes << ",";
-        csvFile << images[i].imMeta.scanner << ",";
-        csvFile << images[i].imMeta.scanNotes << "\n";
+        csvFile << images[i].imgMeta.cameraMake << ",";
+        csvFile << images[i].imgMeta.cameraModel << ",";
+        csvFile << images[i].imgMeta.lens << ",";
+        csvFile << images[i].imgMeta.filmStock << ",";
+        csvFile << images[i].imgMeta.focalLength << ",";
+        csvFile << images[i].imgMeta.fNumber << ",";
+        csvFile << images[i].imgMeta.exposureTime << ",";
+        csvFile << images[i].imgMeta.rollName << ",";
+        csvFile << images[i].imgMeta.dateTime << ",";
+        csvFile << images[i].imgMeta.location << ",";
+        csvFile << images[i].imgMeta.gps << ",";
+        csvFile << images[i].imgMeta.notes << ",";
+        csvFile << images[i].imgMeta.devProcess << ",";
+        csvFile << images[i].imgMeta.chemMfg << ",";
+        csvFile << images[i].imgMeta.devNotes << ",";
+        csvFile << images[i].imgMeta.scanner << ",";
+        csvFile << images[i].imgMeta.scanNotes << ",";
+        csvFile << images[i].imgMeta.rating << "\n";
     }
 
     csvFile.close();
@@ -158,101 +159,101 @@ void filmRoll::rollMetaPreEdit(metaBuff *meta) {
 
     meta->dif_camMake = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.cameraMake == images.front().imMeta.cameraMake;
+            return obj.imgMeta.cameraMake == images.front().imgMeta.cameraMake;
         });
     if (!meta->dif_camMake)
-        std::strcpy(meta->camMake, images[0].imMeta.cameraMake.c_str());
+        std::strcpy(meta->camMake, images[0].imgMeta.cameraMake.c_str());
     //------
     meta->dif_camModel = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.cameraModel == images.front().imMeta.cameraModel;
+            return obj.imgMeta.cameraModel == images.front().imgMeta.cameraModel;
         });
     if (!meta->dif_camModel)
-        std::strcpy(meta->camModel, images[0].imMeta.cameraModel.c_str());
+        std::strcpy(meta->camModel, images[0].imgMeta.cameraModel.c_str());
     //------
     meta->dif_lens = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.lens == images.front().imMeta.lens;
+            return obj.imgMeta.lens == images.front().imgMeta.lens;
         });
     if (!meta->dif_lens)
-        std::strcpy(meta->lens, images[0].imMeta.lens.c_str());
+        std::strcpy(meta->lens, images[0].imgMeta.lens.c_str());
     //------
     meta->dif_film = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.filmStock == images.front().imMeta.filmStock;
+            return obj.imgMeta.filmStock == images.front().imgMeta.filmStock;
         });
     if (!meta->dif_film)
-        std::strcpy(meta->film, images[0].imMeta.filmStock.c_str());
+        std::strcpy(meta->film, images[0].imgMeta.filmStock.c_str());
     //------
     meta->dif_focal = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.focalLength == images.front().imMeta.focalLength;
+            return obj.imgMeta.focalLength == images.front().imgMeta.focalLength;
         });
     if (!meta->dif_focal)
-        std::strcpy(meta->focal, images[0].imMeta.focalLength.c_str());
+        std::strcpy(meta->focal, images[0].imgMeta.focalLength.c_str());
     //------
     meta->dif_date = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.dateTime == images.front().imMeta.dateTime;
+            return obj.imgMeta.dateTime == images.front().imgMeta.dateTime;
         });
     if (!meta->dif_date)
-        std::strcpy(meta->date, images[0].imMeta.dateTime.c_str());
+        std::strcpy(meta->date, images[0].imgMeta.dateTime.c_str());
     //------
     meta->dif_loc = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.location == images.front().imMeta.location;
+            return obj.imgMeta.location == images.front().imgMeta.location;
         });
     if (!meta->dif_loc)
-        std::strcpy(meta->loc, images[0].imMeta.location.c_str());
+        std::strcpy(meta->loc, images[0].imgMeta.location.c_str());
     //------
     meta->dif_gps = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.gps == images.front().imMeta.gps;
+            return obj.imgMeta.gps == images.front().imgMeta.gps;
         });
     if (!meta->dif_gps)
-        std::strcpy(meta->gps, images[0].imMeta.gps.c_str());
+        std::strcpy(meta->gps, images[0].imgMeta.gps.c_str());
     //------
     meta->dif_notes = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.notes == images.front().imMeta.notes;
+            return obj.imgMeta.notes == images.front().imgMeta.notes;
         });
     if (!meta->dif_notes)
-        std::strcpy(meta->notes, images[0].imMeta.notes.c_str());
+        std::strcpy(meta->notes, images[0].imgMeta.notes.c_str());
     //------
     meta->dif_dev = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.devProcess == images.front().imMeta.devProcess;
+            return obj.imgMeta.devProcess == images.front().imgMeta.devProcess;
         });
     if (!meta->dif_dev)
-        std::strcpy(meta->dev, images[0].imMeta.devProcess.c_str());
+        std::strcpy(meta->dev, images[0].imgMeta.devProcess.c_str());
     //------
     meta->dif_chem = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.chemMfg == images.front().imMeta.chemMfg;
+            return obj.imgMeta.chemMfg == images.front().imgMeta.chemMfg;
         });
     if (!meta->dif_chem)
-        std::strcpy(meta->chem, images[0].imMeta.chemMfg.c_str());
+        std::strcpy(meta->chem, images[0].imgMeta.chemMfg.c_str());
     //------
     meta->dif_devnotes = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.devNotes == images.front().imMeta.devNotes;
+            return obj.imgMeta.devNotes == images.front().imgMeta.devNotes;
         });
     if (!meta->dif_devnotes)
-        std::strcpy(meta->devnotes, images[0].imMeta.devNotes.c_str());
+        std::strcpy(meta->devnotes, images[0].imgMeta.devNotes.c_str());
     //------
     meta->dif_scanner = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.scanner == images.front().imMeta.scanner;
+            return obj.imgMeta.scanner == images.front().imgMeta.scanner;
         });
     if (!meta->dif_scanner)
-        std::strcpy(meta->scanner, images[0].imMeta.scanner.c_str());
+        std::strcpy(meta->scanner, images[0].imgMeta.scanner.c_str());
     //------
     meta->dif_scannotes = !std::all_of(images.begin() + 1, images.end(),
         [&](const image& obj) {
-            return obj.imMeta.scanNotes == images.front().imMeta.scanNotes;
+            return obj.imgMeta.scanNotes == images.front().imgMeta.scanNotes;
         });
     if (!meta->dif_scannotes)
-        std::strcpy(meta->scannotes, images[0].imMeta.scanNotes.c_str());
+        std::strcpy(meta->scannotes, images[0].imgMeta.scanNotes.c_str());
     //------
 }
 
@@ -279,92 +280,92 @@ void filmRoll::rollMetaPostEdit(metaBuff *meta) {
 
     if (meta->a_rollname)
         for (auto &img : images){
-            img.imMeta.rollName = meta->rollname;
+            img.imgMeta.rollName = meta->rollname;
             img.needMetaWrite = true;
         }
 
     //------
     if (meta->a_camMake)
         for (auto &img : images) {
-            img.imMeta.cameraMake = meta->camMake;
+            img.imgMeta.cameraMake = meta->camMake;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_camModel)
         for (auto &img : images) {
-            img.imMeta.cameraModel = meta->camModel;
+            img.imgMeta.cameraModel = meta->camModel;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_lens)
         for (auto &img : images) {
-            img.imMeta.lens = meta->lens;
+            img.imgMeta.lens = meta->lens;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_film)
         for (auto &img : images) {
-            img.imMeta.filmStock = meta->film;
+            img.imgMeta.filmStock = meta->film;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_focal)
         for (auto &img : images) {
-            img.imMeta.focalLength = meta->focal;
+            img.imgMeta.focalLength = meta->focal;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_date)
         for (auto &img : images) {
-            img.imMeta.dateTime = meta->date;
+            img.imgMeta.dateTime = meta->date;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_loc)
         for (auto &img : images) {
-            img.imMeta.location = meta->loc;
+            img.imgMeta.location = meta->loc;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_gps)
         for (auto &img : images) {
-            img.imMeta.gps = meta->gps;
+            img.imgMeta.gps = meta->gps;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_notes)
         for (auto &img : images) {
-            img.imMeta.notes = meta-> notes;
+            img.imgMeta.notes = meta-> notes;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_dev)
         for (auto &img : images) {
-            img.imMeta.devProcess = meta->dev;
+            img.imgMeta.devProcess = meta->dev;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_chem)
         for (auto &img : images) {
-            img.imMeta.chemMfg = meta->chem;
+            img.imgMeta.chemMfg = meta->chem;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_devnotes)
         for (auto &img : images) {
-            img.imMeta.devNotes = meta->devnotes;
+            img.imgMeta.devNotes = meta->devnotes;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_scanner)
         for (auto &img : images) {
-            img.imMeta.scanner = meta->scanner;
+            img.imgMeta.scanner = meta->scanner;
             img.needMetaWrite = true;
         }
     //------
     if (meta->a_scannotes)
         for (auto &img : images) {
-            img.imMeta.scanNotes = meta->scannotes;
+            img.imgMeta.scanNotes = meta->scannotes;
             img.needMetaWrite = true;
         }
     //------

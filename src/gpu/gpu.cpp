@@ -266,7 +266,7 @@ void openglGPU::bufferCheck(image* _image)
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
         checkError("Querying Output Texture");
-        if (oWidth < nWidth || oHeight < nHeight) {
+        if (oWidth != nWidth || oHeight != nHeight) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
                          0, GL_RGBA, GL_FLOAT, nullptr);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

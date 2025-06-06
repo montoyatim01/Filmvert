@@ -2,6 +2,7 @@
 #include "window.h"
 #include "windowUtils.h"
 #include <imgui.h>
+#include <string>
 
 //--- Image View ---//
 /*
@@ -25,7 +26,7 @@ void mainWindow::imageView() {
     if (validIm()) {
         // Pre-calc
         int displayWidth, displayHeight;
-        if (activeImage()->imRot == 6 || activeImage()->imRot == 8) {
+        if (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) {
             // For 90-degree rotations, swap width and height
             displayWidth = activeImage()->height;
             displayHeight = activeImage()->width;
@@ -64,7 +65,7 @@ void mainWindow::imageView() {
 
             // Define UV coordinates for each corner based on rotation
             ImVec2 uv0, uv1, uv2, uv3; // top-left, top-right, bottom-right, bottom-left
-            switch (activeImage()->imRot) {
+            switch (activeImage()->imgParam.rotation) {
                 case 1: // Normal (0°)
                     uv0 = ImVec2(0,0); uv1 = ImVec2(1,0);
                     uv2 = ImVec2(1,1); uv3 = ImVec2(0,1);
@@ -132,7 +133,7 @@ void mainWindow::imageView() {
             // Transform coordinates based on rotation
             int transformedX = x;
             int transformedY = y;
-            transformCoordinates(transformedX, transformedY, activeImage()->imRot,
+            transformCoordinates(transformedX, transformedY, activeImage()->imgParam.rotation,
                                  activeImage()->width, activeImage()->height);
 
             // Calculate screen positions with proper scroll offset
@@ -200,13 +201,13 @@ void mainWindow::imageView() {
                     // Transform coordinates for minPoint
                     int minX = activeImage()->imgParam.minX * activeImage()->width;
                     int minY = activeImage()->imgParam.minY * activeImage()->height;
-                    transformCoordinates(minX, minY, activeImage()->imRot,
+                    transformCoordinates(minX, minY, activeImage()->imgParam.rotation,
                                          activeImage()->width, activeImage()->height);
 
                     // Transform coordinates for maxPoint
                     int maxX = activeImage()->imgParam.maxX * activeImage()->width;
                     int maxY = activeImage()->imgParam.maxY * activeImage()->height;
-                    transformCoordinates(maxX, maxY, activeImage()->imRot,
+                    transformCoordinates(maxX, maxY, activeImage()->imgParam.rotation,
                                          activeImage()->width, activeImage()->height);
 
                     ImVec2 minPoint;
@@ -260,9 +261,9 @@ void mainWindow::imageView() {
                 newPosRotated.y = (mousePos.y - imagePos.y) / dispScale;
 
                 // Constrain to rotated images boundaries
-                int rotatedWidth = (activeImage()->imRot == 6 || activeImage()->imRot == 8) ?
+                int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
                                     activeImage()->height : activeImage()->width;
-                int rotatedHeight = (activeImage()->imRot == 6 || activeImage()->imRot == 8) ?
+                int rotatedHeight = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
                                     activeImage()->width : activeImage()->height;
 
                 newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
@@ -271,7 +272,7 @@ void mainWindow::imageView() {
                 // Convert from rotated to original image coordinates
                 int origX = newPosRotated.x;
                 int origY = newPosRotated.y;
-                inverseTransformCoordinates(origX, origY, activeImage()->imRot,
+                inverseTransformCoordinates(origX, origY, activeImage()->imgParam.rotation,
                                             activeImage()->width, activeImage()->height);
 
                 // Update the corner position
@@ -297,9 +298,9 @@ void mainWindow::imageView() {
                 newPosRotated.x = (mousePos.x - imagePos.x) / dispScale;
                 newPosRotated.y = (mousePos.y - imagePos.y) / dispScale;
                 // Constrain to rotated images boundaries
-                int rotatedWidth = (activeImage()->imRot == 6 || activeImage()->imRot == 8) ?
+                int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
                                     activeImage()->height : activeImage()->width;
-                int rotatedHeight = (activeImage()->imRot == 6 || activeImage()->imRot == 8) ?
+                int rotatedHeight = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
                                     activeImage()->width : activeImage()->height;
 
                 newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
@@ -307,7 +308,7 @@ void mainWindow::imageView() {
                 // Convert from rotated to original image coordinates
                 int origX = newPosRotated.x;
                 int origY = newPosRotated.y;
-                inverseTransformCoordinates(origX, origY, activeImage()->imRot,
+                inverseTransformCoordinates(origX, origY, activeImage()->imgParam.rotation,
                                             activeImage()->width, activeImage()->height);
                 // Update the corner position
                 activeImage()->imgParam.minX = (float)origX / activeImage()->width;
@@ -333,9 +334,9 @@ void mainWindow::imageView() {
                 newPosRotated.x = (mousePos.x - imagePos.x) / dispScale;
                 newPosRotated.y = (mousePos.y - imagePos.y) / dispScale;
                 // Constrain to rotated images boundaries
-                int rotatedWidth = (activeImage()->imRot == 6 || activeImage()->imRot == 8) ?
+                int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
                                     activeImage()->height : activeImage()->width;
-                int rotatedHeight = (activeImage()->imRot == 6 || activeImage()->imRot == 8) ?
+                int rotatedHeight = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
                                     activeImage()->width : activeImage()->height;
 
                 newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
@@ -343,7 +344,7 @@ void mainWindow::imageView() {
                 // Convert from rotated to original image coordinates
                 int origX = newPosRotated.x;
                 int origY = newPosRotated.y;
-                inverseTransformCoordinates(origX, origY, activeImage()->imRot,
+                inverseTransformCoordinates(origX, origY, activeImage()->imgParam.rotation,
                                             activeImage()->width, activeImage()->height);
                 // Update the corner position
                 activeImage()->imgParam.maxX = (float)origX / activeImage()->width;
@@ -381,10 +382,10 @@ void mainWindow::imageView() {
 
             // Convert from rotated to original image coordinates
             ImVec2 mousePosInImage = mousePosInRotatedImage;
-            if (activeImage()->imRot != 1) {
+            if (activeImage()->imgParam.rotation != 1) {
                 int origX = mousePosInRotatedImage.x;
                 int origY = mousePosInRotatedImage.y;
-                inverseTransformCoordinates(origX, origY, activeImage()->imRot,
+                inverseTransformCoordinates(origX, origY, activeImage()->imgParam.rotation,
                                             activeImage()->width, activeImage()->height);
                 mousePosInImage.x = origX;
                 mousePosInImage.y = origY;
@@ -448,12 +449,12 @@ void mainWindow::imageView() {
                 // Transform to rotated image coordinates
                 int rotStX = stX;
                 int rotStY = stY;
-                transformCoordinates(rotStX, rotStY, activeImage()->imRot,
+                transformCoordinates(rotStX, rotStY, activeImage()->imgParam.rotation,
                                     activeImage()->width, activeImage()->height);
 
                 int rotEdX = edX;
                 int rotEdY = edY;
-                transformCoordinates(rotEdX, rotEdY, activeImage()->imRot,
+                transformCoordinates(rotEdX, rotEdY, activeImage()->imgParam.rotation,
                                     activeImage()->width, activeImage()->height);
 
                 // Convert to screen coordinates
@@ -540,8 +541,8 @@ void mainWindow::imageView() {
             }
 
             if ((ImGui::IsKeyPressed(ImGuiKey_H) && !ImGui::IsKeyPressed(ImGuiMod_Ctrl)) || firstImage) {
-                int iWidth = activeImage()->imRot == 6 || activeImage()->imRot == 8 ? activeImage()->height : activeImage()->width;
-                int iHeight = activeImage()->imRot == 6 || activeImage()->imRot == 8 ? activeImage()->width : activeImage()->height;
+                int iWidth = activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ? activeImage()->height : activeImage()->width;
+                int iHeight = activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ? activeImage()->width : activeImage()->height;
                 // Pressed the z key, reset zoom
                 float scaleX = ImGui::GetWindowSize().x / (iWidth + ((float)iWidth * 0.01f));
                 float scaleY = ImGui::GetWindowSize().y / (iHeight + ((float)iHeight * 0.01f));
@@ -587,6 +588,35 @@ void mainWindow::imageView() {
         // Draw the text directly to the draw list so it's always visible
         ImU32 textColor = IM_COL32(255, 0, 0, 255); // Red color
         drawList->AddText(textPos, textColor, "GRADE BYPASS");
+    }
+    if (ratingSet) {
+        if (validIm()) {
+            // Get the current window and draw list
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            ImVec2 curWinSize = ImGui::GetWindowSize();
+            std::string rateMsg = "Image Rating ";
+            rateMsg += std::to_string(activeImage()->imgMeta.rating);
+            // Calculate position relative to the visible window area
+            ImVec2 windowPos = ImGui::GetWindowPos();
+            ImGui::PushID("Rating");
+            ImGui::SetWindowFontScale(2.0f);
+            ImVec2 txtSize = ImGui::CalcTextSize(rateMsg.c_str());
+            float textPosX = (curWinSize.x / 2) - (txtSize.x / 2);
+            float textPosY = (curWinSize.y - txtSize.y);
+
+            ImVec2 textPos = ImVec2(windowPos.x + textPosX - 10, windowPos.y + textPosY); // 10px from left, 30px from top
+            int txtAlpha = ((float)ratingFrameCount / 60.0) * 255.0f;
+            txtAlpha = ratingFrameCount > 59 ? 255 : txtAlpha;
+            // Draw the text directly to the draw list so it's always visible
+            ImU32 textColor = IM_COL32(5, 112, 242, txtAlpha); // Red color
+            drawList->AddText(textPos, textColor, rateMsg.c_str());
+            ratingFrameCount--;
+            ratingSet = ratingFrameCount == 0 ? false : true;
+            ImGui::SetWindowFontScale(1.0f);
+            ImGui::PopID();
+        }
+
     }
     ImGui::End();
 

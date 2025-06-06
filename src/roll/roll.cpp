@@ -106,10 +106,10 @@ bool filmRoll::sortRoll() {
     }
     std::sort(images.begin(), images.end(),
             [](const image& a, const image& b) {
-                if (a.imMeta.frameNumber == b.imMeta.frameNumber)
+                if (a.imgMeta.frameNumber == b.imgMeta.frameNumber)
                     return a.srcFilename < b.srcFilename;
                 else
-                    return a.imMeta.frameNumber < b.imMeta.frameNumber;
+                    return a.imgMeta.frameNumber < b.imgMeta.frameNumber;
             });
     return true;
 }

@@ -5,14 +5,13 @@
 # Filmvert
 
 A roll-based film inversion software with a simple repeatable workflow.
-
-Features:
-- Lossless 32-bit floating point operation
-- Highly customizeable inversion parameters
-- Replicatable inversion parameters
-- Wide support for input image formats (Camera RAW, Pakon, TIFF/DNG)
-
 </div>
+Features:
+- Lossless floating point operation
+- Highly customizeable, repeatable inversion parameters
+- Wide support for input image formats (Camera RAW, Pakon, TIFF/DNG)
+- Metadata tagging, import and export
+
 
 ## ⚡️ Quick start
 Download the latest release from the [Releases Page](https://github.com/montoyatim01/Filmvert/releases) and install to your Applications folder.
@@ -44,7 +43,6 @@ For full documentation on all features and workflows, take a look at the project
 ## 🚚 Building from source
 -- Conan 1.66.0
 -- Cmake 3.28?
--- metal-cpp /usr/local/include
 
 
 ## ⚠️ License

@@ -12,15 +12,15 @@
     Set valid exif rotation values
 */
 void image::rotRight() {
-    switch(imRot) {
+    switch(imgParam.rotation) {
         case 1: // Upright
-            imRot = 6; break;
+            imgParam.rotation = 6; break;
         case 6: // Left
-            imRot = 3; break;
+            imgParam.rotation = 3; break;
         case 3: // Upside
-            imRot = 8; break;
+            imgParam.rotation = 8; break;
         case 8: // Right
-            imRot = 1; break;
+            imgParam.rotation = 1; break;
     }
 }
 
@@ -29,15 +29,15 @@ void image::rotRight() {
     Set valid exif rotation values
 */
 void image::rotLeft() {
-    switch(imRot) {
+    switch(imgParam.rotation) {
         case 1: // Upright
-            imRot = 8; break;
+            imgParam.rotation = 8; break;
         case 8: // Right
-            imRot = 3; break;
+            imgParam.rotation = 3; break;
         case 3: // Upside
-            imRot = 6; break;
+            imgParam.rotation = 6; break;
         case 6: // Left
-            imRot = 1; break;
+            imgParam.rotation = 1; break;
     }
 }
 

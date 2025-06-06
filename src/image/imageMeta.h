@@ -12,6 +12,7 @@ struct imageMetadata {
     std::string fileName;
     std::string rollName;
     int frameNumber = 9999;
+    int rating = 0;
     std::string cameraMake;
     std::string cameraModel;
     std::string lens;
@@ -31,7 +32,7 @@ struct imageMetadata {
     std::string scanNotes;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(imageMetadata, fileName, rollName,
-        frameNumber, cameraMake, cameraModel, lens, filmStock,
+        frameNumber, rating, cameraMake, cameraModel, lens, filmStock,
         focalLength, fNumber, exposureTime, dateTime, location,
         gps, notes, devProcess, chemMfg, devNotes, scanner, scanNotes);
 

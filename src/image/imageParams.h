@@ -33,10 +33,12 @@ struct imageParams {
     float cropBoxX[4];
     float cropBoxY[4];
 
+    int rotation = 1;
+
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(imageParams, sampleX, sampleY,
         blurAmount, baseColor, whitePoint, blackPoint, minX, minY,
         maxX, maxY, temp, tint, g_blackpoint, g_whitepoint, g_lift,
-        g_gain, g_mult, g_offset, g_gamma, cropBoxX, cropBoxY);
+        g_gain, g_mult, g_offset, g_gamma, cropBoxX, cropBoxY, rotation);
 
     // == operator for determing if re-render is needed
     // So only parameters affecting image

@@ -93,6 +93,9 @@ class mainWindow
         image* prevIm;
         preferenceSet tmpPrefs;
 
+        int ratingFrameCount = 120;
+        bool ratingSet = false;
+
         std::deque<filmRoll> activeRolls;
         int selRoll = 0;
 
@@ -180,9 +183,9 @@ class mainWindow
         bool exportPopup = false;
         bool expRolls = false;
         std::chrono::time_point<std::chrono::steady_clock> expStart;
-        std::vector<char*> fileTypes;
-        std::vector<char*> bitDepths;
-        std::vector<char*> colorspaceSet;
+        std::vector<const char*> fileTypes;
+        std::vector<const char*> bitDepths;
+        std::vector<const char*> colorspaceSet;
         // Export OCIO Struct
         ocioSetting exportOCIO;
         int ocioEXPCS_Disp = 1;
@@ -212,6 +215,8 @@ class mainWindow
         void checkForRaw();
         void testFirstRawFile();
         bool unsavedChanges();
+        void selectForward();
+        void selectBackward();
 
         // windowMeta.cpp
         void checkMeta();

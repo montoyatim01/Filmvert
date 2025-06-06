@@ -74,24 +74,24 @@ void mainWindow::saveUI() {
 void mainWindow::imageMetaPreEdit() {
     if (!validIm())
         return;
-    metaEdit.frameNum = activeImage()->imMeta.frameNumber;
-    std::strcpy(metaEdit.camMake, activeImage()->imMeta.cameraMake.c_str());
-    std::strcpy(metaEdit.camModel, activeImage()->imMeta.cameraModel.c_str());
-    std::strcpy(metaEdit.lens, activeImage()->imMeta.lens.c_str());
-    std::strcpy(metaEdit.film, activeImage()->imMeta.filmStock.c_str());
-    std::strcpy(metaEdit.focal, activeImage()->imMeta.focalLength.c_str());
-    std::strcpy(metaEdit.fnum, activeImage()->imMeta.fNumber.c_str());
-    std::strcpy(metaEdit.exp, activeImage()->imMeta.exposureTime.c_str());
+    metaEdit.frameNum = activeImage()->imgMeta.frameNumber;
+    std::strcpy(metaEdit.camMake, activeImage()->imgMeta.cameraMake.c_str());
+    std::strcpy(metaEdit.camModel, activeImage()->imgMeta.cameraModel.c_str());
+    std::strcpy(metaEdit.lens, activeImage()->imgMeta.lens.c_str());
+    std::strcpy(metaEdit.film, activeImage()->imgMeta.filmStock.c_str());
+    std::strcpy(metaEdit.focal, activeImage()->imgMeta.focalLength.c_str());
+    std::strcpy(metaEdit.fnum, activeImage()->imgMeta.fNumber.c_str());
+    std::strcpy(metaEdit.exp, activeImage()->imgMeta.exposureTime.c_str());
 
-    std::strcpy(metaEdit.date, activeImage()->imMeta.dateTime.c_str());
-    std::strcpy(metaEdit.loc, activeImage()->imMeta.location.c_str());
-    std::strcpy(metaEdit.gps, activeImage()->imMeta.gps.c_str());
-    std::strcpy(metaEdit.notes, activeImage()->imMeta.notes.c_str());
-    std::strcpy(metaEdit.dev, activeImage()->imMeta.devProcess.c_str());
-    std::strcpy(metaEdit.chem, activeImage()->imMeta.chemMfg.c_str());
-    std::strcpy(metaEdit.devnotes, activeImage()->imMeta.devNotes.c_str());
-    std::strcpy(metaEdit.scanner, activeImage()->imMeta.scanner.c_str());
-    std::strcpy(metaEdit.scannotes, activeImage()->imMeta.scanNotes.c_str());
+    std::strcpy(metaEdit.date, activeImage()->imgMeta.dateTime.c_str());
+    std::strcpy(metaEdit.loc, activeImage()->imgMeta.location.c_str());
+    std::strcpy(metaEdit.gps, activeImage()->imgMeta.gps.c_str());
+    std::strcpy(metaEdit.notes, activeImage()->imgMeta.notes.c_str());
+    std::strcpy(metaEdit.dev, activeImage()->imgMeta.devProcess.c_str());
+    std::strcpy(metaEdit.chem, activeImage()->imgMeta.chemMfg.c_str());
+    std::strcpy(metaEdit.devnotes, activeImage()->imgMeta.devNotes.c_str());
+    std::strcpy(metaEdit.scanner, activeImage()->imgMeta.scanner.c_str());
+    std::strcpy(metaEdit.scannotes, activeImage()->imgMeta.scanNotes.c_str());
 }
 
 //--- Image Metadata Post-Edit ---//
@@ -103,40 +103,40 @@ void mainWindow::imageMetaPreEdit() {
 void mainWindow::imageMetaPostEdit() {
     if (!validIm())
         return;
-    activeImage()->imMeta.frameNumber = metaEdit.frameNum;
+    activeImage()->imgMeta.frameNumber = metaEdit.frameNum;
     if (metaEdit.a_camMake)
-        activeImage()->imMeta.cameraMake = metaEdit.camMake;
+        activeImage()->imgMeta.cameraMake = metaEdit.camMake;
     if (metaEdit.a_camModel)
-        activeImage()->imMeta.cameraModel = metaEdit.camModel;
+        activeImage()->imgMeta.cameraModel = metaEdit.camModel;
     if (metaEdit.a_lens)
-        activeImage()->imMeta.lens = metaEdit.lens;
+        activeImage()->imgMeta.lens = metaEdit.lens;
     if (metaEdit.a_film)
-        activeImage()->imMeta.filmStock = metaEdit.film;
+        activeImage()->imgMeta.filmStock = metaEdit.film;
     if (metaEdit.a_focal)
-        activeImage()->imMeta.focalLength = metaEdit.focal;
+        activeImage()->imgMeta.focalLength = metaEdit.focal;
     if (metaEdit.a_fnum)
-        activeImage()->imMeta.fNumber = metaEdit.fnum;
+        activeImage()->imgMeta.fNumber = metaEdit.fnum;
     if (metaEdit.a_exp)
-        activeImage()->imMeta.exposureTime = metaEdit.exp;
+        activeImage()->imgMeta.exposureTime = metaEdit.exp;
 
     if (metaEdit.a_date)
-        activeImage()->imMeta.dateTime = metaEdit.date;
+        activeImage()->imgMeta.dateTime = metaEdit.date;
     if (metaEdit.a_loc)
-        activeImage()->imMeta.location = metaEdit.loc;
+        activeImage()->imgMeta.location = metaEdit.loc;
     if (metaEdit.a_gps)
-        activeImage()->imMeta.gps = metaEdit.gps;
+        activeImage()->imgMeta.gps = metaEdit.gps;
     if (metaEdit.a_notes)
-        activeImage()->imMeta.notes = metaEdit.notes;
+        activeImage()->imgMeta.notes = metaEdit.notes;
     if (metaEdit.a_dev)
-        activeImage()->imMeta.devProcess = metaEdit.dev;
+        activeImage()->imgMeta.devProcess = metaEdit.dev;
     if (metaEdit.a_chem)
-        activeImage()->imMeta.chemMfg = metaEdit.chem;
+        activeImage()->imgMeta.chemMfg = metaEdit.chem;
     if (metaEdit.a_devnotes)
-        activeImage()->imMeta.devNotes = metaEdit.devnotes;
+        activeImage()->imgMeta.devNotes = metaEdit.devnotes;
     if (metaEdit.a_scanner)
-        activeImage()->imMeta.scanner = metaEdit.scanner;
+        activeImage()->imgMeta.scanner = metaEdit.scanner;
     if (metaEdit.a_scannotes)
-        activeImage()->imMeta.scanNotes = metaEdit.scannotes;
+        activeImage()->imgMeta.scanNotes = metaEdit.scannotes;
 
     activeImage()->needMetaWrite = true;
 

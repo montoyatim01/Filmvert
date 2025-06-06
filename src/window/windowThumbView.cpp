@@ -46,33 +46,24 @@ void mainWindow::thumbView() {
         }
 
         // Handle keyboard navigation
-        bool navigationOccurred = false;
         if (ImGui::IsWindowFocused() && !ImGui::GetIO().WantCaptureKeyboard) {
             int currentSel = activeRoll()->selIm;
             int newSel = currentSel;
 
             if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) && currentSel > 0) {
-                newSel = currentSel - 1;
-                navigationOccurred = true;
+                selectBackward();
             }
             else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) && currentSel < activeRollSize() - 1) {
-                newSel = currentSel + 1;
-                navigationOccurred = true;
-            }
-
-            if (navigationOccurred) {
-                // Clear current selection
-                selection.Clear();
-                for (int i = 0; i < activeRollSize(); i++) {
-                    getImage(i)->selected = false;
-                }
-
-                // Set new selection
-                activeRoll()->selIm = newSel;
-                selection.SetItemSelected(newSel, true);
-                getImage(newSel)->selected = true;
+                selectForward();
             }
         }
+        if (ImGui::IsKeyChordPressed(ImGuiKey_LeftArrow | ImGuiMod_Alt)) {
+            selectBackward();
+        }
+        if (ImGui::IsKeyChordPressed(ImGuiKey_RightArrow | ImGuiMod_Alt)) {
+            selectForward();
+        }
+
 
         // Render thumbnails
         for (int i = 0; i < activeRollSize(); i++) {
@@ -96,7 +87,7 @@ void mainWindow::thumbView() {
             int displayWidth = (int)((float)tWidth * proxyScale);
             int displayHeight = (int)((float)tHeight * proxyScale);
 
-            CalculateThumbDisplaySize(displayWidth, displayHeight, maxAvailable, displaySize, getImage(i)->imRot);
+            CalculateThumbDisplaySize(displayWidth, displayHeight, maxAvailable, displaySize, getImage(i)->imgParam.rotation);
 
             // Start a group to contain the image and its filename
             ImGui::BeginGroup();
@@ -144,7 +135,7 @@ void mainWindow::thumbView() {
 
                 // Define UV coordinates for each corner based on rotation
                 ImVec2 uv0, uv1, uv2, uv3;
-                switch (getImage(i)->imRot) {
+                switch (getImage(i)->imgParam.rotation) {
                     case 1: // Normal (0°)
                         uv0 = ImVec2(0,0); uv1 = ImVec2(1,0);
                         uv2 = ImVec2(1,1); uv3 = ImVec2(0,1);

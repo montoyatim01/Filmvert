@@ -29,22 +29,22 @@ void mainWindow::copyIntoParams() {
         }
 
         //---Metadata
-        copyMeta.cameraMake = activeImage()->imMeta.cameraMake;
-        copyMeta.cameraModel = activeImage()->imMeta.cameraModel;
-        copyMeta.lens = activeImage()->imMeta.lens;
-        copyMeta.filmStock = activeImage()->imMeta.filmStock;
-        copyMeta.focalLength = activeImage()->imMeta.focalLength;
-        copyMeta.fNumber = activeImage()->imMeta.fNumber;
-        copyMeta.exposureTime = activeImage()->imMeta.exposureTime;
-        copyMeta.dateTime = activeImage()->imMeta.dateTime;
-        copyMeta.location = activeImage()->imMeta.location;
-        copyMeta.gps = activeImage()->imMeta.gps;
-        copyMeta.notes = activeImage()->imMeta.notes;
-        copyMeta.devProcess = activeImage()->imMeta.devProcess;
-        copyMeta.chemMfg = activeImage()->imMeta.chemMfg;
-        copyMeta.devNotes = activeImage()->imMeta.devNotes;
-        copyMeta.scanner = activeImage()->imMeta.scanner;
-        copyMeta.scanNotes = activeImage()->imMeta.scanNotes;
+        copyMeta.cameraMake = activeImage()->imgMeta.cameraMake;
+        copyMeta.cameraModel = activeImage()->imgMeta.cameraModel;
+        copyMeta.lens = activeImage()->imgMeta.lens;
+        copyMeta.filmStock = activeImage()->imgMeta.filmStock;
+        copyMeta.focalLength = activeImage()->imgMeta.focalLength;
+        copyMeta.fNumber = activeImage()->imgMeta.fNumber;
+        copyMeta.exposureTime = activeImage()->imgMeta.exposureTime;
+        copyMeta.dateTime = activeImage()->imgMeta.dateTime;
+        copyMeta.location = activeImage()->imgMeta.location;
+        copyMeta.gps = activeImage()->imgMeta.gps;
+        copyMeta.notes = activeImage()->imgMeta.notes;
+        copyMeta.devProcess = activeImage()->imgMeta.devProcess;
+        copyMeta.chemMfg = activeImage()->imgMeta.chemMfg;
+        copyMeta.devNotes = activeImage()->imgMeta.devNotes;
+        copyMeta.scanner = activeImage()->imgMeta.scanner;
+        copyMeta.scanNotes = activeImage()->imgMeta.scanNotes;
 
 
     }

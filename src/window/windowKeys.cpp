@@ -179,7 +179,59 @@ void mainWindow::checkHotkeys() {
         }
     }
 
-    // Printer Lights?
+    // Image rating
+    if (ImGui::IsKeyChordPressed(ImGuiKey_0 | ImGuiMod_Alt)) {
+        if (validIm()) {
+            activeImage()->imgMeta.rating = 0;
+            ratingSet = true;
+            ratingFrameCount = 120;
+            paramUpdate();
+        }
+    }
+    if (ImGui::IsKeyChordPressed(ImGuiKey_1 | ImGuiMod_Alt)) {
+        if (validIm()) {
+            activeImage()->imgMeta.rating = 1;
+            ratingSet = true;
+            ratingFrameCount = 120;
+            paramUpdate();
+        }
+    }
+    if (ImGui::IsKeyChordPressed(ImGuiKey_2 | ImGuiMod_Alt)) {
+        // Metadata popup flag
+        if (validIm()) {
+            activeImage()->imgMeta.rating = 2;
+            ratingSet = true;
+            ratingFrameCount = 120;
+            paramUpdate();
+        }
+    }
+    if (ImGui::IsKeyChordPressed(ImGuiKey_3 | ImGuiMod_Alt)) {
+        // Metadata popup flag
+        if (validIm()) {
+            activeImage()->imgMeta.rating = 3;
+            ratingSet = true;
+            ratingFrameCount = 120;
+            paramUpdate();
+        }
+    }
+    if (ImGui::IsKeyChordPressed(ImGuiKey_4 | ImGuiMod_Alt)) {
+        // Metadata popup flag
+        if (validIm()) {
+            activeImage()->imgMeta.rating = 4;
+            ratingSet = true;
+            ratingFrameCount = 120;
+            paramUpdate();
+        }
+    }
+    if (ImGui::IsKeyChordPressed(ImGuiKey_5 | ImGuiMod_Alt)) {
+        // Metadata popup flag
+        if (validIm()) {
+            activeImage()->imgMeta.rating = 5;
+            ratingSet = true;
+            ratingFrameCount = 120;
+            paramUpdate();
+        }
+    }
 
 
 }

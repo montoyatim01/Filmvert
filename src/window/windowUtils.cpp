@@ -485,6 +485,50 @@ void inverseTransformCoordinates(int& x, int& y, int rotation, int width, int he
             break;
     }
 }
+//--- Select Forward ---//
+/*
+    Advance the active selection one image forward
+*/
+void mainWindow::selectForward() {
+    int currentSel = activeRoll()->selIm;
+    int newSel = currentSel;
+    newSel = currentSel + 1;
+    newSel = newSel < 0 ? 0 :
+        newSel > activeRollSize() - 1 ? activeRollSize() - 1 : newSel;
+    // Clear current selection
+    selection.Clear();
+    for (int i = 0; i < activeRollSize(); i++) {
+        getImage(i)->selected = false;
+    }
+
+    // Set new selection
+    activeRoll()->selIm = newSel;
+    selection.SetItemSelected(newSel, true);
+    getImage(newSel)->selected = true;
+}
+
+//--- Select Backward ---//
+/*
+    Advance the active selection one image backward
+*/
+void mainWindow::selectBackward() {
+    int currentSel = activeRoll()->selIm;
+    int newSel = currentSel;
+    newSel = currentSel - 1;
+
+    newSel = newSel < 0 ? 0 :
+        newSel > activeRollSize() - 1 ? activeRollSize() - 1 : newSel;
+    // Clear current selection
+    selection.Clear();
+    for (int i = 0; i < activeRollSize(); i++) {
+        getImage(i)->selected = false;
+    }
+
+    // Set new selection
+    activeRoll()->selIm = newSel;
+    selection.SetItemSelected(newSel, true);
+    getImage(newSel)->selected = true;
+}
 
 
 //--- Load Mappings ---//

@@ -219,9 +219,9 @@ void mainWindow::importImagePopup() {
 
                     if (img) {
                         imgRender(img, r_bg);
-                        img->imgState.setPtrs(&img->imMeta, &img->imgParam, &img->needRndr);
-                        img->imMeta.rollName = activeRolls[impRoll].rollName;
-                        img->imMeta.frameNumber = i + 1;
+                        img->imgState.setPtrs(&img->imgMeta, &img->imgParam, &img->needRndr);
+                        img->imgMeta.rollName = activeRolls[impRoll].rollName;
+                        img->imgMeta.frameNumber = i + 1;
                         img->rollPath = activeRolls[impRoll].rollPath;
                     }
 
@@ -354,13 +354,13 @@ void mainWindow::importRollPopup() {
                         image* thisIm = getImage(thisRoll, i);
                         if (thisIm) {
                             imgRender(thisIm, r_bg);
-                            thisIm->imMeta.rollName = activeRolls[thisRoll].rollName;
+                            thisIm->imgMeta.rollName = activeRolls[thisRoll].rollName;
                             thisIm->rollPath = importFiles[r];
-                            thisIm->imgState.setPtrs(&thisIm->imMeta, &thisIm->imgParam, &thisIm->needRndr);
-                            maxInt = thisIm->imMeta.frameNumber != 9999 ? std::max(std::min(thisIm->imMeta.frameNumber, 9999), maxInt) : maxInt;
-                            if (thisIm->imMeta.frameNumber == 9999)
+                            thisIm->imgState.setPtrs(&thisIm->imgMeta, &thisIm->imgParam, &thisIm->needRndr);
+                            maxInt = thisIm->imgMeta.frameNumber != 9999 ? std::max(std::min(thisIm->imgMeta.frameNumber, 9999), maxInt) : maxInt;
+                            if (thisIm->imgMeta.frameNumber == 9999)
                                 maxInt++;
-                            thisIm->imMeta.frameNumber = thisIm->imMeta.frameNumber == 9999 ? maxInt : thisIm->imMeta.frameNumber;
+                            thisIm->imgMeta.frameNumber = thisIm->imgMeta.frameNumber == 9999 ? maxInt : thisIm->imgMeta.frameNumber;
 
                         }
                     }
@@ -953,7 +953,7 @@ void mainWindow::localMetaPopup() {
         ImGui::Separator();
 
         const char imgWarn[] = "";
-
+        ImGui::BeginGroup();
         ImGui::Text("Frame Number:");
         ImGui::InputInt("###", &metaEdit.frameNum);
         ImGui::SameLine();
@@ -965,7 +965,7 @@ void mainWindow::localMetaPopup() {
                     int curFrame = metaEdit.frameNum;
                     for (int i = activeRoll()->selIm; i < activeRollSize(); i++) {
                         if (getImage(i)) {
-                            getImage(i)->imMeta.frameNumber = curFrame;
+                            getImage(i)->imgMeta.frameNumber = curFrame;
                             curFrame++;
                         }
                     }
@@ -974,6 +974,16 @@ void mainWindow::localMetaPopup() {
             }
         }
         ImGui::SetItemTooltip("Ripple the frame number change across the\nremaining images in this roll.\nThis will immediately change the frame\nnumbers in this image and the following images.");
+        ImGui::EndGroup();
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 14);
+        ImGui::BeginGroup();
+        ImGui::Text("Rating:");
+        ImGui::InputInt("###rat", &activeImage()->imgMeta.rating);
+        activeImage()->imgMeta.rating = activeImage()->imgMeta.rating > 5 ? 5 :
+            activeImage()->imgMeta.rating < 0 ? 0 :
+            activeImage()->imgMeta.rating;
+        ImGui::EndGroup();
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -1161,7 +1171,7 @@ void mainWindow::preferencesPopup() {
         // Performance Mode
         ImGui::Text("Roll Performance Mode");
         ImGui::Checkbox("###02", &tmpPrefs.perfMode);
-        ImGui::SetItemTooltip("Scale resolution down for optimal interaction speed.\nWill also unload non-active rolls to save memory usage.\nUnloaded rolls are re-loaded when active.");
+        ImGui::SetItemTooltip("Scale resolution down for optimal interaction speed.\nWill also unload non-active rolls to save memory usage.\nUnloaded rolls are re-loaded when active.\nIt is recommended to keep this enabled.");
         if (tmpPrefs.perfMode) {
             ImGui::SameLine();
             ImGui::DragInt("Max Res", &tmpPrefs.maxRes, 10.0f, 1000, 5000, "%d", 0);
@@ -1200,7 +1210,7 @@ void mainWindow::preferencesPopup() {
             ImGui::PopStyleColor();
         }
         if (ocioProc.validExternal) {
-            std::vector<char*> ocioOpts;
+            std::vector<const char*> ocioOpts;
             ocioOpts.push_back("Internal");
             ocioOpts.push_back("External");
             ImGui::Text("Config");
@@ -1325,10 +1335,13 @@ void mainWindow::shortcutsPopup() {
         ImGui::Separator();
         ImGui::Text("%s + E ", s_cmd.c_str());
         ImGui::Text("%s + G ", s_cmd.c_str());
+        ImGui::Text("%s + Num ", s_opt.c_str());
         ImGui::Separator();
         ImGui::Text("H");
         ImGui::Text("%s + Scroll", s_opt.c_str());
         ImGui::Text("Shift + Scroll");
+        ImGui::Text("%s + Left Arrow", s_opt.c_str());
+        ImGui::Text("%s + Right Arrow", s_opt.c_str());
         ImGui::Separator();
         ImGui::Text("%s + [ ", s_cmd.c_str());
         ImGui::Text("%s + ] ", s_cmd.c_str());
@@ -1357,10 +1370,13 @@ void mainWindow::shortcutsPopup() {
         ImGui::Spacing();
         ImGui::Text("Edit Image Metadata");
         ImGui::Text("Edit Roll Metadata");
+        ImGui::Text("Rate Image 0-5");
         ImGui::Spacing();
         ImGui::Text("Reset view to fit image");
         ImGui::Text("Zoom in/out of image");
         ImGui::Text("");
+        ImGui::Text("Previous Image");
+        ImGui::Text("Next Image");
         ImGui::Spacing();
         ImGui::Text("Rotate Left");
         ImGui::Text("Rotate Right");
