@@ -40,7 +40,7 @@
 #include "structs.h"
 #include "threadPool.h"
 #include "windowUtils.h"
-#include "licenses.h"
+
 
 // Declared functions from macOSFile.mm
 std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canChooseDirectories = false);
@@ -105,6 +105,7 @@ class mainWindow
 
         ocioSetting dispOCIO;
 
+        std::string licText;
 
         //int selIm = -1;
         ImGuiSelectionBasicStorage selection;

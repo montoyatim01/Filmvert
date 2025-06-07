@@ -25,7 +25,7 @@ struct preferenceSet {
     bool histEnable = true;
 
     // Mouse settings
-    bool trackpadMode = true;
+    bool trackpadMode = false;
 
     // Performance Mode
     bool perfMode = true;

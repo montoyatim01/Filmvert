@@ -1,6 +1,5 @@
 #include "window.h"
 #include "gpu.h"
-#include "licenses.h"
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "structs.h"
@@ -181,11 +180,13 @@ int mainWindow::openWindow()
     }
 
     // Load in licenses text
-    for (auto &lic : licenses::all_licenses) {
-        licText += "------------" + lic.first + "------------\n";
-        licText += lic.second;
-        licText += "\n\n";
+    auto licFile = fs.open("assets/licenses.txt");
+    if (!licFile) {
+        LOG_ERROR("Error opening License File!");
+    } else {
+      licText = std::string(licFile->begin(), licFile->end());
     }
+
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();

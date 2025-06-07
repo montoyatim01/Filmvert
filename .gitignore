@@ -8,3 +8,4 @@ src/licenses.h
 linuxBuild
 macOSBuild
 *sign.sh
+assets/licenses.txt

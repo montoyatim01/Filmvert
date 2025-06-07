@@ -87,6 +87,7 @@ assets/fonts/JetBrainsMono-Regular.ttf
 assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio
 assets/studio-config-v3.0.0_aces-v2.0_ocio-v2.4.ocio
 assets/logo.png
+assets/licenses.txt
 )
 set_property(TARGET resources PROPERTY POSITION_INDEPENDENT_CODE ON)
 
@@ -158,7 +159,7 @@ if (APPLE)
                   OpenColorIO::OpenColorIO
                   exiv2::exiv2)
 elseif (WIN32)
-    add_executable(Filmvert ${FILMVERT_SRCS})
+    add_executable(Filmvert WIN32 ${FILMVERT_SRCS} src/resources.rc)
     target_link_libraries(Filmvert wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
         glfw
         GLEW::GLEW

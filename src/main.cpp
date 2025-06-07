@@ -4,7 +4,11 @@
 //#include "metalGPU.h"
 #include "window.h"
 
+#if defined (WIN32)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+#else
 int main(void)
+#endif
 {
     // Start Logger
     LOG_INFO("Logging started");
