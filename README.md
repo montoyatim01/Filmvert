@@ -1,6 +1,6 @@
 <div align="center">
 
-<!-- Put Logo Here -->
+[[assets/logo.png|alt=logo]]
 
 # Filmvert
 
@@ -18,7 +18,7 @@ Features:
 
 - Metadata tagging, import and export
 
-<!-- Put Screenshot Here -->
+[[assets/MainApp.png|alt=application]]
 
 ## ⚡️ Quick start
 Download the latest release from the [Releases Page](https://github.com/montoyatim01/Filmvert/releases).
@@ -82,9 +82,9 @@ Feel free to submit a GitHub issue for any recurring problem or bug.
 When submitting an issue, please include the following:
 - The Filmvert log file.
 By default, Filmvert creates a log file at the following location:
-macOS: ```/Users/Shared/Filmvert/Filmvert.log```
-Windows: ```C:/ProgramData/Filmvert/Filmvert.log```
-Linux: ```~/.local/Filmvert/Filmvert.log```
+- macOS: ```/Users/Shared/Filmvert/Filmvert.log```
+- Windows: ```C:/ProgramData/Filmvert/Filmvert.log```
+- Linux: ```~/.local/Filmvert/Filmvert.log```
 
 - System specifications (os version, graphics card, driver version, etc).
 
