@@ -159,7 +159,7 @@ if (APPLE)
                   OpenColorIO::OpenColorIO
                   exiv2::exiv2)
 elseif (WIN32)
-    add_executable(Filmvert WIN32 ${FILMVERT_SRCS} src/resources.rc)
+    add_executable(Filmvert WIN32 ${FILMVERT_SRCS} Icon/resources.rc)
     target_link_libraries(Filmvert wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
         glfw
         GLEW::GLEW
