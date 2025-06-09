@@ -244,15 +244,21 @@ void mainWindow::exportImages() {
                     getImage(i)->exportPreProcess(expSetting.outPath);
                     gpu->addToRender(getImage(i), r_full, exportOCIO);
                     auto start = std::chrono::steady_clock::now();
+                    bool retry = false;
                     while (!getImage(i)->renderReady) {
                         auto end = std::chrono::steady_clock::now();
                         auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-                        if (dur.count() > 15000) {
-                            // Bailing out after waiting 15 seconds for Metal to finish rendering..
-                            // At avg of 20-30fps it should never take this long
-                            LOG_ERROR("Stuck waiting for GPU render. Cannot export file: {}!", getImage(i)->srcFilename);
-                            return;
+                        if (dur.count() > appPrefs.prefs.renderTimeout) {
+                            if (retry) {
+                                // Bailing out after waiting 90 seconds for GL to finish rendering..
+                                LOG_ERROR("Stuck waiting for GPU render. Cannot export file: {}!", getImage(i)->srcFilename);
+                                return;
+                            }
+                            // Try to re-queue the render to the front
+                            gpu->addToRender(getImage(i), r_sdt, exportOCIO);
+                            start = std::chrono::steady_clock::now();
+                            retry = true;
                         }
                         std::this_thread::sleep_for(std::chrono::milliseconds(200));
                     }
@@ -316,15 +322,22 @@ LOG_INFO("Exporting {} Files", exportImgCount);
 
                             gpu->addToRender(getImage(r, i), r_full, exportOCIO);
                             auto start = std::chrono::steady_clock::now();
+                            bool retry = false;
                             while (!getImage(r, i)->renderReady) {
                                 auto end = std::chrono::steady_clock::now();
                                 auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-                                if (dur.count() > 15000) {
-                                    // Bailing out after waiting 15 seconds for Metal to finish rendering..
-                                    // At avg of 20-30fps it should never take this long
-                                    LOG_ERROR("Stuck waiting for GPU render. Cannot export file: {}!", getImage(r, i)->srcFilename);
-                                    return;
+                                if (dur.count() > appPrefs.prefs.renderTimeout) {
+                                    if (retry) {
+                                        // Bailing out after waiting 90 seconds for GL to finish rendering..
+                                        LOG_ERROR("Stuck waiting for GPU render. Cannot export file: {}!", getImage(r, i)->srcFilename);
+                                        return;
+                                    }
+                                    // Try to re-queue the render to the front
+                                    gpu->addToRender(getImage(r, i), r_sdt, exportOCIO);
+                                    start = std::chrono::steady_clock::now();
+                                    retry = true;
+
                                 }
                                 std::this_thread::sleep_for(std::chrono::milliseconds(200));
                             }

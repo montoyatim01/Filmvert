@@ -157,8 +157,6 @@ int mainWindow::openWindow()
     // Initialize GL Kernels
     gpu->initialize(dispOCIO);
 
-    // Setup Threadpool
-    tPool = new ThreadPool(std::thread::hardware_concurrency());
 
     // Load in user preferences
     appPrefs.loadFromFile();

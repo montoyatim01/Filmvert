@@ -28,11 +28,12 @@
 bool image::exportPreProcess(std::string outPath) {
     fullIm = true;
     expFullPath = outPath;
+    renderReady = false;
     if (isRawImage) {
         if (imageLoaded){
             clearBuffers();
         }
-        if(debayerImage(true, 11)) {
+        if(debayerImage(true, appPrefs.prefs.debayerMode)) {
             //allocProcBuf();
             imageLoaded = true;
             return true;
@@ -239,7 +240,7 @@ bool image::debayerImage(bool fullRes, int quality) {
 
     // Convert to float (assuming 16-bit output)
     if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
-        unsigned int numThreads = std::thread::hardware_concurrency();
+        unsigned int numThreads = 2;//std::thread::hardware_concurrency();
         numThreads = numThreads == 0 ? 2 : numThreads;
         // Create a vector of threads
         std::vector<std::thread> threads(numThreads);
@@ -378,7 +379,7 @@ bool image::dataReload() {
     rawImgData = new float[rawWidth * rawHeight * 4];
 
     // Load in the image and pre-process to Linear AP1
-    unsigned int numThreads = std::thread::hardware_concurrency();
+    unsigned int numThreads = 2;//std::thread::hardware_concurrency();
     numThreads = numThreads == 0 ? 2 : numThreads;
     // Create a vector of threads
     std::vector<std::thread> threads(numThreads);
@@ -555,7 +556,7 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
 
             img.rawImgData = new float[img.width * img.height * 4];
             // Load in the image and pre-process to Linear AP1
-            unsigned int numThreads = std::thread::hardware_concurrency();
+            unsigned int numThreads = 2;//std::thread::hardware_concurrency();
             numThreads = numThreads == 0 ? 2 : numThreads;
             // Create a vector of threads
             std::vector<std::thread> threads(numThreads);
@@ -787,7 +788,7 @@ auto c1 = std::chrono::steady_clock::now();
 
     // Convert to float (assuming 16-bit output)
     if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
-        unsigned int numThreads = std::thread::hardware_concurrency();
+        unsigned int numThreads = 2;//std::thread::hardware_concurrency();
         numThreads = numThreads == 0 ? 2 : numThreads;
         // Create a vector of threads
         std::vector<std::thread> threads(numThreads);

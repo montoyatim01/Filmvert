@@ -488,7 +488,10 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
             LOG_ERROR("Could not compile shaders!");
             return;
         }
-        copyToTex(m_inputTexture, _renderParams.width, _renderParams.height, _image->rawImgData);
+        if (!copyToTex(m_inputTexture, _renderParams.width, _renderParams.height, _image->rawImgData)) {
+            LOG_ERROR("Skipping image render {}, no input data!", _image->srcFilename);
+            return;
+        }
         checkError("Copying Image to Input Texture");
         prevIm = _image;
         _image->imgRst = false;
@@ -578,7 +581,7 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     if (!isInQueue(_image))
         _image->inRndQueue = false;
 
-    if (_image->selected)
+    if (_image->selected && !_image->fullIm)
         procHistIm(_image);
     _image->reloading = false;
     auto end = std::chrono::steady_clock::now();
@@ -602,7 +605,11 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
 }
 
 
-void openglGPU::copyToTex(GLuint textureID, int width, int height, float* rgbaData) {
+bool openglGPU::copyToTex(GLuint textureID, int width, int height, float* rgbaData) {
+    if (!rgbaData) {
+        LOG_ERROR("No image data for render!");
+        return false;
+    }
     glBindTexture(GL_TEXTURE_2D, textureID);
 
     // Upload the data to the existing texture
@@ -616,6 +623,7 @@ void openglGPU::copyToTex(GLuint textureID, int width, int height, float* rgbaDa
     checkError("Copying Texture");
 
     glBindTexture(GL_TEXTURE_2D, 0);
+    return true;
 }
 void openglGPU::copyFromTexFull(GLuint textureID, int width, int height, float* rgbaData) {
     glBindTexture(GL_TEXTURE_2D, textureID);

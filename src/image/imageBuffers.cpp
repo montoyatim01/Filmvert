@@ -155,7 +155,7 @@ void image::padToRGBA() {
     }
 
     // Define the number of threads to use
-    unsigned int numThreads = std::thread::hardware_concurrency();
+    unsigned int numThreads = 2;//std::thread::hardware_concurrency();
     if (numThreads == 0) {
         numThreads = 2; // Default value if concurrent threads can't be determined
     }
@@ -213,7 +213,7 @@ void image::trimForSave() {
     }
 
     // Define the number of threads to use
-    unsigned int numThreads = std::thread::hardware_concurrency();
+    unsigned int numThreads = 2;//std::thread::hardware_concurrency();
     if (numThreads == 0) {
         numThreads = 2; // Default value if concurrent threads can't be determined
     }

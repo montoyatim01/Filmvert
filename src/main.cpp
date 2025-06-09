@@ -15,6 +15,10 @@ int main(void)
     LOG_INFO("Version: {}.{}.{}", 1, 0, 0);
     LOG_INFO("Build {:.8}-{}", GIT_COMMIT_HASH, BUILD_DATE);
 
+    // Setup Threadpool
+    unsigned int numThreads = std::thread::hardware_concurrency();
+    LOG_INFO("Starting thread pool with {} threads", numThreads);
+    tPool = new ThreadPool(numThreads);
     // Initialize Metal/CUDA Subsystem
     //metalGPU metalSubsystem;
 

@@ -376,6 +376,8 @@ void mainWindow::importRollPopup() {
                         totalTasks = importFiles.size();
                         completedTasks = 1;
                         activeRolls[thisRoll].rollLoaded = true;
+                        if (activeRolls[thisRoll].images.size() > 0)
+                            activeRolls[thisRoll].images[0].selected = true;
                     }
                     activeRolls[thisRoll].selIm = activeRolls[thisRoll].rollSize() > 0 ? 0 : -1;
                     activeRolls[thisRoll].imagesLoading = false;
@@ -512,7 +514,7 @@ void mainWindow::batchRenderPopup() {
             ImGui::CloseCurrentPopup();
         }
 
-        if (isExporting) {
+        if (disableSet) {
             ImGui::BeginDisabled();
             disableSet = true;
         }

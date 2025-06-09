@@ -112,7 +112,7 @@ class openglGPU {
         void renderImage(image* _image, ocioSetting ocioSet);
         void renderBlurPass(image* _image);
 
-        void copyToTex(GLuint textureID, int width, int height, float* rgbaData);
+        bool copyToTex(GLuint textureID, int width, int height, float* rgbaData);
         void copyFromTexFull(GLuint textureID, int width, int height, float* rgbaData);
         void getHistTexture(image* _img, float*& pixels, int &width, int &height);
         void setHistTexture(float* pixels);

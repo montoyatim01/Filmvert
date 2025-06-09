@@ -44,12 +44,14 @@ struct preferenceSet {
 
     float proxyRes = 0.35f;
 
+    unsigned long renderTimeout = 90000;
+
 
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(preferenceSet, undoLevels,
         autoSave, autoSFreq, histInt, histEnable, trackpadMode,
         perfMode, maxRes, rollTimeout, debayerMode, ocioPath,
-        ocioExt, autoSort, proxyRes);
+        ocioExt, autoSort, proxyRes, renderTimeout);
 };
 
 class userPreferences {
