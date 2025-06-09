@@ -187,6 +187,9 @@ int mainWindow::openWindow()
       licText = std::string(licFile->begin(), licFile->end());
     }
 
+    // Set ini location
+    setIni();
+
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();

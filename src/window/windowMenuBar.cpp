@@ -43,16 +43,22 @@ void mainWindow::menuBar() {
             ImGui::Separator();
 
             if (ImGui::MenuItem("Export Image(s)")) {
-                exportOCIO.display = dispOCIO.display;
-                exportOCIO.view = dispOCIO.view;
-                expRolls = false;
-                exportPopup = true;
+                if (validRoll()) {
+                    exportOCIO.display = dispOCIO.display;
+                    exportOCIO.view = dispOCIO.view;
+                    expRolls = false;
+                    exportPopup = true;
+                }
+
             }
             if (ImGui::MenuItem("Export Roll(s)")) {
-                exportOCIO.display = dispOCIO.display;
-                exportOCIO.view = dispOCIO.view;
-                expRolls = true;
-                exportPopup = true;
+                if (activeRollSize() > 0) {
+                    exportOCIO.display = dispOCIO.display;
+                    exportOCIO.view = dispOCIO.view;
+                    expRolls = true;
+                    exportPopup = true;
+                }
+
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Close Selected Image(s)")) {
@@ -167,7 +173,10 @@ void mainWindow::menuBar() {
             }
             // Paste
             if (ImGui::MenuItem("Paste")) {
-                pasteTrigger = true;
+                if (validRoll()) {
+                    pasteTrigger = true;
+                }
+
             }
 
             ImGui::Separator();
@@ -195,27 +204,31 @@ void mainWindow::menuBar() {
         if (ImGui::BeginMenu("Metadata")) {
             // Import Roll Metadata
             if (ImGui::MenuItem("Import Roll Metadata")) {
-                if (openJSON()) {
-                    imMatchPopTrig = true;
-                    ImMatchRoll = true;
-                } else {
-                    std::string err = ackError;
-                    if (!err.empty()) {
-                        std::strcpy(ackMsg, "Metadata failed to import:");
-                        ackPopTrig = true;
+                if (validRoll()) {
+                    if (openJSON()) {
+                        imMatchPopTrig = true;
+                        ImMatchRoll = true;
+                    } else {
+                        std::string err = ackError;
+                        if (!err.empty()) {
+                            std::strcpy(ackMsg, "Metadata failed to import:");
+                            ackPopTrig = true;
+                        }
                     }
                 }
             }
 
             // Import Image Metadata
             if (ImGui::MenuItem("Import Image Metadata")) {
-                if (openImageMeta()) {
-                    imMatchPopTrig = true;
-                } else {
-                    std::string err = ackError;
-                    if (!err.empty()) {
-                        std::strcpy(ackMsg, "Metadata failed to import:");
-                        ackPopTrig = true;
+                if (validIm()) {
+                    if (openImageMeta()) {
+                        imMatchPopTrig = true;
+                    } else {
+                        std::string err = ackError;
+                        if (!err.empty()) {
+                            std::strcpy(ackMsg, "Metadata failed to import:");
+                            ackPopTrig = true;
+                        }
                     }
                 }
             }

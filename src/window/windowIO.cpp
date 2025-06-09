@@ -6,6 +6,45 @@
 #include <chrono>
 #include <filesystem>
 
+//--- Set ini ---//
+/*
+    Set the location of the imgui ini file
+*/
+void mainWindow::setIni() {
+    ImGuiIO& io = ImGui::GetIO();
+    #if defined(WIN32)
+    std::string appData;
+    char szPath[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_COMMON_APPDATA, NULL, 0, szPath)))
+    {
+        appData = szPath;
+    }
+    else
+    {
+        LOG_CRITICAL("Cannot query the AppData folder!");
+    }
+    appData += "\\Filmvert\\";
+    std::string prefPath = appData;
+    prefPath += std::string("/imgui.ini");
+    io.IniFilename = prefPath.c_str();
+
+    #elif defined __APPLE__
+    char* homeDir = getenv("HOME");
+    std::string homeStr = homeDir;
+    homeStr += "/Library/Preferences/Filmvert/";
+    homeStr += "imgui.ini";
+    io.IniFilename = homeStr.c_str();
+
+
+    #else
+    char* homeDir = getenv("HOME");
+    std::string homeStr = homeDir;
+    homeStr += "/.local/Filmvert/";
+    homeStr += "imgui.ini";
+    io.IniFilename = homeStr.c_str();
+    #endif
+}
+
 //--- Load Logo Texture ---//
 /*
     Load the logo image and create an
@@ -212,7 +251,7 @@ void mainWindow::exportImages() {
                         if (dur.count() > 15000) {
                             // Bailing out after waiting 15 seconds for Metal to finish rendering..
                             // At avg of 20-30fps it should never take this long
-                            LOG_ERROR("Stuck waiting for Metal GPU render. Cannot export file: {}!", getImage(i)->srcFilename);
+                            LOG_ERROR("Stuck waiting for GPU render. Cannot export file: {}!", getImage(i)->srcFilename);
                             return;
                         }
                         std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -276,7 +315,20 @@ LOG_INFO("Exporting {} Files", exportImgCount);
                             }
 
                             gpu->addToRender(getImage(r, i), r_full, exportOCIO);
-                            //LOG_INFO("Exporting Roll: {}, Image {}: {}", r, i, getImage(r, i)->srcFilename);
+                            auto start = std::chrono::steady_clock::now();
+                            while (!getImage(r, i)->renderReady) {
+                                auto end = std::chrono::steady_clock::now();
+                                auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+                                if (dur.count() > 15000) {
+                                    // Bailing out after waiting 15 seconds for Metal to finish rendering..
+                                    // At avg of 20-30fps it should never take this long
+                                    LOG_ERROR("Stuck waiting for GPU render. Cannot export file: {}!", getImage(r, i)->srcFilename);
+                                    return;
+                                }
+                                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                            }
+                            getImage(r, i)->renderReady = false;
                             getImage(r, i)->writeImg(expSetting, exportOCIO);
                             getImage(r, i)->exportPostProcess();
                             exportProcCount++;

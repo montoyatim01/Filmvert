@@ -62,7 +62,8 @@ void mainWindow::checkHotkeys() {
     // Paste (Cmd + V)
     if (ImGui::IsKeyChordPressed(ImGuiKey_V | ImGuiMod_Ctrl)) {
         // Paste
-        pasteTrigger = true;
+        if (validRoll())
+            pasteTrigger = true;
     }
 
     // Save Image (Cmd + S)
@@ -181,6 +182,7 @@ void mainWindow::checkHotkeys() {
 
     // Image rating
     if (ImGui::IsKeyChordPressed(ImGuiKey_0 | ImGuiMod_Alt)) {
+        // Rating 0
         if (validIm()) {
             activeImage()->imgMeta.rating = 0;
             ratingSet = true;
@@ -189,6 +191,7 @@ void mainWindow::checkHotkeys() {
         }
     }
     if (ImGui::IsKeyChordPressed(ImGuiKey_1 | ImGuiMod_Alt)) {
+        // Rating 1
         if (validIm()) {
             activeImage()->imgMeta.rating = 1;
             ratingSet = true;
@@ -197,7 +200,7 @@ void mainWindow::checkHotkeys() {
         }
     }
     if (ImGui::IsKeyChordPressed(ImGuiKey_2 | ImGuiMod_Alt)) {
-        // Metadata popup flag
+        // Rating 2
         if (validIm()) {
             activeImage()->imgMeta.rating = 2;
             ratingSet = true;
@@ -206,7 +209,7 @@ void mainWindow::checkHotkeys() {
         }
     }
     if (ImGui::IsKeyChordPressed(ImGuiKey_3 | ImGuiMod_Alt)) {
-        // Metadata popup flag
+        // Rating 3
         if (validIm()) {
             activeImage()->imgMeta.rating = 3;
             ratingSet = true;
@@ -215,7 +218,7 @@ void mainWindow::checkHotkeys() {
         }
     }
     if (ImGui::IsKeyChordPressed(ImGuiKey_4 | ImGuiMod_Alt)) {
-        // Metadata popup flag
+        // Rating 4
         if (validIm()) {
             activeImage()->imgMeta.rating = 4;
             ratingSet = true;
@@ -224,7 +227,7 @@ void mainWindow::checkHotkeys() {
         }
     }
     if (ImGui::IsKeyChordPressed(ImGuiKey_5 | ImGuiMod_Alt)) {
-        // Metadata popup flag
+        // Rating 5
         if (validIm()) {
             activeImage()->imgMeta.rating = 5;
             ratingSet = true;
@@ -232,6 +235,4 @@ void mainWindow::checkHotkeys() {
             paramUpdate();
         }
     }
-
-
 }

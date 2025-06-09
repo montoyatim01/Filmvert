@@ -3,6 +3,7 @@
 #include "nlohmann/json.hpp"
 #include "logger.h"
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 
 // Global Application Preferences
@@ -44,7 +45,7 @@ void userPreferences::saveToFile() {
         std::string jDump = j.dump(4);
         std::ofstream jsonFile(getPrefFile(), std::ios::out | std::ios::trunc);
         if (!jsonFile) {
-            LOG_ERROR("Unable to open JSON file for roll metadata export!");
+            LOG_ERROR("Unable to write preferences file!");
             return;
         }
         jsonFile << jDump;
@@ -76,6 +77,9 @@ std::string userPreferences::getPrefFile() {
     }
     appData += "\\Filmvert\\";
     std::string prefPath = appData;
+    if (!std::filesystem::exists(prefPath))
+        if (!std::filesystem::create_directory(prefPath))
+            LOG_ERROR("Unable to create preference directory!");
     prefPath += std::string("/fv_pref.json");
     return prefPath;
 
@@ -83,7 +87,10 @@ std::string userPreferences::getPrefFile() {
     #elif defined __APPLE__
     char* homeDir = getenv("HOME");
     std::string homeStr = homeDir;
-    homeStr += "/Library/Preferences/";
+    homeStr += "/Library/Preferences/Filmvert/";
+    if (!std::filesystem::exists(homeStr))
+        if (!std::filesystem::create_directory(homeStr))
+            LOG_ERROR("Unable to create preference directory!");
     homeStr += "fv_pref.json";
     return homeStr;
 
@@ -92,6 +99,9 @@ std::string userPreferences::getPrefFile() {
     char* homeDir = getenv("HOME");
     std::string homeStr = homeDir;
     homeStr += "/.local/Filmvert/";
+    if (!std::filesystem::exists(homeStr))
+        if (!std::filesystem::create_directory(homeStr))
+            LOG_ERROR("Unable to create preference directory!");
     homeStr += "fv_pref.json";
     return homeStr;
 

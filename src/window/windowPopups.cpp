@@ -425,6 +425,11 @@ void mainWindow::batchRenderPopup() {
         else
             ImGui::Text("Export selected image(s)");
         ImGui::Separator();
+        bool disableSet = false;
+        if (isExporting) {
+            ImGui::BeginDisabled();
+            disableSet = true;
+        }
         if (expRolls) {
             // Table for selecting rolls
             if (ImGui::BeginChild("##Basket", ImVec2(-FLT_MIN, ImGui::GetFontSize() * 6), ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY))
@@ -498,6 +503,8 @@ void mainWindow::batchRenderPopup() {
         if (expRolls)
             ImGui::Text("(Rolls will save in sub-directories)");
 
+        if (disableSet)
+            ImGui::EndDisabled();
 
         if (ImGui::Button("Cancel")) {
             isExporting = false;
@@ -505,7 +512,6 @@ void mainWindow::batchRenderPopup() {
             ImGui::CloseCurrentPopup();
         }
 
-        bool disableSet = false;
         if (isExporting) {
             ImGui::BeginDisabled();
             disableSet = true;
@@ -1602,12 +1608,12 @@ void mainWindow::aboutPopup() {
         const char* copyrightText = "Copyright 2025 Timothy Montoya";
         float copyrightTextWidth = ImGui::CalcTextSize(copyrightText).x;
         ImGui::SetCursorPosX((windowWidth - copyrightTextWidth) * 0.5f);
-        ImGui::Text("Copyright 2025 Timothy Montoya.");
+        ImGui::Text("Copyright 2025 Timothy Montoya");
 
         const char* licenseText = "Distributed under MIT license";
         float licenseTextWidth = ImGui::CalcTextSize(licenseText).x;
         ImGui::SetCursorPosX((windowWidth - licenseTextWidth) * 0.5f);
-        ImGui::Text("Distributed under MIT license.");
+        ImGui::Text("Distributed under MIT license");
         ImGui::Spacing();
 
         const char* copyText = "Copyright notices for included libraries:";

@@ -61,6 +61,17 @@ int main(void)
 // -* Rotation doesn't rollup
 
 /*
+- Set ImGui ini locations
+- Modified macOS preference location
+- Preferences only save when modified
+- Safegaurd actions with no active images/rolls
+- Export window options disable when export in progress
+- Addressed issue where roll exports would crash
+- Addressed issue where re-imported images would default bypass render
+- Addressed issue where image renders would not clear vram buffers
+*/
+
+/*
 - Image rating possible now
 - Cleanup variables
 - XMP embedding on export for all but jpg files

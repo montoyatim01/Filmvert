@@ -58,9 +58,10 @@ void mainWindow::checkMeta() {
 void mainWindow::saveUI() {
     auto now = std::chrono::steady_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::seconds>(now - lastUISave);
-    if (dur.count() > 10) {
+    if (dur.count() > 10 && uiChanges) {
         appPrefs.saveToFile();
         lastUISave = std::chrono::steady_clock::now();
+        uiChanges = false;
     }
 }
 

@@ -209,6 +209,7 @@ void image::trimForSave() {
     }
     if (!procImgData || !tmpOutData) {
         LOG_ERROR("Either source or destination rgba buffer is null");
+        return;
     }
 
     // Define the number of threads to use

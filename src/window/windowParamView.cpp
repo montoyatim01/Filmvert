@@ -175,12 +175,18 @@ void mainWindow::paramView() {
                 ImGui::SameLine();
                 renderCall |= ImGui::Checkbox("Bypass Render", &activeImage()->renderBypass);
                 ImGui::SameLine();
-                renderCall |= ImGui::Checkbox("Histogram", &appPrefs.prefs.histEnable);
+                if (ImGui::Checkbox("Histogram", &appPrefs.prefs.histEnable)) {
+                    renderCall |= true;
+                    uiChanges = true;
+                }
                 activeImage()->gradeBypass = gradeBypass;
                 if (appPrefs.prefs.histEnable) {
                     ImGui::SameLine();
                     ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20);
-                    renderCall |= ImGui::SliderFloat("###int", &appPrefs.prefs.histInt, 0.0f, 1.0f);
+                    if (ImGui::SliderFloat("###int", &appPrefs.prefs.histInt, 0.0f, 1.0f)) {
+                        renderCall |= true;
+                        uiChanges = true;
+                    }
                     ImGui::SetItemTooltip("Histogram intensity");
                 }
 

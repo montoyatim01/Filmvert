@@ -566,6 +566,8 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
         copyFromTexFull(_image->glTexture, _renderParams.width, _renderParams.height, _image->procImgData);
         checkError("Copying Full Image for write");
         _image->renderReady = true;
+        glDeleteTextures(1, (GLuint*)&_image->glTexture);
+        _image->glTexture = 0;
     } else {
         // Change to OpenGL image buffer
         //_image->allocDispBuf();

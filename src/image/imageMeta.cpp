@@ -534,7 +534,7 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
                 metaChg = true;
             }
         }
-        renderBypass |= metaChg;
+        renderBypass &= !metaChg;
     }
 
     if (meta != nullptr) {

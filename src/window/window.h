@@ -94,6 +94,7 @@ class mainWindow
         bool rollChange = false;
         bool histRunning = false;
         bool wantClose = false;
+        bool uiChanges = false;
         image* prevIm;
         preferenceSet tmpPrefs;
 
@@ -240,6 +241,7 @@ class mainWindow
         void calculateVisible();
 
         // windowIO.cpp
+        void setIni();
         void loadLogoTexture(std::optional<cmrc::file> logoIm);
         void openImages();
         bool openJSON();
