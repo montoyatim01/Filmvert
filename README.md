@@ -28,6 +28,8 @@ Download the latest release from the [Releases Page](https://github.com/montoyat
 Load in images by selecting a few individual images, or an entire directory's worth at once. Filmvert operates per-roll, so directories will import as rolls. Individual images will need to be added to a roll.
 
 ### Analysis
+![basicWorkflow](assets/BasicWorkflow.gif)
+
 Set the four corners of the analysis region to encompass the image. Exclude any sprocket holes or any scanning equipment as this will throw off the inversion. The analysis only looks at pixels within the set region, so portions of the frame can be included/excluded to influence the analysis.
 
 Set the base color by holding Cmd + Shift, and clicking and dragging a clear space in the image where the film base is visible.
@@ -68,6 +70,7 @@ to generate default profiles
 
 ## ⭐️ Contributing
 If there are any features you'd like to see, submit a PR for inclusion into the codebase.
+
 If you like the program, consider buying me a cup of coffee:
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/G2G51BYM3L)
