@@ -1,6 +1,7 @@
 <div align="center">
 
-[[assets/logo.png|alt=logo]]
+![logo](assets/logo.png)
+
 
 # Filmvert
 
@@ -18,7 +19,7 @@ Features:
 
 - Metadata tagging, import and export
 
-[[assets/MainApp.png|alt=application]]
+![mainApp](assets/MainApp.png)
 
 ## ⚡️ Quick start
 Download the latest release from the [Releases Page](https://github.com/montoyatim01/Filmvert/releases).
@@ -45,7 +46,7 @@ Further, the **Grade** options can be used to set a quick grade on an image.
 
 ## 📖 Project Wiki
 
-For full documentation on all features and workflows, take a look at the project wiki.
+For full documentation on all features and workflows, take a look at the [project wiki](https://github.com/montoyatim01/Filmvert/wiki)
 
 ## 🚚 Building from source
 **Requirements**
@@ -65,16 +66,11 @@ If you get a warning about missing conan profiles, run the command:
 ```conan profile new default --detect```
 to generate default profiles
 
-## ⚠️ License
-The application is licensed under the [MIT License](https://opensource.org/licenses/MIT):
+## ⭐️ Contributing
+If there are any features you'd like to see, submit a PR for inclusion into the codebase.
+If you like the program, consider buying me a cup of coffee:
 
-Copyright &copy; 2025 Timothy Montoya
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/G2G51BYM3L)
 
 ## ‼️ Troubleshooting
 Feel free to submit a GitHub issue for any recurring problem or bug.
