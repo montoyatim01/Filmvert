@@ -43,6 +43,7 @@ class openglGPU {
         void addToRender(image* _image, renderType type, ocioSetting ocioSet);
         bool initialize(ocioSetting &ocioSet);
         bool isInQueue(image* _image);
+        void removeFromQueue(image* _image);
         void processQueue();
         void clearImBuffer(image* img);
         void clearSmBuffer(image* img);

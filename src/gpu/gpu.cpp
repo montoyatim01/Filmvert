@@ -408,6 +408,23 @@ bool openglGPU::isInQueue(image* _image) {
     return false;
 }
 
+//--- Remove From Queue ---//
+/*
+    Remove all instances of the image
+    from the render queue
+*/
+void openglGPU::removeFromQueue(image* _image) {
+    if (!_image)
+        return;
+    queueLock.lock();
+    for (int i = 0; i < renderQueue.size(); i++){
+        if (renderQueue[i]._img == _image) {
+            renderQueue.erase(renderQueue.begin() + i);
+        }
+    }
+    queueLock.unlock();
+}
+
 //--- Process Queue ---//
 /*
     Loop through checking to see if there is a new item in the

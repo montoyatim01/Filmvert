@@ -155,7 +155,7 @@ void mainWindow::thumbView() {
                 }
 
                 // Draw the rotated quad
-                if (getImage(i)->imageLoaded && !toggleProxy && !getImage(i)->reloading)
+                if (getImage(i)->imageLoaded && !toggleProxy && !getImage(i)->reloading && !getImage(i)->fullIm)
                     draw_list->AddImageQuad(
                         static_cast<ImTextureID>(getImage(i)->glTexture),
                         canvas_pos,

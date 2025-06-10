@@ -85,7 +85,7 @@ void mainWindow::imageView() {
             }
 
             // Draw the rotated quad
-            if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading)
+            if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading && !activeImage()->fullIm)
                 draw_list->AddImageQuad(
                     static_cast<ImTextureID>(activeImage()->glTexture),
                     canvas_pos, // top-left

@@ -265,6 +265,7 @@ void mainWindow::exportImages() {
                     getImage(i)->renderReady = false;
                     //LOG_INFO("Exporting Image {}: {}", i, getImage(i)->srcFilename);
                     getImage(i)->writeImg(expSetting, exportOCIO);
+                    gpu->removeFromQueue(getImage(i));
                     getImage(i)->exportPostProcess();
                     exportProcCount++;
                 }
@@ -343,6 +344,7 @@ LOG_INFO("Exporting {} Files", exportImgCount);
                             }
                             getImage(r, i)->renderReady = false;
                             getImage(r, i)->writeImg(expSetting, exportOCIO);
+                            gpu->removeFromQueue(getImage(r, i));
                             getImage(r, i)->exportPostProcess();
                             exportProcCount++;
                         } else {
