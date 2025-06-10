@@ -301,7 +301,8 @@ int mainWindow::openWindow()
         checkMeta();
 
         // Routine for updating thumbnails
-        rollRenderCheck();
+        if (!isExporting)
+            rollRenderCheck();
 
 
         // Check for GPU errors
