@@ -186,7 +186,7 @@ int mainWindow::openWindow()
     }
 
     // Set ini location
-    setIni();
+    //setIni();
 
 
     // Setup Dear ImGui style
