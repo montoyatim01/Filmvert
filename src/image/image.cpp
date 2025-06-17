@@ -13,13 +13,21 @@
 */
 void image::rotRight() {
     switch(imgParam.rotation) {
-        case 1: // Upright
+        case 1: // Normal -> 90° CW
             imgParam.rotation = 6; break;
-        case 6: // Left
-            imgParam.rotation = 3; break;
-        case 3: // Upside
+        case 2: // H flip -> 90° CW + H flip
+            imgParam.rotation = 7; break;
+        case 3: // 180° -> 90° CCW
             imgParam.rotation = 8; break;
-        case 8: // Right
+        case 4: // V flip -> 90° CCW + H flip
+            imgParam.rotation = 5; break;
+        case 5: // 90° CCW + H flip -> Normal + H flip
+            imgParam.rotation = 2; break;
+        case 6: // 90° CW -> 180°
+            imgParam.rotation = 3; break;
+        case 7: // 90° CW + H flip -> V flip
+            imgParam.rotation = 4; break;
+        case 8: // 90° CCW -> Normal
             imgParam.rotation = 1; break;
     }
 }
@@ -30,14 +38,72 @@ void image::rotRight() {
 */
 void image::rotLeft() {
     switch(imgParam.rotation) {
-        case 1: // Upright
+        case 1: // Normal -> 90° CCW
             imgParam.rotation = 8; break;
-        case 8: // Right
-            imgParam.rotation = 3; break;
-        case 3: // Upside
+        case 2: // H flip -> 90° CCW + H flip
+            imgParam.rotation = 5; break;
+        case 3: // 180° -> 90° CW
             imgParam.rotation = 6; break;
-        case 6: // Left
+        case 4: // V flip -> 90° CW + H flip
+            imgParam.rotation = 7; break;
+        case 5: // 90° CCW + H flip -> V flip
+            imgParam.rotation = 4; break;
+        case 6: // 90° CW -> Normal
             imgParam.rotation = 1; break;
+        case 7: // 90° CW + H flip -> H flip
+            imgParam.rotation = 2; break;
+        case 8: // 90° CCW -> 180°
+            imgParam.rotation = 3; break;
+    }
+}
+
+//---Flip Vertical---//
+/*
+    Set valid exif rotation values
+*/
+void image::flipV() {
+    switch(imgParam.rotation) {
+        case 1: // Normal -> Vertical flip
+            imgParam.rotation = 4; break;
+        case 2: // Horizontal flip -> 180°
+            imgParam.rotation = 3; break;
+        case 3: // 180° -> Horizontal flip
+            imgParam.rotation = 2; break;
+        case 4: // Vertical flip -> Normal
+            imgParam.rotation = 1; break;
+        case 5: // 90° CCW + H flip -> 90° CW + H flip
+            imgParam.rotation = 7; break;
+        case 6: // 90° CW -> 90° CCW
+            imgParam.rotation = 8; break;
+        case 7: // 90° CW + H flip -> 90° CCW + H flip
+            imgParam.rotation = 5; break;
+        case 8: // 90° CCW -> 90° CW
+            imgParam.rotation = 6; break;
+    }
+}
+
+//---Flip Horizontal---//
+/*
+    Set valid exif rotation values
+*/
+void image::flipH() {
+    switch(imgParam.rotation) {
+        case 1: // Normal -> Horizontal flip
+            imgParam.rotation = 2; break;
+        case 2: // Horizontal flip -> Normal
+            imgParam.rotation = 1; break;
+        case 3: // 180° -> Vertical flip
+            imgParam.rotation = 4; break;
+        case 4: // Vertical flip -> 180°
+            imgParam.rotation = 3; break;
+        case 5: // 90° CCW + H flip -> 90° CCW
+            imgParam.rotation = 8; break;
+        case 6: // 90° CW -> 90° CW + H flip
+            imgParam.rotation = 7; break;
+        case 7: // 90° CW + H flip -> 90° CW
+            imgParam.rotation = 6; break;
+        case 8: // 90° CCW -> 90° CCW + H flip
+            imgParam.rotation = 5; break;
     }
 }
 
@@ -76,9 +142,18 @@ renderParams img_to_param(image* _img) {
     params.sigmaFilter = _img->imgParam.blurAmount;
     params.temp = _img->imgParam.temp;
     params.tint = _img->imgParam.tint;
+    params.saturation = _img->imgParam.saturation;
 
     params.bypass = _img->renderBypass ? 1 : 0;
     params.gradeBypass = _img->gradeBypass ? 1 : 0;
+
+    params.arbitraryRotation = _img->imgParam.arbitraryRotation;
+    params.cropEnable = _img->imgParam.cropEnable;
+    params.cropVisible = _img->imgParam.cropVisible;
+    params.imageCropMinX = _img->imgParam.imageCropMinX;
+    params.imageCropMinY = _img->imgParam.imageCropMinY;
+    params.imageCropMaxX = _img->imgParam.imageCropMaxX;
+    params.imageCropMaxY = _img->imgParam.imageCropMaxY;
 
     for (int i = 0; i < 4; i++) {
         params.baseColor[i] = i == 3 ? 0.0f : _img->imgParam.baseColor[i];
@@ -91,6 +166,7 @@ renderParams img_to_param(image* _img) {
         params.G_mult[i] = i == 3 ? 1.0f : _img->imgParam.g_mult[i] * _img->imgParam.g_mult[3];
         params.G_offset[i] = i == 3 ? 0.0f : _img->imgParam.g_offset[i] + _img->imgParam.g_offset[3];
         params.G_gamma[i] = i == 3 ? 1.0f : _img->imgParam.g_gamma[i] * _img->imgParam.g_gamma[3];
+
     }
 
     return params;

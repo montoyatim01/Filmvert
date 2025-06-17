@@ -42,6 +42,17 @@ struct image {
     unsigned int height = 0;
     unsigned int rawWidth = 0;
     unsigned int rawHeight = 0;
+
+    // Resolution used for display
+    // This is modified by the crop settings
+    unsigned int dispW = 0;
+    unsigned int dispH = 0;
+
+    // Resolution used for file output
+    // This is modified by the crop settings
+    unsigned int rndrW = 0;
+    unsigned int rndrH = 0;
+
     bool isRawImage = false;
     bool isDataRaw = false;
 
@@ -78,6 +89,7 @@ struct image {
     // Display/Render flags
     bool renderBypass = true;
     bool gradeBypass = false;
+    bool applyCrops = false;
 
 
     // GL Display
@@ -126,10 +138,13 @@ struct image {
     bool writeExpMeta(std::string filename);
     bool importImageMeta(std::string filename, copyPaste* impOpt = nullptr);
     void metaPaste(copyPaste selectons, imageParams* params, imageMetadata* meta, bool init = false);
+    void loadParamJSONObj(imageParams* imgParam, copyPaste *&pasteOpts, nlohmann::json obj);
 
     // image.cpp
     void rotLeft();
     void rotRight();
+    void flipV();
+    void flipH();
     void setCrop();
 
 

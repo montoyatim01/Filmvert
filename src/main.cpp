@@ -64,6 +64,23 @@ int main(void)
 // -* Check esc hotkey in popups to close them!
 // -* Rotation doesn't rollup
 
+// - Can't add images to new roll!
+// - OIIO Resizing incorrect
+// copy/paste rotation
+
+/* 20250617
+- Added saturation slider
+- Added the ability to copy/paste rotation across images
+- Added flip horizontal/vertical
+- Added arbitrary crop/rotation
+- Added the ability to bake rotations/crops in export
+- Color coded the controls
+- Hide the IDT/ODT image settings in a tree
+- Addressed an issue where images wouldn't import to the selected roll
+- Addressed an issue with non-raw images exporting
+- Addressed an issue that would allow for setting non-legal preferences.
+*/
+
 /*
 - Set ImGui ini locations
 - Modified macOS preference location

@@ -34,6 +34,9 @@ void imageParams::rstTmp() {
 void imageParams::rstTnt() {
     tint = 0.0f;
 }
+void imageParams::rstSat() {
+    saturation = 0.0f;
+}
 
 void imageParams::rst_gBP() {
     std::fill(std::begin(g_blackpoint), std::end(g_blackpoint), 0.0f);

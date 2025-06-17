@@ -20,37 +20,6 @@ const std::string glsl_vertex(R"V0G0N(
     }
 )V0G0N");
 
-// --- Base Color Process Only --- //
-const std::string glsl_baseColor(R"V0G0N(
-    #version 330 core
-
-    // Input from vertex shader
-    in vec2 texCoord;
-
-    // Uniforms
-    uniform sampler2D inputTexture;     // Input image (imgIn)
-    uniform vec3 baseColor;             // Base color RGB values (renderParams->baseColor)
-
-    // Output
-    out vec4 fragColor;
-
-    void main()
-    {
-        // Sample input pixel
-        vec4 pixIn = texture(inputTexture, texCoord);
-
-        // Process pixel (equivalent to Metal kernel logic)
-        vec4 pixOut;
-        pixOut.x = (baseColor.x / pixIn.x) * 0.1;
-        pixOut.y = (baseColor.y / pixIn.y) * 0.1;
-        pixOut.z = (baseColor.z / pixIn.z) * 0.1;
-        pixOut.w = 1.0;
-
-        // Output processed pixel
-        fragColor = pixOut;
-    }
-)V0G0N");
-
 // --- Full kernel --- //
 const std::string glsl_process(R"V0G0N(
 
@@ -71,12 +40,74 @@ const std::string glsl_process(R"V0G0N(
     uniform vec4 G_gamma;
     uniform float G_temp;
     uniform float G_tint;
+    uniform float G_sat;
     uniform int bypass;
     uniform int gradeBypass;
+    // For Cropping
+    uniform vec2 imageCropMin;  // Top-left corner of crop rectangle
+    uniform vec2 imageCropMax;  // Bottom-right corner of crop rectangle
+    uniform float arbitraryRotation;  // Rotation in radians
+    uniform bool cropEnabled;  // Whether to apply crop
+    uniform bool cropVisible;  // Whether to apply crop
+    uniform vec2 imageSize;  // Original image dimensions
 
     // Output
     out vec4 fragColor;
     out vec4 fragColorSm;
+
+    // Calculate UV coordinates for cropped and rotated region
+    vec2 getCroppedRotatedUV(vec2 uv) {
+        // Apply rotation if either crop is enabled OR crop is visible
+        // This allows rotation to be visible during crop adjustment
+        if (!cropEnabled && !cropVisible) {
+            return uv;
+        }
+
+        // Get crop rectangle dimensions and center
+        vec2 cropSize = imageCropMax - imageCropMin;
+        vec2 cropCenter = (imageCropMin + imageCropMax) * 0.5;
+
+        // If crop is enabled, map output UV to crop region
+        vec2 workingUV = uv;
+        if (cropEnabled) {
+            // Map output UV (0-1) to crop rectangle coordinates
+            workingUV = imageCropMin + cropSize * uv;
+        }
+
+        // Apply rotation around image center (0.5, 0.5)
+        vec2 imageCenter = vec2(0.5, 0.5);
+
+        // Convert to centered coordinates for rotation
+        vec2 centeredUV = workingUV - imageCenter;
+
+        // Calculate aspect ratio and apply it to maintain proper proportions
+        float aspectRatio = imageSize.x / imageSize.y;
+
+        // Scale by aspect ratio before rotation to work in square coordinates
+        centeredUV.x *= aspectRatio;
+
+        // Apply inverse rotation (positive angle because we're going backwards)
+        float cosR = cos(arbitraryRotation);
+        float sinR = sin(arbitraryRotation);
+        vec2 rotatedUV = vec2(
+            centeredUV.x * cosR - centeredUV.y * sinR,
+            centeredUV.x * sinR + centeredUV.y * cosR
+        );
+
+        // Scale back by inverse aspect ratio after rotation
+        rotatedUV.x /= aspectRatio;
+
+        // Convert back to texture coordinates
+        vec2 finalUV = rotatedUV + imageCenter;
+
+        return finalUV;
+    }
+
+    //---LUMA---//
+    float luma(vec4 inputPixel)
+    {
+        return inputPixel.x * 0.3439664498 + inputPixel.y * 0.7281660966 + inputPixel.z * -0.0721325464;
+    }
 
     //---LOG---//
     vec4 JPLogtoLin(vec4 inputPixel)
@@ -157,14 +188,32 @@ const std::string glsl_process(R"V0G0N(
         // Back to lin for output
         tempPix = JPLogtoLin(tempPix);
 
+        // Perform saturation operation
+        float lumaPix = luma(tempPix);
+        tempPix = lumaPix + (G_sat + 1.0) * (tempPix - lumaPix);
+
         return (bypass == 1 ? pixIn : gradeBypass == 1 ? pixOut : tempPix);
     }
 
     void main()
     {
-        vec4 inputPixel = texture(inputTexture, texCoord);
+        vec2 sampleUV = texCoord;
+        if (cropEnabled || cropVisible) {
+            sampleUV = getCroppedRotatedUV(texCoord);
+
+            // Check if we're outside the valid texture bounds
+            if (sampleUV.x < 0.0 || sampleUV.x > 1.0 ||
+                sampleUV.y < 0.0 || sampleUV.y > 1.0) {
+                // Output black for areas outside the image
+                fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                fragColorSm = fragColor;
+                return;
+            }
+        }
+
+        vec4 inputPixel = texture(inputTexture, sampleUV);
         vec4 gradedPixel = imgProcess(inputPixel);
-        gradedPixel.w = 1.0;
+        gradedPixel.w = 1.0f;
         fragColor = OCIOFUNC(gradedPixel);
         fragColorSm = fragColor;
     }

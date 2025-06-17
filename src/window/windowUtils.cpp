@@ -1,6 +1,7 @@
 #include "roll.h"
 #include "window.h"
 #include <filesystem>
+#include <imgui.h>
 
 //--- ImGui Style ---//
 /*
@@ -47,6 +48,85 @@ colors[ImGuiCol_Tab]                    = ImVec4(0.58f, 0.58f, 0.58f, 0.86f);
 
 }
 
+void setTempColor(float tempVal) {
+    ImVec4 FrameBG = ImGui::GetStyle().Colors[ImGuiCol_FrameBg];
+    float tempColor[4] = {FrameBG.x, FrameBG.y, FrameBG.z, FrameBG.w};
+    float warm[4] = {2.0, 1.0, 0.0, 1.0};
+    float cool[4] = {0.0, 2.0, 2.0, 1.0};
+    tempVal *= -1.0f;
+    for (int i = 0; i < 4; i++) {
+        tempColor[i] = tempVal >= 0.0 ?
+            (tempColor[i] * cool[i] * tempVal) + ((1.0 - tempVal) * tempColor[i]) :
+            (tempColor[i] * warm[i] * (-1.0 * tempVal)) + ((1.0 - (-1.0 * tempVal)) * tempColor[i]);
+    }
+
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(tempColor[0], tempColor[1], tempColor[2], tempColor[3]));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(tempColor[0] * 1.2, tempColor[1] * 1.2, tempColor[2] * 1.2, tempColor[3]));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(tempColor[0] * 1.1, tempColor[1] * 1.1, tempColor[2] * 1.1, 1.0));
+    return;
+}
+
+void setTintColor(float tintVal) {
+    ImVec4 FrameBG = ImGui::GetStyle().Colors[ImGuiCol_FrameBg];
+    float tempColor[4] = {FrameBG.x, FrameBG.y, FrameBG.z, FrameBG.w};
+    float green[4] = {0.0, 1.5, 0.0, 1.0};
+    float mag[4] = {1.5, 0.0, 1.5, 1.0};
+    tintVal *= 0.75f;
+    for (int i = 0; i < 4; i++) {
+        tempColor[i] = tintVal >= 0.0 ?
+            (tempColor[i] * mag[i] * tintVal) + ((1.0 - tintVal) * tempColor[i]) :
+            (tempColor[i] * green[i] * (-1.0 * tintVal)) + ((1.0 - (-1.0 * tintVal)) * tempColor[i]);
+    }
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(tempColor[0], tempColor[1], tempColor[2], tempColor[3]));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(tempColor[0] * 1.2, tempColor[1] * 1.2, tempColor[2] * 1.2, tempColor[3]));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(tempColor[0] * 1.1, tempColor[1] * 1.1, tempColor[2] * 1.1, 1.0));
+    return;
+}
+
+bool DragFloat4WithColors(const char* label, float col[4], float speed) {
+    bool valueChanged = false;
+    std::string labelRGBW = label;
+    labelRGBW += "RGBW";
+    ImGui::PushID(labelRGBW.c_str());
+    float windowWidth = ImGui::GetWindowWidth();
+
+    // Red Slider
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,67,67,138));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,131,131,138)); //0, 103, 220, 138
+    ImGui::SetNextItemWidth(windowWidth * 0.15);
+    valueChanged |= ImGui::DragFloat("##dragR", &col[0], speed, -10.0f, 10.0f);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+ImGui::SameLine();
+    // Green Slider
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,112,67,138));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,220,131,138));
+    ImGui::SetNextItemWidth(windowWidth * 0.15);
+    valueChanged |= ImGui::DragFloat("##dragG", &col[1], speed, -10.0f, 10.0f);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+ImGui::SameLine();
+    // Blue Slider
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,67,112,138));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,131,220,138));
+    ImGui::SetNextItemWidth(windowWidth * 0.15);
+    valueChanged |= ImGui::DragFloat("##dragB", &col[2], speed, -10.0f, 10.0f);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+ImGui::SameLine();
+    // White Slider
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,112,112,138));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,220,220,138));
+    ImGui::SetNextItemWidth(windowWidth * 0.15);
+    valueChanged |= ImGui::DragFloat("##dragW", &col[3], speed, -10.0f, 10.0f);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+
+
+    ImGui::PopID();
+    return valueChanged;
+}
+
 //--- Custom Color Slider ---//
 /*
     Custom color slider widget to enable
@@ -62,7 +142,8 @@ bool ColorEdit4WithFineTune(const char* label, float col[4], ImGuiColorEditFlags
     float speed = ImGui::GetIO().KeyShift ? 0.000005f : 0.001f;
 
     // Use DragFloat4 for the color components
-    value_changed = ImGui::DragFloat4("##drag", col, speed, -10.0f, 10.0f);
+    value_changed = DragFloat4WithColors("##drag", col, speed);
+        //ImGui::DragFloat4("##drag", col, speed, -10.0f, 10.0f);
 
     // Add color preview
     ImGui::SameLine();
@@ -84,7 +165,7 @@ bool ColorEdit4WithFineTune(const char* label, float col[4], ImGuiColorEditFlags
 // Function to calculate display dimensions while maintaining aspect ratio
 void mainWindow::CalculateThumbDisplaySize(int imageWidth, int imageHeight, float maxHeight, ImVec2& outDisplaySize, int rotation) {
 
-    bool rot = rotation == 6 || rotation == 8 ? true : false;
+    bool rot = rotation == 5 || rotation == 6 || rotation == 7 || rotation == 8 ? true : false;
     int imWid = rot ? imageHeight : imageWidth;
     int imHei = rot ? imageWidth : imageHeight;
 
@@ -436,9 +517,13 @@ void transformCoordinates(int& x, int& y, int rotation, int width, int height) {
     int tempY = y;
 
     switch (rotation) {
-        case 6: // Left (90 degrees counterclockwise)
-            x = height - 1 - tempY;
-            y = tempX;
+        case 1: // Normal
+            // No transformation needed
+            break;
+
+        case 2: // Horizontal flip
+            x = width - 1 - tempX;
+            y = tempY;
             break;
 
         case 3: // Upside-down (180 degrees)
@@ -446,12 +531,31 @@ void transformCoordinates(int& x, int& y, int rotation, int width, int height) {
             y = height - 1 - tempY;
             break;
 
+        case 4: // Vertical flip
+            x = tempX;
+            y = height - 1 - tempY;
+            break;
+
+        case 5: // Transpose (horizontal flip + 90 degrees counterclockwise)
+            x = height - 1 - tempY;
+            y = width - 1 -tempX;
+            break;
+
+        case 6: // Left (90 degrees counterclockwise)
+            x = height - 1 - tempY;
+            y = tempX;
+            break;
+
+        case 7: // Transverse (horizontal flip + 90 degrees clockwise)
+            x = tempY;
+            y = tempX;
+            break;
+
         case 8: // Right (90 degrees clockwise)
             x = tempY;
             y = width - 1 - tempX;
             break;
 
-        case 1: // Normal
         default:
             // No transformation needed
             break;
@@ -464,9 +568,13 @@ void inverseTransformCoordinates(int& x, int& y, int rotation, int width, int he
     int tempY = y;
 
     switch (rotation) {
-        case 6: // Left (90 degrees counterclockwise)
-            x = tempY;
-            y = height - 1 - tempX;
+        case 1: // Normal
+            // No transformation needed
+            break;
+
+        case 2: // Horizontal flip
+            x = width - 1 - tempX;
+            y = tempY;
             break;
 
         case 3: // Upside-down (180 degrees)
@@ -474,17 +582,259 @@ void inverseTransformCoordinates(int& x, int& y, int rotation, int width, int he
             y = height - 1 - tempY;
             break;
 
+        case 4: // Vertical flip
+            x = tempX;
+            y = height - 1 - tempY;
+            break;
+
+        case 5: // Transpose (horizontal flip + 90 degrees counterclockwise)
+            x = height - 1 - tempY;
+            y = width - 1 - tempX;
+            break;
+
+        case 6: // Left (90 degrees counterclockwise)
+            x = tempY;
+            y = height - 1 - tempX;
+            break;
+
+        case 7: // Transverse (horizontal flip + 90 degrees clockwise)
+            x = tempY;
+            y = tempX;
+            break;
+
         case 8: // Right (90 degrees clockwise)
             x = width - 1 - tempY;
             y = tempX;
             break;
 
-        case 1: // Normal
         default:
             // No transformation needed
             break;
     }
 }
+
+// Transform a point from original image coordinates to cropped/rotated display coordinates
+ImVec2 transformPointToCroppedDisplay(float origX, float origY, image* img, float dispScale, ImVec2 imagePos) {
+    ImVec2 result;
+
+    if (img->imgParam.cropEnable) {
+        // First check if the point is within the crop region (in original image space)
+        if (origX < img->imgParam.imageCropMinX || origX > img->imgParam.imageCropMaxX ||
+            origY < img->imgParam.imageCropMinY || origY > img->imgParam.imageCropMaxY) {
+            // Point is outside crop, return off-screen position
+            result.x = -1000;
+            result.y = -1000;
+            return result;
+        }
+
+        // Calculate where the point is relative to the crop region (0-1 within crop)
+        float cropWidth = img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX;
+        float cropHeight = img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY;
+
+        float normX = (origX - img->imgParam.imageCropMinX) / cropWidth;
+        float normY = (origY - img->imgParam.imageCropMinY) / cropHeight;
+
+        // Apply arbitrary rotation around center of crop
+        float centerX = 0.5f;
+        float centerY = 0.5f;
+
+        // For flipped EXIF orientations, mirror the rotation
+        float rotationAngle = img->imgParam.arbitraryRotation;
+        bool needsMirroring = (img->imgParam.rotation == 2 ||
+                              img->imgParam.rotation == 4 ||
+                              img->imgParam.rotation == 5 ||
+                              img->imgParam.rotation == 7);
+
+        if (needsMirroring) {
+            rotationAngle = -rotationAngle;
+        }
+
+        float rotRad = rotationAngle * M_PI / 180.0f;
+        float cosR = cos(rotRad);
+        float sinR = sin(rotRad);
+
+        // Translate to origin
+        float tempX = normX - centerX;
+        float tempY = normY - centerY;
+
+        // Rotate
+        float rotatedX = tempX * cosR - tempY * sinR;
+        float rotatedY = tempX * sinR + tempY * cosR;
+
+        // Translate back
+        rotatedX += centerX;
+        rotatedY += centerY;
+
+        // Get the display dimensions accounting for EXIF rotation
+        int displayWidth = img->width;
+        int displayHeight = img->height;
+        if (img->imgParam.rotation == 6 || img->imgParam.rotation == 8 ||
+            img->imgParam.rotation == 5 || img->imgParam.rotation == 7) {
+            std::swap(displayWidth, displayHeight);
+        }
+
+        // Convert to display coordinates using the cropped display dimensions
+        float cropDisplayW = (img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX) * displayWidth;
+        float cropDisplayH = (img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY) * displayHeight;
+
+        result.x = imagePos.x + rotatedX * cropDisplayW * dispScale;
+        result.y = imagePos.y + rotatedY * cropDisplayH * dispScale;
+    } else {
+        // No crop enabled, use standard transformation with EXIF rotation
+        int pixelX = origX * img->width;
+        int pixelY = origY * img->height;
+
+        // Apply EXIF rotation transformation
+        int transformedX = pixelX;
+        int transformedY = pixelY;
+
+        switch (img->imgParam.rotation) {
+            case 1: // Normal
+                break;
+            case 2: // Flip horizontal
+                transformedX = img->width - pixelX;
+                break;
+            case 3: // Rotate 180
+                transformedX = img->width - pixelX;
+                transformedY = img->height - pixelY;
+                break;
+            case 4: // Flip vertical
+                transformedY = img->height - pixelY;
+                break;
+            case 5: // Rotate 90 CCW + flip horizontal
+                transformedX = img->height - pixelY;
+                transformedY = img->width - pixelX;
+                break;
+            case 6: // Rotate 90 CW
+                transformedX = img->height - pixelY;
+                transformedY = pixelX;
+                break;
+            case 7: // Rotate 90 CW + flip horizontal
+                transformedX = pixelY;
+                transformedY = pixelX;
+                break;
+            case 8: // Rotate 90 CCW
+                transformedX = pixelY;
+                transformedY = img->width - pixelX;
+                break;
+        }
+
+        result.x = imagePos.x + transformedX * dispScale;
+        result.y = imagePos.y + transformedY * dispScale;
+    }
+
+    return result;
+}
+
+// Inverse transform from display coordinates back to original image coordinates
+bool inverseTransformFromCroppedDisplay(ImVec2 displayPos, ImVec2 imagePos, image* img, float dispScale, float& origX, float& origY) {
+    if (img->imgParam.cropEnable) {
+        // Get the display dimensions accounting for EXIF rotation
+        int displayWidth = img->width;
+        int displayHeight = img->height;
+        if (img->imgParam.rotation == 6 || img->imgParam.rotation == 8 ||
+            img->imgParam.rotation == 5 || img->imgParam.rotation == 7) {
+            std::swap(displayWidth, displayHeight);
+        }
+
+        float cropDisplayW = (img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX) * displayWidth;
+        float cropDisplayH = (img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY) * displayHeight;
+
+        // Convert from display to normalized crop coordinates
+        float normX = (displayPos.x - imagePos.x) / (cropDisplayW * dispScale);
+        float normY = (displayPos.y - imagePos.y) / (cropDisplayH * dispScale);
+
+        // Apply inverse arbitrary rotation
+        float centerX = 0.5f;
+        float centerY = 0.5f;
+
+        // For flipped EXIF orientations, mirror the rotation
+        float rotationAngle = img->imgParam.arbitraryRotation;
+        bool needsMirroring = (img->imgParam.rotation == 2 ||
+                              img->imgParam.rotation == 4 ||
+                              img->imgParam.rotation == 5 ||
+                              img->imgParam.rotation == 7);
+
+        if (needsMirroring) {
+            rotationAngle = -rotationAngle;
+        }
+
+        float rotRad = -rotationAngle * M_PI / 180.0f; // Negative for inverse
+        float cosR = cos(rotRad);
+        float sinR = sin(rotRad);
+
+        // Translate to origin
+        float tempX = normX - centerX;
+        float tempY = normY - centerY;
+
+        // Rotate
+        float unrotatedX = tempX * cosR - tempY * sinR;
+        float unrotatedY = tempX * sinR + tempY * cosR;
+
+        // Translate back
+        unrotatedX += centerX;
+        unrotatedY += centerY;
+
+        // Check bounds
+        if (unrotatedX < 0 || unrotatedX > 1 || unrotatedY < 0 || unrotatedY > 1) {
+            return false; // Outside crop region
+        }
+
+        // Convert back to original image coordinates
+        float cropWidth = img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX;
+        float cropHeight = img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY;
+
+        origX = img->imgParam.imageCropMinX + unrotatedX * cropWidth;
+        origY = img->imgParam.imageCropMinY + unrotatedY * cropHeight;
+
+        return true;
+    } else {
+        // No crop, use standard inverse transformation with EXIF rotation
+        int transformedX = (displayPos.x - imagePos.x) / dispScale;
+        int transformedY = (displayPos.y - imagePos.y) / dispScale;
+
+        // Apply inverse EXIF rotation
+        int pixelX = transformedX;
+        int pixelY = transformedY;
+
+        switch (img->imgParam.rotation) {
+            case 1: // Normal
+                break;
+            case 2: // Flip horizontal
+                pixelX = img->width - transformedX;
+                break;
+            case 3: // Rotate 180
+                pixelX = img->width - transformedX;
+                pixelY = img->height - transformedY;
+                break;
+            case 4: // Flip vertical
+                pixelY = img->height - transformedY;
+                break;
+            case 5: // Rotate 90 CCW + flip horizontal
+                pixelX = img->width - transformedY;
+                pixelY = img->height - transformedX;
+                break;
+            case 6: // Rotate 90 CW
+                pixelX = transformedY;
+                pixelY = img->height - transformedX;
+                break;
+            case 7: // Rotate 90 CW + flip horizontal
+                pixelX = transformedY;
+                pixelY = transformedX;
+                break;
+            case 8: // Rotate 90 CCW
+                pixelX = img->width - transformedY;
+                pixelY = transformedX;
+                break;
+        }
+
+        origX = (float)pixelX / img->width;
+        origY = (float)pixelY / img->height;
+
+        return (origX >= 0 && origX <= 1 && origY >= 0 && origY <= 1);
+    }
+}
+
 //--- Select Forward ---//
 /*
     Advance the active selection one image forward

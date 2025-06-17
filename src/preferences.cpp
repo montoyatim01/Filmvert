@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <thread>
 
 // Global Application Preferences
 userPreferences appPrefs;
@@ -24,6 +25,8 @@ void userPreferences::loadFromFile() {
         if (prefObj.contains("Preferences")) {
             prefs = prefObj["Preferences"].get<preferenceSet>();
             tmpAutoSave = prefs.autoSave;
+            if (prefs.maxSimExports < 1)
+                prefs.maxSimExports = std::thread::hardware_concurrency();
         }
     }  catch (const std::exception& e) {
         LOG_WARN("Unable to import preferences file: {}", e.what());

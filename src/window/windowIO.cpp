@@ -1,5 +1,7 @@
 //#include "metalGPU.h"
 #include "ocioProcessor.h"
+#include "preferences.h"
+#include "threadPool.h"
 #include "window.h"
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/filesystem.h>
@@ -232,15 +234,19 @@ void mainWindow::exportImages() {
         expStart = std::chrono::steady_clock::now();
 
         std::vector<std::future<void>> futures;
+        ThreadPool expPool(appPrefs.prefs.maxSimExports);
 
         for (int i = 0; i < activeRollSize(); i++) {
-            futures.push_back(tPool->submit([this, i]() {
+            futures.push_back(expPool.submit([this, i]() {
                 if (!isExporting) { // If user has cancelled
                     exportPopup = false; // Bail out
                     return;
                 }
                 if (getImage(i) && getImage(i)->selected) {
-
+                    bool prevCrop = getImage(i)->imgParam.cropEnable;
+                    getImage(i)->applyCrops = expSetting.bakeRotation;
+                    if (expSetting.bakeRotation)
+                        getImage(i)->imgParam.cropEnable = true;
                     getImage(i)->exportPreProcess(expSetting.outPath);
                     gpu->addToRender(getImage(i), r_full, exportOCIO);
                     auto start = std::chrono::steady_clock::now();
@@ -267,6 +273,7 @@ void mainWindow::exportImages() {
                     getImage(i)->writeImg(expSetting, exportOCIO);
                     gpu->removeFromQueue(getImage(i));
                     getImage(i)->exportPostProcess();
+                    getImage(i)->imgParam.cropEnable = prevCrop;
                     exportProcCount++;
                 }
 
@@ -305,17 +312,21 @@ LOG_INFO("Exporting {} Files", exportImgCount);
         expStart = std::chrono::steady_clock::now();
 
         std::vector<std::future<void>> futures;
-
+        ThreadPool expPool(appPrefs.prefs.maxSimExports);
         for (int r = 0; r < activeRolls.size(); r++) {
             if (activeRolls[r].selected) {
                 for (int i = 0; i < activeRolls[r].rollSize(); i++) {
                     //LOG_INFO("Exporting {} Image from {} Roll", i, r);
-                    futures.push_back(tPool->submit([this, r, i]() {
+                    futures.push_back(expPool.submit([this, r, i]() {
                         if (!isExporting) { // If user has cancelled
                             exportPopup = false; // Bail out
                             return;
                         }
                         if (getImage(r, i)) {
+                            bool prevCrop = getImage(r, i)->imgParam.cropEnable;
+                            getImage(r, i)->applyCrops = expSetting.bakeRotation;
+                            if (expSetting.bakeRotation)
+                                getImage(r, i)->imgParam.cropEnable = true;
                             getImage(r, i)->exportPreProcess(expSetting.outPath + activeRolls[r].rollName);
                             if (!std::filesystem::exists(getImage(r, i)->expFullPath)) {
                                 std::filesystem::create_directories(getImage(r, i)->expFullPath);
@@ -346,6 +357,7 @@ LOG_INFO("Exporting {} Files", exportImgCount);
                             getImage(r, i)->writeImg(expSetting, exportOCIO);
                             gpu->removeFromQueue(getImage(r, i));
                             getImage(r, i)->exportPostProcess();
+                            getImage(r, i)->imgParam.cropEnable = prevCrop;
                             exportProcCount++;
                         } else {
                             LOG_WARN("Could not get {} img from {} roll", i, r);

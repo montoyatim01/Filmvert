@@ -26,13 +26,14 @@ void mainWindow::imageView() {
     if (validIm()) {
         // Pre-calc
         int displayWidth, displayHeight;
-        if (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) {
+        if (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ||
+            activeImage()->imgParam.rotation == 5 || activeImage()->imgParam.rotation == 7) {
             // For 90-degree rotations, swap width and height
-            displayWidth = activeImage()->height;
-            displayHeight = activeImage()->width;
+            displayWidth = activeImage()->dispH;
+            displayHeight = activeImage()->dispW;
         } else {
-            displayWidth = activeImage()->width;
-            displayHeight = activeImage()->height;
+            displayWidth = activeImage()->dispW;
+            displayHeight = activeImage()->dispH;
         }
         float effecDisp = dispScale;
         if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading) {
@@ -67,21 +68,37 @@ void mainWindow::imageView() {
             ImVec2 uv0, uv1, uv2, uv3; // top-left, top-right, bottom-right, bottom-left
             switch (activeImage()->imgParam.rotation) {
                 case 1: // Normal (0°)
-                    uv0 = ImVec2(0,0); uv1 = ImVec2(1,0);
-                    uv2 = ImVec2(1,1); uv3 = ImVec2(0,1);
-                    break;
-                case 6: // 90° clockwise
-                    uv0 = ImVec2(0,1); uv1 = ImVec2(0,0);
-                    uv2 = ImVec2(1,0); uv3 = ImVec2(1,1);
-                    break;
-                case 3: // 180°
-                    uv0 = ImVec2(1,1); uv1 = ImVec2(0,1);
-                    uv2 = ImVec2(0,0); uv3 = ImVec2(1,0);
-                    break;
-                case 8: // 90° counter-clockwise
-                    uv0 = ImVec2(1,0); uv1 = ImVec2(1,1);
-                    uv2 = ImVec2(0,1); uv3 = ImVec2(0,0);
-                    break;
+                     uv0 = ImVec2(0,0); uv1 = ImVec2(1,0);
+                     uv2 = ImVec2(1,1); uv3 = ImVec2(0,1);
+                     break;
+                 case 2: // Horizontal flip
+                     uv0 = ImVec2(1,0); uv1 = ImVec2(0,0);
+                     uv2 = ImVec2(0,1); uv3 = ImVec2(1,1);
+                     break;
+                 case 3: // 180°
+                     uv0 = ImVec2(1,1); uv1 = ImVec2(0,1);
+                     uv2 = ImVec2(0,0); uv3 = ImVec2(1,0);
+                     break;
+                 case 4: // Vertical flip
+                     uv0 = ImVec2(0,1); uv1 = ImVec2(1,1);
+                     uv2 = ImVec2(1,0); uv3 = ImVec2(0,0);
+                     break;
+                 case 5: // 90° CCW + Horizontal flip
+                     uv0 = ImVec2(1,1); uv1 = ImVec2(1,0);
+                     uv2 = ImVec2(0,0); uv3 = ImVec2(0,1);
+                     break;
+                 case 6: // 90° CW
+                     uv0 = ImVec2(0,1); uv1 = ImVec2(0,0);
+                     uv2 = ImVec2(1,0); uv3 = ImVec2(1,1);
+                     break;
+                 case 7: // 90° CW + Horizontal flip
+                     uv0 = ImVec2(0,0); uv1 = ImVec2(0,1);
+                     uv2 = ImVec2(1,1); uv3 = ImVec2(1,0);
+                     break;
+                 case 8: // 90° CCW
+                     uv0 = ImVec2(1,0); uv1 = ImVec2(1,1);
+                     uv2 = ImVec2(0,1); uv3 = ImVec2(0,0);
+                     break;
             }
 
             // Draw the rotated quad
@@ -148,7 +165,7 @@ void mainWindow::imageView() {
         float lineThickness = 2.0f;
 
         // Draw the lines connecting the corners - connect in order: top-left, top-right, bottom-right, bottom-left
-        if (cropDisplay) {
+        if (cropDisplay && !cropVisible && !activeImage()->imgParam.cropEnable) {
             drawList->AddLine(cropBoxScreen[0], cropBoxScreen[1], lineColor, lineThickness); // Top line
             drawList->AddLine(cropBoxScreen[1], cropBoxScreen[2], lineColor, lineThickness); // Right line
             drawList->AddLine(cropBoxScreen[2], cropBoxScreen[3], lineColor, lineThickness); // Bottom line
@@ -178,7 +195,7 @@ void mainWindow::imageView() {
             bool handleHovered = distSq <= (handleRadius * handleRadius);
 
             // Draw the handle with appropriate color
-            if (cropDisplay) {
+            if (cropDisplay && !cropVisible && !activeImage()->imgParam.cropEnable) {
                 drawList->AddCircleFilled(
                     cropBoxScreen[i],
                     handleRadius,
@@ -195,7 +212,7 @@ void mainWindow::imageView() {
             }
         }
         // Draw min/max positions if available
-        if (minMaxDisp) {
+        if (minMaxDisp && !cropVisible && !activeImage()->imgParam.cropEnable) {
             if (validIm()){
                 if (activeImage()->imgParam.minX > 0.001 && activeImage()->imgParam.maxY > 0.001) {
                     // Transform coordinates for minPoint
@@ -396,7 +413,7 @@ void mainWindow::imageView() {
             mousePosInImage.y = ImClamp(mousePosInImage.y, 0.0f, (float)activeImage()->height);
 
             // Start selection when mouse is clicked while holding Ctrl+Shift
-            if (ctrlShiftPressed && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !isSelecting && !dragging) {
+            if (ctrlShiftPressed && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !isSelecting && !dragging && !cropVisible) {
                 isSelecting = true;
                 selectionStart = mousePosInImage;  // This is in original image coordinates
                 selectionEnd = selectionStart;     // Initialize end position as same as start
@@ -439,7 +456,7 @@ void mainWindow::imageView() {
 
         // Draw the selection rectangle if actively selecting
         if (validIm()){
-            if ((isSelecting && ctrlShiftPressed) || sampleVisible) {
+            if (((isSelecting && ctrlShiftPressed ) || sampleVisible) && !cropVisible) {
                 // Get selection coordinates in original image space
                 int stX = activeImage()->imgParam.sampleX[0] * activeImage()->width;
                 int stY = activeImage()->imgParam.sampleY[0] * activeImage()->height;
@@ -473,15 +490,9 @@ void mainWindow::imageView() {
             }
         }
 
+        // Handle the cropping
+        windowCrop(imagePos, dragging, isInteracting, currentlyInteracting);
 
-        // Display the current selection coordinates if a selection exists
-        /*if (sampleX[0] != sampleX[1] || sampleY[0] != sampleY[1]) {
-            ImVec2 textPos = ImVec2(10, 10); // Position in top-left of window
-            char selText[128];
-            sprintf(selText, "Selection: (%.1f, %.1f) to (%.1f, %.1f)",
-                    sampleX[0], sampleY[0], sampleX[1], sampleY[1]);
-            drawList->AddText(ImGui::GetWindowPos() + textPos, IM_COL32(255, 255, 255, 255), selText);
-        }*/
 
         // Controls for panning and zooming the image
         if (ImGui::IsItemHovered()) {
@@ -553,8 +564,9 @@ void mainWindow::imageView() {
             }
 
             // Only allow panning if we're not dragging a corner and not making a selection
+            // And not moving the min/max points and not working the image crop
             if ((ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f)) &&
-                    !dragging && !isSelecting && !minDrag && !maxDrag) {
+                    !dragging && !isSelecting && !minDrag && !maxDrag && !draggingImageCrop) {
                 scroll.x = ImGui::GetScrollX() - ImGui::GetIO().MouseDelta.x;
                 scroll.y = ImGui::GetScrollY() - ImGui::GetIO().MouseDelta.y;
                 ImGui::SetScrollX(scroll.x);

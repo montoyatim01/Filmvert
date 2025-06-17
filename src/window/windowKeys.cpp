@@ -24,6 +24,8 @@ void mainWindow::checkHotkeys() {
 
     // Open Image(s) (Cmd + O)
     if (ImGui::IsKeyChordPressed(ImGuiKey_O | ImGuiMod_Ctrl)) {
+        if (validRoll())
+            impRoll = selRoll;
         openImages();
     }
 
@@ -157,7 +159,40 @@ void mainWindow::checkHotkeys() {
             paramUpdate();
             activeRoll()->rollUpState();
         }
+    }
 
+    // Flip Vertical (alt + shift + v)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_V | ImGuiMod_Shift | ImGuiMod_Alt)) {
+        if (validIm()) {
+            activeImage()->flipV();
+            renderCall = true;
+            paramUpdate();
+            activeRoll()->rollUpState();
+        }
+    }
+    // Flip Horizontal (alt + shift + h)
+    if (ImGui::IsKeyChordPressed(ImGuiKey_H | ImGuiMod_Shift | ImGuiMod_Alt)) {
+        if (validIm()) {
+            activeImage()->flipH();
+            renderCall = true;
+            paramUpdate();
+            activeRoll()->rollUpState();
+        }
+    }
+
+    // Refresh Image
+    if (ImGui::IsKeyChordPressed(ImGuiKey_R | ImGuiMod_Ctrl)) {
+        if (validIm()) {
+            renderCall = true;
+            activeImage()->imgRst = true;
+        }
+    }
+
+    // Toggle Base Color Selection
+    if (ImGui::IsKeyChordPressed(ImGuiKey_B | ImGuiMod_Ctrl)) {
+        if (validIm()) {
+            sampleVisible = !sampleVisible;
+        }
     }
 
     // Open Image Metadata (Cmd + E)
@@ -234,5 +269,10 @@ void mainWindow::checkHotkeys() {
             ratingFrameCount = 120;
             paramUpdate();
         }
+    }
+
+    if (ImGui::IsKeyChordPressed(ImGuiKey_D | ImGuiMod_Ctrl)) {
+        // Metadata popup flag
+        demoWin = !demoWin;
     }
 }

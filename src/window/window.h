@@ -85,6 +85,7 @@ class mainWindow
         float dispScale = 1.0f;
         ImVec2 dispSize;
         ImVec2 scroll;
+        bool draggingImageCrop = false;
 
         unsigned long long logoTex = 0;
 
@@ -119,6 +120,7 @@ class mainWindow
         bool gradeBypass = false;
         bool fpsFlag = false;
         bool toggleProxy = false;
+        bool cropVisible = false;
 
         // Copy/Paste
         imageParams copyParams;
@@ -205,6 +207,7 @@ class mainWindow
         // Views
         void menuBar();
         void imageView();
+        void windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteracting, bool &currentlyInteracting);
         void paramView();
         void thumbView();
 

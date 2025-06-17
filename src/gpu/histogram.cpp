@@ -23,7 +23,7 @@ void openglGPU::procHistIm(image* img) {
 //--- Calculate Histogram from RGBA ---//
 void calculateHistogramFromRGBA(const float *rgba_buffer, int width,
                                 int height, HistogramData &histogram,
-                                const unsigned int* xPoints, const unsigned int* yPoints) {
+                                const unsigned int* xPoints, const unsigned int* yPoints, bool cropped) {
     if (!rgba_buffer || !xPoints || !yPoints) {
         return;
     }
@@ -56,7 +56,7 @@ void calculateHistogramFromRGBA(const float *rgba_buffer, int width,
                 const int idx = i * 4;
                 int y = i / width;
                 int x = i % width;
-                if (!isPointInBox(x, y, xPoints, yPoints))
+                if (!cropped && !isPointInBox(x, y, xPoints, yPoints))
                     continue;
 
                 // Convert float values (0.0-1.0) to 8-bit values (0-255)
@@ -168,7 +168,8 @@ void openglGPU::updateHistPixels(image* img, float* imgPixels, float* histPixels
     // Calculate histogram
     HistogramData histogram;
     calculateHistogramFromRGBA(imgPixels, width, height,
-                              histogram, cropBoxX, cropBoxY);
+                              histogram, cropBoxX, cropBoxY,
+                              img->imgParam.cropEnable);
 
     // Find max values for scaling
     int max_r = *std::max_element(histogram.r_hist.begin(), histogram.r_hist.end());

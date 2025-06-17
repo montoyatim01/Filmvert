@@ -150,8 +150,16 @@ class openglGPU {
                 GLint G_gamma;
                 GLint G_temp;
                 GLint G_tint;
+                GLint G_sat;
                 GLint bypass;
                 GLint gradeBypass;
+                // Crop Variables
+                GLint imageCropMin;
+                GLint imageCropMax;
+                GLint arbitraryRotation;
+                GLint cropEnabled;
+                GLint cropVisible;
+                GLint imageSize;
         } m_uniforms;
 };
 

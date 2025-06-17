@@ -223,14 +223,14 @@ void image::trimForSave() {
     std::vector<std::thread> threads(numThreads);
 
     // Divide the workload into equal parts for each thread
-    int rowsPerThread = rawHeight / numThreads;
+    int rowsPerThread = rndrH / numThreads;
 
     auto processRows = [&](int startRow, int endRow) {
         for (int y=startRow; y<endRow; y++)
         {
-            for (int x=0; x<rawWidth; x++)
+            for (int x=0; x<rndrW; x++)
             {
-                int index = (y * rawWidth) + x;
+                int index = (y * rndrW) + x;
                 tmpOutData[nChannels * index] = procImgData[4 * index]; // R channel
                 if (nChannels > 1)
                     tmpOutData[nChannels * index + 1] = nChannels >= 2 ? procImgData[4 * index + 1] : 0.0f; // G channel
@@ -245,7 +245,7 @@ void image::trimForSave() {
     // Launch the threads
     for (int i=0; i<numThreads; ++i) {
         int startRow = i * rowsPerThread;
-        int endRow = (i == numThreads - 1) ? rawHeight : (i + 1) * rowsPerThread;
+        int endRow = (i == numThreads - 1) ? rndrH : (i + 1) * rowsPerThread;
         threads[i] = std::thread(processRows, startRow, endRow);
     }
 

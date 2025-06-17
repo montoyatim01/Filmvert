@@ -266,8 +266,17 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         fvParams["maxX"] = imgParam.maxX;
         fvParams["maxY"] = imgParam.maxY;
 
+        fvParams["imageCropMinX"] = imgParam.imageCropMinX;
+        fvParams["imageCropMinY"] = imgParam.imageCropMinY;
+
+        fvParams["imageCropMaxX"] = imgParam.imageCropMaxX;
+        fvParams["imageCropMaxY"] = imgParam.imageCropMaxY;
+        fvParams["cropEnable"] = imgParam.cropEnable;
+        fvParams["arbitraryRotation"] = imgParam.arbitraryRotation;
+
         fvParams["temp"] = imgParam.temp;
         fvParams["tint"] = imgParam.tint;
+        fvParams["saturation"] = imgParam.saturation;
         fvParams["rotation"] = imgParam.rotation;
 
         metaParams = imgMeta;
@@ -389,7 +398,7 @@ bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt, bool init) 
         nlohmann::json jsonObject = nlohmann::json::parse(j);
         if (jsonObject.contains("filmvert")) {
             impParam = new imageParams;
-            *impParam = jsonObject["filmvert"].get<imageParams>();
+            loadParamJSONObj(impParam, impOpt, jsonObject["filmvert"]);
         } else {
             LOG_WARN("No params found!");
         }
@@ -415,7 +424,7 @@ bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt, bool init) 
         opts.analysisGlobal();
         opts.gradeGlobal();
         opts.metaGlobal();
-        //LOG_INFO("Setting full params");
+        LOG_INFO("Setting full params");
     } else {
         opts = *impOpt;
     }
@@ -494,6 +503,35 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
             imgParam.tint = impParams.tint;
             metaChg = true;
         }
+        if (selectons.saturation) {
+            imgParam.saturation = impParams.saturation;
+            metaChg = true;
+        }
+        if (selectons.rotation) {
+            imgParam.rotation = impParams.rotation;
+            imgParam.arbitraryRotation = impParams.arbitraryRotation;
+            metaChg = true;
+        }
+        if (selectons.imageCrop) {
+            imgParam.imageCropMinX = impParams.imageCropMinX;
+            imgParam.imageCropMaxX = impParams.imageCropMaxX;
+            imgParam.imageCropMinY = impParams.imageCropMinY;
+            imgParam.imageCropMaxY = impParams.imageCropMaxY;
+            imgParam.cropEnable = impParams.cropEnable;
+            metaChg = true;
+        }
+        if (selectons.analysis) {
+            if (selectons.fromLoad) {
+                imgParam.minX = impParams.minX;
+                imgParam.minY = impParams.minY;
+                imgParam.maxX = impParams.maxX;
+                imgParam.maxY = impParams.maxY;
+                imgParam.sampleX[0] = impParams.sampleX[0];
+                imgParam.sampleX[1] = impParams.sampleX[1];
+                imgParam.sampleY[0] = impParams.sampleY[0];
+                imgParam.sampleY[1] = impParams.sampleY[1];
+            }
+        }
         for (int j = 0; j < 4; j++) {
             if (selectons.cropPoints) {
                 imgParam.cropBoxX[j] = impParams.cropBoxX[j];
@@ -503,6 +541,7 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
             if (selectons.analysis) {
                 imgParam.blackPoint[j] = impParams.blackPoint[j];
                 imgParam.whitePoint[j] = impParams.whitePoint[j];
+
                 metaChg = true;
             }
             if (selectons.bp) {
@@ -607,4 +646,176 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
     }
     if (!init)
         needMetaWrite |= metaChg;
+}
+
+//--- Load Param from JSON Object ---//
+/*
+    Helper function to load a param object from
+    a json object. Will fill an empty pasteOpts
+    with the varaiables it finds, so only the found
+    variables get applied
+*/
+void image::loadParamJSONObj(imageParams* imgParam, copyPaste *&pasteOpts, nlohmann::json obj) {
+    if (!imgParam)
+        return;
+    if (!pasteOpts) {
+        pasteOpts = new copyPaste;
+        pasteOpts->fromLoad = true;
+    }
+
+
+    if (obj.contains("sampleX")) {
+        auto temp = obj["sampleX"].get<std::array<float, 2>>();
+        std::copy(temp.begin(), temp.end(), imgParam->sampleX);
+    }
+    if (obj.contains("sampleY")) {
+        auto temp = obj["sampleY"].get<std::array<float, 2>>();
+        std::copy(temp.begin(), temp.end(), imgParam->sampleY);
+    }
+    if (obj.contains("blurAmount")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->analysisBlur = true;
+        imgParam->blurAmount = obj["blurAmount"].get<float>();
+    }
+    if (obj.contains("baseColor")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->baseColor = true;
+        auto temp = obj["baseColor"].get<std::array<float, 3>>();
+        std::copy(temp.begin(), temp.end(), imgParam->baseColor);
+    }
+    if (obj.contains("whitePoint")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->analysis = true;
+        auto temp = obj["whitePoint"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->whitePoint);
+    }
+    if (obj.contains("blackPoint")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->analysis = true;
+        auto temp = obj["blackPoint"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->blackPoint);
+    }
+
+    if (obj.contains("minX")) {
+        imgParam->minX = obj["minX"].get<float>();
+    }
+    if (obj.contains("minY")) {
+        imgParam->minY = obj["minY"].get<float>();
+    }
+    if (obj.contains("maxX")) {
+        imgParam->maxX = obj["maxX"].get<float>();
+    }
+    if (obj.contains("maxY")) {
+        imgParam->maxY = obj["maxY"].get<float>();
+    }
+
+    if (obj.contains("temp")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->temp = true;
+        imgParam->temp = obj["temp"].get<float>();
+    }
+    if (obj.contains("tint")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->tint = true;
+        imgParam->tint = obj["tint"].get<float>();
+    }
+    if (obj.contains("saturation")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->saturation = true;
+        imgParam->saturation = obj["saturation"].get<float>();
+    }
+
+    if (obj.contains("g_blackpoint")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->bp = true;
+        auto temp = obj["g_blackpoint"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->g_blackpoint);
+    }
+    if (obj.contains("g_whitepoint")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->wp = true;
+        auto temp = obj["g_whitepoint"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->g_whitepoint);
+    }
+    if (obj.contains("g_lift")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->lift = true;
+        auto temp = obj["g_lift"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->g_lift);
+    }
+    if (obj.contains("g_gain")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->gain = true;
+        auto temp = obj["g_gain"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->g_gain);
+    }
+    if (obj.contains("g_mult")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->mult = true;
+        auto temp = obj["g_mult"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->g_mult);
+    }
+    if (obj.contains("g_offset")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->offset = true;
+        auto temp = obj["g_offset"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->g_offset);
+    }
+    if (obj.contains("g_gamma")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->gamma = true;
+        auto temp = obj["g_gamma"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->g_gamma);
+    }
+
+    if (obj.contains("cropBoxX")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->cropPoints = true;
+        auto temp = obj["cropBoxX"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->cropBoxX);
+    }
+    if (obj.contains("cropBoxY")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->cropPoints = true;
+        auto temp = obj["cropBoxY"].get<std::array<float, 4>>();
+        std::copy(temp.begin(), temp.end(), imgParam->cropBoxY);
+    }
+
+    if (obj.contains("rotation")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->rotation = true;
+        imgParam->rotation = obj["rotation"].get<float>();
+    }
+
+    if (obj.contains("arbitraryRotation")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->rotation = true;
+        imgParam->arbitraryRotation = obj["arbitraryRotation"].get<float>();
+    }
+
+    if (obj.contains("imageCropMinX")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->imageCrop = true;
+        imgParam->imageCropMinX = obj["imageCropMinX"].get<float>();
+    }
+    if (obj.contains("imageCropMinY")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->imageCrop = true;
+        imgParam->imageCropMinY = obj["imageCropMinY"].get<float>();
+    }
+    if (obj.contains("imageCropMaxX")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->imageCrop = true;
+        imgParam->imageCropMaxX = obj["imageCropMaxX"].get<float>();
+    }
+    if (obj.contains("imageCropMaxY")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->imageCrop = true;
+        imgParam->imageCropMaxY = obj["imageCropMaxY"].get<float>();
+    }
+    if (obj.contains("cropEnable")) {
+        if (pasteOpts->fromLoad)
+        imgParam->cropEnable = obj["cropEnable"].get<int>();
+    }
+
 }

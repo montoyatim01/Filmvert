@@ -25,6 +25,7 @@ class ocioProcessor {
     void setIntActive();
 
     void processImage(float* img, unsigned int width, unsigned int height, ocioSetting &ocioSet);
+    void refGamutCompress(float* img, unsigned int width, unsigned int height);
     OCIO::GpuShaderDescRcPtr getGLDesc(ocioSetting& ocioSet);
     std::string getMetalKernel(ocioSetting& ocioSet);
 

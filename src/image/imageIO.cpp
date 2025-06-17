@@ -4,6 +4,7 @@
 #include "preferences.h"
 #include "lancir.h"
 
+#include <OpenImageIO/imagebufalgo.h>
 #include <variant>
 #include <filesystem>
 #include <stdexcept>
@@ -68,7 +69,7 @@ bool image::exportPreProcess(std::string outPath) {
     Reset the width/height back to working values
 */
 void image::exportPostProcess() {
-    if (imageLoaded && isRawImage) {
+    if (imageLoaded) {
         clearBuffers();
     } else {
         delProcBuf();
@@ -131,52 +132,61 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
         LOG_INFO("Skipping file: {}", filePath);
         return false;
     }
-    std::unique_ptr<OIIO::ImageOutput> out = OIIO::ImageOutput::create(filePath);
-    if (!out) {
-        LOG_ERROR("Unable to write image");
-            return false;
-    }
-    OIIO::ImageSpec spec(rawWidth, rawHeight, nChannels, outFormat);
 
-
-    if (param.format == 2) {
-        // Jpeg Compression
-        std::string compression = "";
-        compression = "jpeg:" + std::to_string(param.quality);
-        spec["Compression"] = compression;
-    } else if (param.format == 1) {
-        // EXR Compression
-        spec["Compression"] = "zip";
-    } else if (param.format == 3) {
-        spec["png:compressionLevel"] = param.compression;
-    } else if (param.format == 4) {
-        // Tiff Compression
-        spec["tiff:zipquality"] = param.compression;
-    }
-
-    // Open the destination file
-    if (!out->open(filePath, spec)) {
-        LOG_ERROR("Unable to open output file: {}", OIIO::geterror());
-            return false;
-    }
+    OIIO::ImageSpec inspec(rndrW, rndrH, nChannels, OIIO::TypeDesc::FLOAT);
 
     // Trim proc data for save
     allocateTmpBuf();
     trimForSave();
 
+    int prevRot = imgParam.rotation;
 
-    // Write the image data
-    if (!out->write_image(format, tmpOutData)) {
-        LOG_ERROR("Failed to write image data: {}", OIIO::geterror());
+    // Apply the orientation to the image
+    OIIO::ImageBuf srcBuf(inspec, tmpOutData);
+    OIIO::ImageBuf* finalBuf = &srcBuf;
+    OIIO::ImageBuf reorientedBuf;
+
+    if (applyCrops && imgParam.rotation != 1) {
+        // Set the orientation metadata in the source buffer
+        srcBuf.specmod()["Orientation"] = imgParam.rotation;
+        // Apply reorientation
+        if (!OIIO::ImageBufAlgo::reorient(reorientedBuf, srcBuf)) {
+            LOG_ERROR("Failed to reorient image: {}", OIIO::geterror());
+        } else {
+            imgParam.rotation = 1;
+        }
+        finalBuf = &reorientedBuf;
+
+    }
+
+    if (param.format == 2) {
+        // Jpeg Compression
+        std::string compression = "";
+        compression = "jpeg:" + std::to_string(param.quality);
+        finalBuf->specmod()["Compression"] = compression;
+    } else if (param.format == 1) {
+        // EXR Compression
+        finalBuf->specmod()["Compression"] = "zip";
+    } else if (param.format == 3) {
+        finalBuf->specmod()["png:compressionLevel"] = param.compression;
+    } else if (param.format == 4) {
+        // Tiff Compression
+        finalBuf->specmod()["tiff:zipquality"] = param.compression;
+    }
+
+    // Write Image Data
+    if (!finalBuf->write(filePath, outFormat)) {
+        LOG_ERROR("Failed to write image: {}", OIIO::geterror());
         return false;
     }
 
-    // Close the file
-    out->close();
     clearTmpBuf();
 
     // Write out the metadata
     writeExpMeta(filePath);
+
+    imgParam.rotation = prevRot;
+
     return true;
 
 }
@@ -335,8 +345,10 @@ bool image::oiioReload() {
     if (appPrefs.prefs.perfMode && !fullIm)
         resizeProxy();
 
-
-    ocioProc.processImage(rawImgData, width, height, intOCIOSet);
+    if (appPrefs.prefs.perfMode && !fullIm)
+        ocioProc.processImage(rawImgData, width, height, intOCIOSet);
+    else
+        ocioProc.processImage(rawImgData, rawWidth, rawHeight, intOCIOSet);
     imageLoaded = true;
     needRndr = true;
     return true;

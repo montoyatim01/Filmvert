@@ -80,8 +80,8 @@ void mainWindow::thumbView() {
 
             ImVec2 displaySize;
 
-            int tWidth = getImage(i)->width;
-            int tHeight = getImage(i)->height;
+            int tWidth = getImage(i)->dispW;
+            int tHeight = getImage(i)->dispH;
 
             float proxyScale = (getImage(i)->imageLoaded && !toggleProxy && !getImage(i)->reloading) ? 1.0f : appPrefs.prefs.proxyRes;
             int displayWidth = (int)((float)tWidth * proxyScale);
@@ -137,21 +137,37 @@ void mainWindow::thumbView() {
                 ImVec2 uv0, uv1, uv2, uv3;
                 switch (getImage(i)->imgParam.rotation) {
                     case 1: // Normal (0°)
-                        uv0 = ImVec2(0,0); uv1 = ImVec2(1,0);
-                        uv2 = ImVec2(1,1); uv3 = ImVec2(0,1);
-                        break;
-                    case 6: // 90° clockwise
-                        uv0 = ImVec2(0,1); uv1 = ImVec2(0,0);
-                        uv2 = ImVec2(1,0); uv3 = ImVec2(1,1);
-                        break;
-                    case 3: // 180°
-                        uv0 = ImVec2(1,1); uv1 = ImVec2(0,1);
-                        uv2 = ImVec2(0,0); uv3 = ImVec2(1,0);
-                        break;
-                    case 8: // 90° counter-clockwise
-                        uv0 = ImVec2(1,0); uv1 = ImVec2(1,1);
-                        uv2 = ImVec2(0,1); uv3 = ImVec2(0,0);
-                        break;
+                         uv0 = ImVec2(0,0); uv1 = ImVec2(1,0);
+                         uv2 = ImVec2(1,1); uv3 = ImVec2(0,1);
+                         break;
+                     case 2: // Horizontal flip
+                         uv0 = ImVec2(1,0); uv1 = ImVec2(0,0);
+                         uv2 = ImVec2(0,1); uv3 = ImVec2(1,1);
+                         break;
+                     case 3: // 180°
+                         uv0 = ImVec2(1,1); uv1 = ImVec2(0,1);
+                         uv2 = ImVec2(0,0); uv3 = ImVec2(1,0);
+                         break;
+                     case 4: // Vertical flip
+                         uv0 = ImVec2(0,1); uv1 = ImVec2(1,1);
+                         uv2 = ImVec2(1,0); uv3 = ImVec2(0,0);
+                         break;
+                     case 5: // 90° CCW + Horizontal flip
+                         uv0 = ImVec2(1,1); uv1 = ImVec2(1,0);
+                         uv2 = ImVec2(0,0); uv3 = ImVec2(0,1);
+                         break;
+                     case 6: // 90° CW
+                         uv0 = ImVec2(0,1); uv1 = ImVec2(0,0);
+                         uv2 = ImVec2(1,0); uv3 = ImVec2(1,1);
+                         break;
+                     case 7: // 90° CW + Horizontal flip
+                         uv0 = ImVec2(0,0); uv1 = ImVec2(0,1);
+                         uv2 = ImVec2(1,1); uv3 = ImVec2(1,0);
+                         break;
+                     case 8: // 90° CCW
+                         uv0 = ImVec2(1,0); uv1 = ImVec2(1,1);
+                         uv2 = ImVec2(0,1); uv3 = ImVec2(0,0);
+                         break;
                 }
 
                 // Draw the rotated quad

@@ -1,5 +1,6 @@
 #include "preferences.h"
 #include "window.h"
+#include "windowUtils.h"
 #include <imgui.h>
 
 //--- Main Parameter View Routine ---//
@@ -47,21 +48,64 @@ void mainWindow::paramView() {
                 }
             }
             ImGui::SameLine();
-            if (ImGui::Button("Toggle Selection")) {
+            if (ImGui::Button("Flip Vertically")) {
                 if (validIm()) {
-                    sampleVisible = !sampleVisible;
+                    activeImage()->flipV();
+                    renderCall = true;
+                    paramChange = true;
+                    activeRoll()->rollUpState();
                 }
             }
-            ImGui::SetItemTooltip("Toggle the base color selection preview");
+            ImGui::SetItemTooltip("Flip the image vertically");
 
             ImGui::SameLine();
-            if (ImGui::Button("Refresh")) {
+            if (ImGui::Button("Flip Horizontally")) {
                 if (validIm()) {
+                    activeImage()->flipH();
                     renderCall = true;
-                    activeImage()->imgRst = true;
+                    paramChange = true;
+                    activeRoll()->rollUpState();
                 }
             }
-            ImGui::SetItemTooltip("Re-render the current image");
+            ImGui::SetItemTooltip("Flip the image horizontally");
+            if (validIm()) {
+                if (activeImage()->imgParam.cropEnable) {
+                    if (ImGui::Button("Show Crop")) {
+                        paramChange |= true;
+                        cropVisible = true;
+                        activeImage()->imgParam.cropEnable = false;
+                    }
+                } else if (cropVisible) {
+                    if (ImGui::Button("Hide Crop")) {
+                        paramChange |= true;
+                        cropVisible = false;
+                        activeImage()->imgParam.cropEnable = false;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Apply Crop")) {
+                        paramChange |= true;
+                        cropVisible = false;
+                        activeImage()->imgParam.cropEnable = true;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset Crop")) {
+                        paramChange |= true;
+                        activeImage()->imgParam.imageCropMinX = 0.0f;
+                        activeImage()->imgParam.imageCropMinY = 0.0f;
+                        activeImage()->imgParam.imageCropMaxX = 1.0f;
+                        activeImage()->imgParam.imageCropMaxY = 1.0f;
+                        activeImage()->imgParam.arbitraryRotation = 0.0f;
+                    }
+                    paramChange |= ImGui::DragFloat("Rotation", &activeImage()->imgParam.arbitraryRotation, 0.01f, -45.0f, 45.0f);
+                    //paramChange |= ImGui::SliderFloat("Rotation", &activeImage()->imgParam.arbitraryRotation, -45.0f, 45.0f);
+                } else {
+                    if (ImGui::Button("Image Crop")) {
+                        paramChange |= true;
+                        cropVisible = true;
+                        activeImage()->imgParam.cropEnable = false;
+                    }
+                }
+            }
 
             ImGui::Separator();
 
@@ -69,6 +113,11 @@ void mainWindow::paramView() {
             if (validIm()) {
                 ImGui::SetNextItemOpen(true, ImGuiCond_Once);
                 if (ImGui::TreeNode("Analysis")) {
+
+                    //paramChange |= ImGui::Checkbox("Enable Crop", (bool*)&activeImage()->imgParam.cropEnable);
+                    //ImGui::SameLine();
+                    //paramChange |= ImGui::Checkbox("Show Crop", &cropVisible);
+
                     ImGui::Text("Base Color:");
                     paramChange |= ImGui::ColorEdit3("##BC", (float*)activeImage()->imgParam.baseColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Hold ⌘ + shift, click and drag an area in the image\nto sample the base color.");
@@ -105,6 +154,7 @@ void mainWindow::paramView() {
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##02")){activeImage()->imgParam.rstWP(); paramChange = true;}
                     ImGui::TreePop();
+                    ImGui::Spacing();
                 }
             }
 
@@ -115,15 +165,24 @@ void mainWindow::paramView() {
                 ImGui::Separator();
                 if (ImGui::TreeNode("Grade")) {
                     ImGui::Text("Temperature");
+                    setTempColor(activeImage()->imgParam.temp);
                     paramChange |= ImGui::SliderFloat("##TMP", &activeImage()->imgParam.temp, -1.0f, 1.0f);
+                    ImGui::PopStyleColor(3);
                     ImGui::SetItemTooltip("Adjust the color temperature of the image.\n⌘ + Click to edit the value manually");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##03")){activeImage()->imgParam.rstTmp(); paramChange = true;}
                     ImGui::Text("Tint");
+                    setTintColor(activeImage()->imgParam.tint);
                     paramChange |= ImGui::SliderFloat("##TNT", &activeImage()->imgParam.tint, -1.0f, 1.0f);
+                    ImGui::PopStyleColor(3);
                     ImGui::SetItemTooltip("Adjust the tint of the image.\n⌘ + Click to edit the value manually");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##04")){activeImage()->imgParam.rstTnt(); paramChange = true;}
+                    ImGui::Text("Saturation");
+                    paramChange |= ImGui::SliderFloat("##SAT", &activeImage()->imgParam.saturation, -1.0f, 1.0f);
+                    ImGui::SetItemTooltip("Adjust the saturation of the image.\n⌘ + Click to edit the value manually");
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset##04s")){activeImage()->imgParam.rstSat(); paramChange = true;}
                     ImGui::Text("Black Point");
                     paramChange |= ColorEdit4WithFineTune("##GBP", (float*)activeImage()->imgParam.g_blackpoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the image black point.\nThe Alpha value acts as a global multiplier for RGB channels");
@@ -160,6 +219,7 @@ void mainWindow::paramView() {
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##09")){activeImage()->imgParam.rst_gMul(); paramChange = true;}
                     ImGui::TreePop();
+                    ImGui::Spacing();
                 }
             }
 
@@ -196,12 +256,14 @@ void mainWindow::paramView() {
                     fps,
                     activeImage()->rawWidth, activeImage()->rawHeight,
                     activeImage()->width, activeImage()->height);
+                ImGui::SameLine();
+                ImGui::Text("ROTATION: %i", activeImage()->imgParam.rotation);
             }
-            /*ImGui::Checkbox("Proxy", &toggleProxy);
+            ImGui::Checkbox("Proxy", &toggleProxy);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20);
             renderCall |= ImGui::SliderFloat("###pxy", &appPrefs.prefs.proxyRes, 0.05f, 0.8f);
-            ImGui::SameLine();*/
+            ImGui::SameLine();
             std::string statusText;
             if (gpu->rendering)
                 statusText += "Rendering... ";
@@ -227,7 +289,8 @@ void mainWindow::paramView() {
         } ImGui::EndChild();
 
     }
-
+    if (validIm())
+        activeImage()->imgParam.cropVisible = cropVisible;
     renderCall |= paramChange;
     needStateUp |= paramChange;
 

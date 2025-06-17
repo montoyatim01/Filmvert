@@ -63,23 +63,27 @@ void mainWindow::importRawSettings() {
 */
 void mainWindow::importIDTSetting() {
     //ImGui::Separator();
-    ImGui::Text("Image Colorspace Setting (for non-raw images):");
-    ImGui::Combo("###CSO", &ocioCS_Disp, colorspaceSet.data(), colorspaceSet.size());
-    if (ocioCS_Disp == 0) {
-        // Colorspace
-        ImGui::Text("Colorspace:");
-        ImGui::Combo("###CS", &importOCIO.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
-        importOCIO.useDisplay = false;
-    } else {
-        ImGui::Text("Display:");
-        ImGui::Combo("###DSP", &importOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
+    ImGui::SetNextItemOpen(false, ImGuiCond_Once);
+    if (ImGui::TreeNode("Image Input Colorspace Setting")) {
+        ImGui::Combo("###CSO", &ocioCS_Disp, colorspaceSet.data(), colorspaceSet.size());
+        if (ocioCS_Disp == 0) {
+            // Colorspace
+            ImGui::Text("Colorspace:");
+            ImGui::Combo("###CS", &importOCIO.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
+            importOCIO.useDisplay = false;
+        } else {
+            ImGui::Text("Display:");
+            ImGui::Combo("###DSP", &importOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
 
-        ImGui::Text("View:");
-        ImGui::Combo("##VW", &importOCIO.view, ocioProc.views[importOCIO.display].data(), ocioProc.views[importOCIO.display].size());
-        importOCIO.useDisplay = true;
+            ImGui::Text("View:");
+            ImGui::Combo("##VW", &importOCIO.view, ocioProc.views[importOCIO.display].data(), ocioProc.views[importOCIO.display].size());
+            importOCIO.useDisplay = true;
+        }
+        importOCIO.inverse = true;
+        importOCIO.ext = appPrefs.prefs.ocioExt && ocioProc.validExternal;
+        ImGui::TreePop();
     }
-    importOCIO.inverse = true;
-    importOCIO.ext = appPrefs.prefs.ocioExt && ocioProc.validExternal;
+
 
     ImGui::Separator();
 
@@ -97,8 +101,7 @@ void mainWindow::importImagePopup() {
     for (const auto& item : activeRolls) {
         rollPointers.push_back(item.rollName.c_str());
     }
-    if (validRoll())
-        impRoll = selRoll;
+
     if (dispImportPop)
         ImGui::OpenPopup("Import Images");
     if (ImGui::BeginPopupModal("Import Images", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
@@ -468,25 +471,30 @@ void mainWindow::batchRenderPopup() {
 
         ImGui::Separator();
         ImGui::Spacing();
-        ImGui::Text("Colorspace Settings");
+        if (ImGui::TreeNode("Colorspace Settings")) {
+            // Colorspace or display
+            ImGui::Combo("###CSO", &expSetting.colorspaceOpt, colorspaceSet.data(), colorspaceSet.size());
+            if (expSetting.colorspaceOpt == 0) {
+                // Colorspace
+                ImGui::Text("Colorspace:");
+                ImGui::Combo("###CS", &exportOCIO.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
+                exportOCIO.useDisplay = false;
+            } else {
+                ImGui::Text("Display:");
+                ImGui::Combo("###DSP", &exportOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
 
-        // Colorspace or display
-        ImGui::Combo("###CSO", &expSetting.colorspaceOpt, colorspaceSet.data(), colorspaceSet.size());
-        if (expSetting.colorspaceOpt == 0) {
-            // Colorspace
-            ImGui::Text("Colorspace:");
-            ImGui::Combo("###CS", &exportOCIO.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
-            exportOCIO.useDisplay = false;
-        } else {
-            ImGui::Text("Display:");
-            ImGui::Combo("###DSP", &exportOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
-
-            ImGui::Text("View:");
-            ImGui::Combo("##VW", &exportOCIO.view, ocioProc.views[exportOCIO.display].data(), ocioProc.views[exportOCIO.display].size());
-            exportOCIO.useDisplay = true;
+                ImGui::Text("View:");
+                ImGui::Combo("##VW", &exportOCIO.view, ocioProc.views[exportOCIO.display].data(), ocioProc.views[exportOCIO.display].size());
+                exportOCIO.useDisplay = true;
+            }
+            exportOCIO.inverse = false;
+            ImGui::TreePop();
         }
-        exportOCIO.inverse = false;
         ImGui::Separator();
+
+        ImGui::Checkbox("Bake Crop & Rotation", &expSetting.bakeRotation);
+        ImGui::SetItemTooltip("Bake in all crop and rotation settings to the image.\nWhat is seen in the viewport is what will be exported");
+
         ImGui::Spacing();
 
         ImGui::Checkbox("Overwrite Existing File(s)?", &expSetting.overwrite);
@@ -597,6 +605,7 @@ void mainWindow::pastePopup() {
         ImGui::InvisibleButton("##02", btnSize);
         ImGui::Checkbox("Temperature", &pasteOptions.temp);
         ImGui::Checkbox("Tint", &pasteOptions.tint);
+        ImGui::Checkbox("Saturation", &pasteOptions.saturation);
         ImGui::Checkbox("Blackpoint", &pasteOptions.bp);
         ImGui::Separator();
         ImGui::InvisibleButton("##03", btnSize);
@@ -624,6 +633,7 @@ void mainWindow::pastePopup() {
         ImGui::Checkbox("Whitepoint", &pasteOptions.wp);
         ImGui::Checkbox("Lift", &pasteOptions.lift);
         ImGui::Checkbox("Gain", &pasteOptions.gain);
+        ImGui::InvisibleButton("##04a", btnSize);
         ImGui::Spacing();
 
         if (ImGui::Button("All Metadata")) {
@@ -635,6 +645,8 @@ void mainWindow::pastePopup() {
         ImGui::Checkbox("Location", &pasteOptions.location);
         ImGui::Checkbox("GPS", &pasteOptions.gps);
         ImGui::Checkbox("Notes", &pasteOptions.notes);
+        ImGui::Checkbox("Rotation", &pasteOptions.rotation);
+
         ImGui::EndGroup();
 
         ImGui::SameLine();
@@ -649,6 +661,7 @@ void mainWindow::pastePopup() {
         ImGui::Checkbox("Multiply", &pasteOptions.mult);
         ImGui::Checkbox("Offset", &pasteOptions.offset);
         ImGui::Checkbox("Gamma", &pasteOptions.gamma);
+        ImGui::InvisibleButton("##07a", btnSize);
         ImGui::Spacing();
 
         ImGui::InvisibleButton("##08", btnSize);
@@ -658,6 +671,7 @@ void mainWindow::pastePopup() {
         ImGui::Checkbox("Development Notes", &pasteOptions.devnote);
         ImGui::Checkbox("Scanner", &pasteOptions.scanner);
         ImGui::Checkbox("Scanner Notes", &pasteOptions.scannotes);
+        ImGui::Checkbox("Crop", &pasteOptions.imageCrop);
         ImGui::InvisibleButton("##09", btnSize);
         ImGui::EndGroup();
 
@@ -1162,6 +1176,8 @@ void mainWindow::preferencesPopup() {
         // Undo Levels
         ImGui::Text("Undo Levels");
         ImGui::InputInt("###00a", &tmpPrefs.undoLevels);
+        tmpPrefs.undoLevels = tmpPrefs.undoLevels < 10 ? 10 :
+            tmpPrefs.undoLevels > 10000 ? 10000 : tmpPrefs.undoLevels;
 
         ImGui::Separator();
 
@@ -1171,6 +1187,8 @@ void mainWindow::preferencesPopup() {
         if (tmpPrefs.autoSave) {
             ImGui::SameLine();
             ImGui::InputInt("Frequency (seconds)", &tmpPrefs.autoSFreq);
+            tmpPrefs.autoSFreq = tmpPrefs.autoSFreq < 1 ? 1 :
+                tmpPrefs.autoSFreq > 10000 ? 10000 : tmpPrefs.autoSFreq;
         }
 
         ImGui::Separator();
@@ -1190,12 +1208,21 @@ void mainWindow::preferencesPopup() {
             ImGui::Text("Roll Timeout");
             ImGui::InputInt("###pf1", &tmpPrefs.rollTimeout);
             ImGui::SetItemTooltip("Rolls sent to the background will wait this amount of time before unloading.\nThis prevents excessive disk/CPU usage when jumping between rolls.");
+            tmpPrefs.rollTimeout = tmpPrefs.rollTimeout < 1 ? 1 :
+                tmpPrefs.rollTimeout > 10000 ? 10000 : tmpPrefs.rollTimeout;
         }
         ImGui::Separator();
         ImGui::Text("Debayer Mode");
         ImGui::InputInt("###db1", &tmpPrefs.debayerMode);
         ImGui::SetItemTooltip("Set the debayer mode on export/when not using Performance Mode.\n0: Bilinear\n1: VNG\n2: PPG\n3: AHD\n4: DCB\n5: PL_AHD\n6: AFD\n7: VCD\n8: VCD + AHD\n9: LMMSE\n10: AMaZE\n11: DHT\n12: AP_AHD");
+        tmpPrefs.debayerMode = tmpPrefs.debayerMode < 0 ? 0 :
+            tmpPrefs.debayerMode > 12 ? 12 : tmpPrefs.debayerMode;
         ImGui::Separator();
+        ImGui::Text("Max Simultaneous Exports");
+        ImGui::InputInt("###SM1", &tmpPrefs.maxSimExports);
+        ImGui::SetItemTooltip("Set the maximum number of simultaneous images to\nprocess when exporting.");
+        tmpPrefs.maxSimExports = tmpPrefs.maxSimExports < 1 ? 1 :
+            tmpPrefs.maxSimExports > 256 ? 256 : tmpPrefs.maxSimExports;
 
         // OCIO
         ImGui::Text("Custom OCIO Config:");
@@ -1353,9 +1380,13 @@ void mainWindow::shortcutsPopup() {
         ImGui::Text("Shift + Scroll");
         ImGui::Text("%s + Left Arrow", s_opt.c_str());
         ImGui::Text("%s + Right Arrow", s_opt.c_str());
+        ImGui::Text("%s + R", s_cmd.c_str());
+        ImGui::Text("%s + B", s_cmd.c_str());
         ImGui::Separator();
         ImGui::Text("%s + [ ", s_cmd.c_str());
         ImGui::Text("%s + ] ", s_cmd.c_str());
+        ImGui::Text("%s + H ", s_opt.c_str());
+        ImGui::Text("%s + V ", s_opt.c_str());
         ImGui::Separator();
         ImGui::Text("%s + A ", s_cmd.c_str());
         ImGui::Text("%s + C ", s_cmd.c_str());
@@ -1388,9 +1419,13 @@ void mainWindow::shortcutsPopup() {
         ImGui::Text("");
         ImGui::Text("Previous Image");
         ImGui::Text("Next Image");
+        ImGui::Text("Refresh Image");
+        ImGui::Text("Toggle Base Color Selection");
         ImGui::Spacing();
         ImGui::Text("Rotate Left");
         ImGui::Text("Rotate Right");
+        ImGui::Text("Flip Horizontally");
+        ImGui::Text("Flip Vertically");
         ImGui::Spacing();
         ImGui::Text("Select All");
         ImGui::Text("Copy");
@@ -1467,6 +1502,7 @@ void mainWindow::importImMatchPopup() {
         ImGui::InvisibleButton("##02", btnSize);
         ImGui::Checkbox("Temperature", &metImpOpt.temp);
         ImGui::Checkbox("Tint", &metImpOpt.tint);
+        ImGui::Checkbox("Saturation", &metImpOpt.saturation);
         ImGui::Checkbox("Blackpoint", &metImpOpt.bp);
         ImGui::Separator();
         ImGui::InvisibleButton("##03", btnSize);
@@ -1494,6 +1530,7 @@ void mainWindow::importImMatchPopup() {
         ImGui::Checkbox("Whitepoint", &metImpOpt.wp);
         ImGui::Checkbox("Lift", &metImpOpt.lift);
         ImGui::Checkbox("Gain", &metImpOpt.gain);
+        ImGui::InvisibleButton("##04a", btnSize);
         ImGui::Spacing();
 
         if (ImGui::Button("All Metadata")) {
@@ -1505,6 +1542,7 @@ void mainWindow::importImMatchPopup() {
         ImGui::Checkbox("Location", &metImpOpt.location);
         ImGui::Checkbox("GPS", &metImpOpt.gps);
         ImGui::Checkbox("Notes", &metImpOpt.notes);
+        ImGui::Checkbox("Rotation", &metImpOpt.rotation);
         ImGui::EndGroup();
 
         ImGui::SameLine();
@@ -1519,6 +1557,7 @@ void mainWindow::importImMatchPopup() {
         ImGui::Checkbox("Multiply", &metImpOpt.mult);
         ImGui::Checkbox("Offset", &metImpOpt.offset);
         ImGui::Checkbox("Gamma", &metImpOpt.gamma);
+        ImGui::InvisibleButton("##07a", btnSize);
         ImGui::Spacing();
 
         ImGui::InvisibleButton("##08", btnSize);
@@ -1528,6 +1567,7 @@ void mainWindow::importImMatchPopup() {
         ImGui::Checkbox("Development Notes", &metImpOpt.devnote);
         ImGui::Checkbox("Scanner", &metImpOpt.scanner);
         ImGui::Checkbox("Scanner Notes", &metImpOpt.scannotes);
+        ImGui::Checkbox("Crop", &metImpOpt.imageCrop);
         ImGui::InvisibleButton("##09", btnSize);
         ImGui::EndGroup();
 

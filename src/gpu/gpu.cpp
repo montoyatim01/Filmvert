@@ -104,8 +104,16 @@ void openglGPU::cacheUniformLocations() {
     m_uniforms.G_gamma = glGetUniformLocation(m_shaderProgram, "G_gamma");
     m_uniforms.G_temp = glGetUniformLocation(m_shaderProgram, "G_temp");
     m_uniforms.G_tint = glGetUniformLocation(m_shaderProgram, "G_tint");
+    m_uniforms.G_sat = glGetUniformLocation(m_shaderProgram, "G_sat");
     m_uniforms.bypass = glGetUniformLocation(m_shaderProgram, "bypass");
     m_uniforms.gradeBypass = glGetUniformLocation(m_shaderProgram, "gradeBypass");
+    // Crop variables
+    m_uniforms.imageCropMin = glGetUniformLocation(m_shaderProgram, "imageCropMin");
+    m_uniforms.imageCropMax = glGetUniformLocation(m_shaderProgram, "imageCropMax");
+    m_uniforms.arbitraryRotation = glGetUniformLocation(m_shaderProgram, "arbitraryRotation");
+    m_uniforms.cropEnabled = glGetUniformLocation(m_shaderProgram, "cropEnabled");
+    m_uniforms.cropVisible = glGetUniformLocation(m_shaderProgram, "cropVisible");
+    m_uniforms.imageSize = glGetUniformLocation(m_shaderProgram, "imageSize");
 }
 
 void openglGPU::setupGeometry()
@@ -227,53 +235,72 @@ void openglGPU::bufferCheck(image* _image)
     unsigned int nWidth = _image->fullIm ? _image->rawWidth : _image->width;
     unsigned int nHeight = _image->fullIm ? _image->rawHeight : _image->height;
 
-    if (nWidth != m_width || nHeight != m_height) {
-        LOG_INFO("Resizing Input Buffer");
+    // Store original dimensions for shader
+    unsigned int originalWidth = nWidth;
+    unsigned int originalHeight = nHeight;
 
-        // Create input texture
+    // Calculate cropped dimensions if crop is enabled
+    if (_image->imgParam.cropEnable) {
+        // Calculate crop rectangle dimensions
+        nWidth = (_image->imgParam.imageCropMaxX - _image->imgParam.imageCropMinX) * nWidth;
+        nHeight = (_image->imgParam.imageCropMaxY - _image->imgParam.imageCropMinY) * nHeight;
+
+        // Ensure minimum size
+        if (nWidth < 1) nWidth = 1;
+        if (nHeight < 1) nHeight = 1;
+    }
+
+    if (nWidth != m_width || nHeight != m_height) {
+        LOG_INFO("Resizing Buffers from {}x{} to {}x{}", m_width, m_height, nWidth, nHeight);
+
+        // Create input texture (always use original dimensions)
         if (m_inputTexture == 0 || glIsTexture(m_inputTexture) == GL_FALSE) {
             glGenTextures(1, &m_inputTexture);
             checkError("Generating Input Texture");
         }
         glBindTexture(GL_TEXTURE_2D, m_inputTexture);
-        while( glGetError() != GL_NO_ERROR){} // Ignore errors for binding to input
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, nWidth, nHeight,
+        while(glGetError() != GL_NO_ERROR){} // Clear errors
+
+        // Input texture should always be original size
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, originalWidth, originalHeight,
                      0, GL_RGBA, GL_FLOAT, nullptr);
         checkError("Allocating Input Texture");
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        checkError("Setting Modes Input Texture");
+        checkError("Setting Input Texture Parameters");
+
         m_width = nWidth;
         m_height = nHeight;
     }
 
-    // Create output texture
+    // Create output texture with cropped dimensions
     if (_image->glTexture == 0 || !glIsTexture(_image->glTexture)) {
         glGenTextures(1, (GLuint*)&_image->glTexture);
         glBindTexture(GL_TEXTURE_2D, _image->glTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
                      0, GL_RGBA, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        checkError("Generating Initial Output Texture");
+        checkError("Creating Output Texture");
     } else {
         glBindTexture(GL_TEXTURE_2D, _image->glTexture);
         int oWidth, oHeight;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
         checkError("Querying Output Texture");
+
         if (oWidth != nWidth || oHeight != nHeight) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
                          0, GL_RGBA, GL_FLOAT, nullptr);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            checkError("Generating Fullsize Output Texture");
+            checkError("Resizing Output Texture");
         }
     }
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -283,23 +310,23 @@ void openglGPU::bufferCheck(image* _image)
     if (_image->glTextureSm == 0 || !glIsTexture(_image->glTextureSm)) {
         glGenTextures(1, (GLuint*)&_image->glTextureSm);
         glBindTexture(GL_TEXTURE_2D, _image->glTextureSm);
-        int smWidth = (int)((float)nWidth * scaleFactor);
-        int smHeight = (int)((float)nHeight * scaleFactor);
+        int smWidth = std::max(1, (int)((float)nWidth * scaleFactor));
+        int smHeight = std::max(1, (int)((float)nHeight * scaleFactor));
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, smWidth, smHeight,
                      0, GL_RGBA, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        checkError("Generating Initial Output Texture");
+        checkError("Creating Small Output Texture");
     } else {
         glBindTexture(GL_TEXTURE_2D, _image->glTextureSm);
         int oWidth, oHeight;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
-        checkError("Querying Output Texture");
-        int smWidth = (int)((float)nWidth * scaleFactor);
-        int smHeight = (int)((float)nHeight * scaleFactor);
+        checkError("Querying Small Output Texture");
+        int smWidth = std::max(1, (int)((float)nWidth * scaleFactor));
+        int smHeight = std::max(1, (int)((float)nHeight * scaleFactor));
         if (oWidth != smWidth || oHeight != smHeight) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, smWidth, smHeight,
                          0, GL_RGBA, GL_FLOAT, nullptr);
@@ -307,23 +334,21 @@ void openglGPU::bufferCheck(image* _image)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            checkError("Generating Small Output Texture");
+            checkError("Resizing Small Output Texture");
         }
     }
     glBindTexture(GL_TEXTURE_2D, 0);
 
     if (m_framebuffer == 0) {
-        // Create framebuffer
         glGenFramebuffers(1, &m_framebuffer);
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
-    checkError("Binding to Framebuffer for resize");
+    checkError("Binding Framebuffer");
 
     // Attach output texture to framebuffer
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               GL_TEXTURE_2D, _image->glTexture, 0);
-
+                          GL_TEXTURE_2D, _image->glTexture, 0);
     checkError("Attaching Output to Framebuffer");
 
     GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0};
@@ -334,6 +359,17 @@ void openglGPU::bufferCheck(image* _image)
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         LOG_ERROR("Framebuffer not complete! Status: 0x{:x}", status);
+        switch(status) {
+            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+                LOG_ERROR("GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT");
+                break;
+            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+                LOG_ERROR("GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT");
+                break;
+            case GL_FRAMEBUFFER_UNSUPPORTED:
+                LOG_ERROR("GL_FRAMEBUFFER_UNSUPPORTED");
+                break;
+        }
     }
 
     // Unbind
@@ -368,8 +404,22 @@ void openglGPU::updateUniforms(renderParams params) {
     glUniform4fv(m_uniforms.G_gamma, 1, params.G_gamma);
     glUniform1f(m_uniforms.G_temp, params.temp);
     glUniform1f(m_uniforms.G_tint, params.tint);
+    glUniform1f(m_uniforms.G_sat, params.saturation);
     glUniform1i(m_uniforms.bypass, params.bypass);
     glUniform1i(m_uniforms.gradeBypass, params.gradeBypass);
+    // Crop Variables
+    glUniform2f(m_uniforms.imageCropMin, params.imageCropMinX, params.imageCropMinY);
+    glUniform2f(m_uniforms.imageCropMax, params.imageCropMaxX, params.imageCropMaxY);
+
+    // Convert degrees to radians for shader
+    float rotationRad = params.arbitraryRotation * M_PI / 180.0f;
+    glUniform1f(m_uniforms.arbitraryRotation, rotationRad);
+
+    glUniform1i(m_uniforms.cropEnabled, params.cropEnable ? 1 : 0);
+    glUniform1i(m_uniforms.cropVisible, params.cropVisible ? 1 : 0);
+
+    // Pass original image dimensions
+    glUniform2f(m_uniforms.imageSize, params.width, params.height);
 }
 
 //--- Add To Render Queue ---//
@@ -475,15 +525,16 @@ void openglGPU::processQueue() {
 }
 
 void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
-
     if (!_image)
         return;
     if (!_image->imageLoaded)
         return; //We don't have our buffers yet
     if (!_image->rawImgData)
         return;
+
     auto start = std::chrono::steady_clock::now();
-    while( glGetError() != GL_NO_ERROR){} // Clear any errors from previous
+    while(glGetError() != GL_NO_ERROR){} // Clear any errors from previous
+
     // Generate RenderParams struct
     renderParams _renderParams = img_to_param(_image);
 
@@ -495,17 +546,17 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     setupGeometry();
     checkError("Geometry Setup");
 
-    // Create Shaders
-    //createShaders(ocioSet);
-    //checkError("Shader Compilation");
-
     // OCIO Check
     if (prevOCIO != ocioSet || prevIm != _image || _image->fullIm || _image->imgRst) {
         if (!createShaders(ocioSet)){
             LOG_ERROR("Could not compile shaders!");
             return;
         }
-        if (!copyToTex(m_inputTexture, _renderParams.width, _renderParams.height, _image->rawImgData)) {
+        // Always use original dimensions for input texture
+        unsigned int inputWidth = _image->fullIm ? _image->rawWidth : _image->width;
+        unsigned int inputHeight = _image->fullIm ? _image->rawHeight : _image->height;
+
+        if (!copyToTex(m_inputTexture, inputWidth, inputHeight, _image->rawImgData)) {
             LOG_ERROR("Skipping image render {}, no input data!", _image->srcFilename);
             return;
         }
@@ -514,9 +565,23 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
         _image->imgRst = false;
     }
 
+    // Calculate output dimensions based on crop settings
+    unsigned int outputWidth = _renderParams.width;
+    unsigned int outputHeight = _renderParams.height;
+
+    if (_image->imgParam.cropEnable) {
+        // Calculate crop rectangle dimensions
+        outputWidth = (_image->imgParam.imageCropMaxX - _image->imgParam.imageCropMinX) * outputWidth;
+        outputHeight = (_image->imgParam.imageCropMaxY - _image->imgParam.imageCropMinY) * outputHeight;
+
+        // Ensure minimum size
+        if (outputWidth < 1) outputWidth = 1;
+        if (outputHeight < 1) outputHeight = 1;
+    }
+
     // Bind framebuffer for rendering to output texture
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
-    glViewport(0, 0, _renderParams.width, _renderParams.height);
+    glViewport(0, 0, outputWidth, outputHeight);
     checkError("Setting Viewport");
 
     // Clear the framebuffer
@@ -540,7 +605,6 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     checkError("Binding Input Texture");
 
     // OCIO textures should be on units 1, 2, 3
-    // The OCIO builder should handle this with useAllTextures()
     ocioBuilder->useAllTextures();
     ocioBuilder->useAllUniforms();
     checkError("Setting OCIO Textures");
@@ -550,6 +614,7 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     checkError("Render");
 
+    // Create small version
     GLuint smallFBO;
     glGenFramebuffers(1, &smallFBO);
 
@@ -557,22 +622,18 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, smallFBO);       // Dest: small texture
 
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               GL_TEXTURE_2D, _image->glTextureSm, 0);
+                          GL_TEXTURE_2D, _image->glTextureSm, 0);
 
-    int smallWidth = (int)((float)_renderParams.width * appPrefs.prefs.proxyRes);
-    int smallHeight = (int)((float)_renderParams.height * appPrefs.prefs.proxyRes);
+    int smallWidth = std::max(1, (int)((float)outputWidth * appPrefs.prefs.proxyRes));
+    int smallHeight = std::max(1, (int)((float)outputHeight * appPrefs.prefs.proxyRes));
 
-    glBlitFramebuffer(0, 0, _renderParams.width, _renderParams.height,
+    glBlitFramebuffer(0, 0, outputWidth, outputHeight,
                      0, 0, smallWidth, smallHeight,
                      GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
     glDeleteFramebuffers(1, &smallFBO);
 
-    //while(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){}
-
     // Unbind
-    //glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    //glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, 0, 0);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glActiveTexture(GL_TEXTURE0);
@@ -580,19 +641,20 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     glUseProgram(0);
     checkError("Unbind");
 
+    // Set resolution of display and render based on crop
+    _image->dispW = outputWidth;
+    _image->dispH = outputHeight;
+    _image->rndrW = outputWidth;
+    _image->rndrH = outputHeight;
+
     // Copy Completed Image
     if (_image->fullIm) {
         _image->allocProcBuf();
-        copyFromTexFull(_image->glTexture, _renderParams.width, _renderParams.height, _image->procImgData);
+        copyFromTexFull(_image->glTexture, outputWidth, outputHeight, _image->procImgData);
         checkError("Copying Full Image for write");
         _image->renderReady = true;
         glDeleteTextures(1, (GLuint*)&_image->glTexture);
         _image->glTexture = 0;
-    } else {
-        // Change to OpenGL image buffer
-        //_image->allocDispBuf();
-        //memcpy(_image->dispImgData, m_disp->contents(), dispSize);
-        //_image->glUpdate = true;
     }
 
     if (!isInQueue(_image))
@@ -601,13 +663,12 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     if (_image->selected && !_image->fullIm)
         procHistIm(_image);
     _image->reloading = false;
+
     auto end = std::chrono::steady_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
     rdTimer.renderTime = dur.count();
     rdTimer.fps = 1000.0f / (float)dur.count();
-
-
 
     // Disable depth testing for 2D rendering
     glDisable(GL_DEPTH_TEST);

@@ -27,6 +27,9 @@ struct preferenceSet {
     // Mouse settings
     bool trackpadMode = false;
 
+    // Viewer Setting
+    int viewerSetting = 0;
+
     // Performance Mode
     bool perfMode = true;
     int maxRes = 3000;
@@ -34,6 +37,9 @@ struct preferenceSet {
 
     // Debayer Mode
     int debayerMode = 10;
+
+    // Max simultaneous exports
+    int maxSimExports = -1;
 
     // OCIO
     std::string ocioPath;
@@ -50,8 +56,9 @@ struct preferenceSet {
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(preferenceSet, undoLevels,
         autoSave, autoSFreq, histInt, histEnable, trackpadMode,
-        perfMode, maxRes, rollTimeout, debayerMode, ocioPath,
-        ocioExt, autoSort, proxyRes, renderTimeout);
+        viewerSetting, perfMode, maxRes, rollTimeout, debayerMode,
+        maxSimExports, ocioPath, ocioExt, autoSort, proxyRes,
+        renderTimeout);
 };
 
 class userPreferences {

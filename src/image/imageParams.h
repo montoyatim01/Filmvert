@@ -22,6 +22,7 @@ struct imageParams {
     // Correction
     float temp = 0.0f;
     float tint = 0.0f;
+    float saturation = 0.0f;
     float g_blackpoint[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     float g_whitepoint[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     float g_lift[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -30,15 +31,30 @@ struct imageParams {
     float g_offset[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     float g_gamma[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
+    // This is for the analysis selection region
     float cropBoxX[4];
     float cropBoxY[4];
 
+    // This is for actually cropping the image
+    float imageCropMinX = 0.0f;
+    float imageCropMinY = 0.0f;
+    float imageCropMaxX = 1.0f;
+    float imageCropMaxY = 1.0f;
+    int cropEnable = 0;
+    int cropVisible = 0;
+
+    // This is for an arbitrary rotation
+    float arbitraryRotation = 0.0f;
+
+    // This is the EXIF rotation value
     int rotation = 1;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(imageParams, sampleX, sampleY,
         blurAmount, baseColor, whitePoint, blackPoint, minX, minY,
-        maxX, maxY, temp, tint, g_blackpoint, g_whitepoint, g_lift,
-        g_gain, g_mult, g_offset, g_gamma, cropBoxX, cropBoxY, rotation);
+        maxX, maxY, temp, tint, saturation, g_blackpoint, g_whitepoint, g_lift,
+        g_gain, g_mult, g_offset, g_gamma, cropBoxX, cropBoxY,
+        imageCropMinX, imageCropMinY, imageCropMaxX, imageCropMaxY,
+        cropEnable, arbitraryRotation, rotation);
 
     // == operator for determing if re-render is needed
     // So only parameters affecting image
@@ -70,6 +86,7 @@ struct imageParams {
 
     void rstTmp();
     void rstTnt();
+    void rstSat();
 
     void rst_gBP();
     void rst_gWP();

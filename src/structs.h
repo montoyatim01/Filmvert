@@ -10,6 +10,8 @@
 
 struct copyPaste {
 
+    bool fromLoad = false;
+
     //---Analysis
     bool baseColor = false;
     bool cropPoints = false;
@@ -26,6 +28,7 @@ struct copyPaste {
     bool mult = false;
     bool offset = false;
     bool gamma = false;
+    bool saturation = false;
 
     //---Metadata
     bool make = false;
@@ -44,6 +47,9 @@ struct copyPaste {
     bool devnote = false;
     bool scanner = false;
     bool scannotes = false;
+
+    bool rotation = false;
+    bool imageCrop = false;
 
     void analysisGlobal(){
         if (baseColor && cropPoints &&
@@ -67,11 +73,13 @@ struct copyPaste {
             gps && notes && dev && chem && devnote && scanner && scannotes)
                 make = model = lens = stock = focal =
                 fstop = exposure = date = location =
-                gps = notes = dev = chem = devnote = scanner = scannotes = !devnote;
+                gps = notes = dev = chem = devnote =
+                scanner = scannotes = rotation = !devnote;
         else
             make = model = lens = stock = focal =
             fstop = exposure = date = location =
-            gps = notes = dev = chem = devnote = scanner = scannotes = true;
+            gps = notes = dev = chem = devnote =
+            scanner = scannotes = rotation = true;
     }
 };
 
@@ -84,6 +92,7 @@ struct exportParam {
   int compression = 8;
   bool overwrite = false;
   int colorspaceOpt = 1;
+  bool bakeRotation = true;
 };
 
 struct minMaxPoint {

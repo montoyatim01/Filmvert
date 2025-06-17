@@ -22,6 +22,7 @@ struct renderParams
   float sigmaFilter;
   float temp;
   float tint;
+  float saturation;
 
   float baseColor[4];
 
@@ -35,6 +36,14 @@ struct renderParams
   float G_mult[4];
   float G_offset[4];
   float G_gamma[4];
+
+  float arbitraryRotation;
+  float imageCropMinX;
+  float imageCropMinY;
+  float imageCropMaxX;
+  float imageCropMaxY;
+  int cropEnable;
+  int cropVisible;
 
 
 };

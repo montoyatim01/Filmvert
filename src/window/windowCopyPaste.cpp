@@ -14,6 +14,11 @@ void mainWindow::copyIntoParams() {
         copyParams.baseColor[0] = activeImage()->imgParam.baseColor[0];
         copyParams.baseColor[1] = activeImage()->imgParam.baseColor[1];
         copyParams.baseColor[2] = activeImage()->imgParam.baseColor[2];
+        copyParams.imageCropMinX = activeImage()->imgParam.imageCropMinX;
+        copyParams.imageCropMaxX = activeImage()->imgParam.imageCropMaxX;
+        copyParams.imageCropMinY = activeImage()->imgParam.imageCropMinY;
+        copyParams.imageCropMaxY = activeImage()->imgParam.imageCropMaxY;
+        copyParams.arbitraryRotation = activeImage()->imgParam.arbitraryRotation;
         for (int i = 0; i < 4; i++) {
             copyParams.whitePoint[i] = activeImage()->imgParam.whitePoint[i];
             copyParams.blackPoint[i] = activeImage()->imgParam.blackPoint[i];

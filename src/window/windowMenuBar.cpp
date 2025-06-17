@@ -15,6 +15,8 @@ void mainWindow::menuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("Open Image(s)")) {
+                if (validRoll())
+                    impRoll = selRoll;
                 openImages();
             }
             if (ImGui::MenuItem("Open Roll(s)")) {

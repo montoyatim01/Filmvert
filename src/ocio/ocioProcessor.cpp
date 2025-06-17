@@ -64,6 +64,12 @@ bool ocioProcessor::initialize(std::string &configFile) {
         }
         views.push_back(curView);
     }
+
+    // Print all available looks
+    for (int i = 0; i < OCIOconfig->getNumLooks(); i++) {
+        std::string lookName = OCIOconfig->getLookNameByIndex(i);
+        LOG_INFO("Look Name: {}", lookName);
+    }
     return true;
 }
 
@@ -260,6 +266,49 @@ void ocioProcessor::processImage(float *img, unsigned int width,
   }
 }
 
+void ocioProcessor::refGamutCompress(float* img, unsigned int width, unsigned int height) {
+    try {
+
+      OCIO::ConstProcessorRcPtr processor;
+      OCIO::LookTransformRcPtr lookTransform = OCIO::LookTransform::Create();
+      lookTransform->setLooks("ACES 1.3 Reference Gamut Compression");
+      processor = OCIOconfig->getProcessor(lookTransform);
+
+      OCIO::ConstCPUProcessorRcPtr cpu =
+          processor->getOptimizedCPUProcessor(OCIO::OPTIMIZATION_DEFAULT);
+
+      // Get number of hardware threads
+      const unsigned int numThreads = std::thread::hardware_concurrency();
+      const unsigned int rowsPerThread = (height + numThreads - 1) / numThreads;
+
+      std::vector<std::thread> threads;
+
+      for (unsigned int t = 0; t < numThreads; ++t) {
+        unsigned int yStart = t * rowsPerThread;
+        unsigned int yEnd = height > yStart + rowsPerThread ? yStart + rowsPerThread : height;
+
+        if (yStart >= yEnd)
+          continue;
+
+        threads.emplace_back([=]() {
+          float *threadImg = img + yStart * width * 4; // 4 channels per pixel
+          unsigned int threadHeight = yEnd - yStart;
+
+          OCIO::PackedImageDesc threadDesc(threadImg, width, threadHeight, 4);
+          cpu->apply(threadDesc);
+        });
+      }
+
+      for (auto &t : threads) {
+        t.join();
+      }
+
+    } catch (OCIO::Exception &e) {
+      LOG_ERROR("Error processing OIIO Gamut Compression!");
+      return;
+    }
+}
+
 //--- Get GL Desc ---//
 /*
     With the given OCIO Settings, create the requisite
@@ -292,6 +341,7 @@ OCIO::GpuShaderDescRcPtr ocioProcessor::getGLDesc(ocioSetting& ocioSet) {
               transform->setDirection(OCIO::TRANSFORM_DIR_INVERSE);
             processor = !useExt ? OCIOconfig->getProcessor(transform) : extOCIOconfig->getProcessor(transform);
         }
+
         // Step 5: Create GPU shader description
         OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateShaderDesc();
         shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_GLSL_4_0);
