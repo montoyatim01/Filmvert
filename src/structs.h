@@ -63,10 +63,10 @@ struct copyPaste {
 
     void gradeGlobal(){
         if (temp && tint && bp && wp && lift &&
-            gain && mult && offset && gamma)
-            temp = tint = bp = wp = lift = gain = mult = offset = gamma = !gamma;
+            gain && mult && offset && gamma && saturation)
+            temp = tint = bp = wp = lift = gain = mult = offset = gamma = saturation = !gamma;
         else
-            temp = tint = bp = wp = lift = gain = mult = offset = gamma = true;
+            temp = tint = bp = wp = lift = gain = mult = offset = gamma = saturation = true;
     }
 
     void metaGlobal() {
