@@ -1,14 +1,14 @@
 #include "roll.h"
 #include "structs.h"
+#include "exifUtils.h"
 
-
-
-//--- Export Roll Metadata JSON ---//
+//--- Get Roll Metadata String ---//
 /*
-    Export the full JSON file with metadata and params
-    from each image in the roll.
+    Get the string with the full JSON
+    metadata/params for saving or embedding
+    in a contact sheet
 */
-bool filmRoll::exportRollMetaJSON() {
+std::string filmRoll::getRollMetaString(bool pretty) {
     try {
         nlohmann::json j;
         nlohmann::json jRoll = nlohmann::json::object();
@@ -22,7 +22,22 @@ bool filmRoll::exportRollMetaJSON() {
             }
         }
         j[rollName.c_str()] = jRoll;
-        std::string jDump = j.dump(4);
+        std::string jDump = j.dump(pretty ? 4 : -1);
+        return jDump;
+    } catch (const std::exception& e) {
+        LOG_WARN("Unable to format roll JSON: {}", e.what());
+        return "";
+    }
+}
+
+//--- Export Roll Metadata JSON ---//
+/*
+    Export the full JSON file with metadata and params
+    from each image in the roll.
+*/
+bool filmRoll::exportRollMetaJSON() {
+    try {
+        std::string jDump = getRollMetaString(true);
         std::string outPath = rollPath + "/" + rollName + ".fvi";
         std::ofstream jsonFile(outPath, std::ios::out | std::ios::trunc);
         if (!jsonFile) {
@@ -33,7 +48,7 @@ bool filmRoll::exportRollMetaJSON() {
         jsonFile.close();
         return true;
     } catch (const std::exception& e) {
-        LOG_WARN("Unable to format roll JSON: {}", e.what());
+        LOG_WARN("Unable to save roll JSON: {}", e.what());
         return false;
     }
 }
@@ -92,10 +107,44 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
     metaImp.clear();
      try {
         nlohmann::json jIn;
-        std::ifstream f(jsonFile);
-        if (!f)
-            return false;
-        jIn = nlohmann::json::parse(f);
+        std::filesystem::path imPath(jsonFile);
+
+        if (imPath.extension().string() == ".fvi" ||
+            imPath.extension().string() == ".FVI") {
+            // Selected json file for import
+            std::ifstream f(jsonFile);
+            if (!f)
+                return false;
+            jIn = nlohmann::json::parse(f);
+        } else {
+            // Selected image file for import
+            Exiv2::enableBMFF();
+            auto image = Exiv2::ImageFactory::open(jsonFile);
+            if (!image) {
+                throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Could not open the image for metadata reading");
+            }
+            image->readMetadata();
+            // Read EXIF Data into Image
+            Exiv2::ExifData exifData = image->exifData();
+            if (!exifData.empty()) {
+                if (auto fvMetaOpt = getExifValue<std::string>(exifData, "Exif.Image.ImageDescription"); fvMetaOpt.has_value()) {
+                    std::string customMeta = saniJsonString(fvMetaOpt.value());
+                    if (!customMeta.empty()) {
+                        // Run the meta loding function
+                        jIn = nlohmann::json::parse(customMeta);
+                    } else {
+                        LOG_WARN("No metadata in selected image!");
+                        return false;
+                    }
+                } else {
+                    LOG_WARN("No metadata in selected image!");
+                    return false;
+                }
+            } else {
+                LOG_WARN("No metadata in selected image!");
+                return false;
+            }
+        } // Image selection
         auto first_item = jIn.begin();
         rollName = first_item.key();
         nlohmann::json jRoll = first_item.value();
@@ -112,6 +161,9 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
 
     } catch (const std::exception& e) {
         LOG_WARN("Unable to import roll from JSON file: {}", e.what());
+        return false;
+    } catch (const Exiv2::Error& e) {
+        LOG_ERROR("Exiv2 image exception: {}", e.what());
         return false;
     }
 

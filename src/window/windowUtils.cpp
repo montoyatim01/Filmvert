@@ -903,4 +903,8 @@ void mainWindow::loadMappings()
     colorspaceSet.push_back("Colorspace");
     colorspaceSet.push_back("Display");
 
+    csBake.push_back("None");
+    csBake.push_back("Flip Only");
+    csBake.push_back("All");
+
 }

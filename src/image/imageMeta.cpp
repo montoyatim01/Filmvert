@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <ostream>
+#include <csignal>
 
 // Metadata workflow:
 // Import:
@@ -279,6 +280,13 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         fvParams["saturation"] = imgParam.saturation;
         fvParams["rotation"] = imgParam.rotation;
 
+        fvParams["ocioName"] = imgParam.ocioName;
+        fvParams["ocioColor"] = imgParam.ocioColor;
+        fvParams["ocioDisp"] = imgParam.ocioDisp;
+        fvParams["ocioView"] = imgParam.ocioView;
+        fvParams["useDisplay"] = imgParam.useDisplay;
+        fvParams["inverse"] = imgParam.inverse;
+
         metaParams = imgMeta;
 
         j["filmvert"] = fvParams;
@@ -427,6 +435,9 @@ bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt, bool init) 
         LOG_INFO("Setting full params");
     } else {
         opts = *impOpt;
+        if (opts.fromLoad) {
+            opts.metaGlobal();
+        }
     }
     metaPaste(opts, impParam, impMeta, init);
     if (impParam == nullptr && impMeta == nullptr)
@@ -485,6 +496,14 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
     bool metaChg = false;
     if (params != nullptr) {
         imageParams impParams = *params;
+        if (selectons.ocio) {
+            imgParam.ocioName = impParams.ocioName;
+            imgParam.ocioColor = impParams.ocioColor;
+            imgParam.ocioDisp = impParams.ocioDisp;
+            imgParam.ocioView = impParams.ocioView;
+            imgParam.useDisplay = impParams.useDisplay;
+            imgParam.inverse = impParams.inverse;
+        }
         if (selectons.baseColor) {
             imgParam.baseColor[0] = impParams.baseColor[0];
             imgParam.baseColor[1] = impParams.baseColor[1];
@@ -509,7 +528,6 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
         }
         if (selectons.rotation) {
             imgParam.rotation = impParams.rotation;
-            imgParam.arbitraryRotation = impParams.arbitraryRotation;
             metaChg = true;
         }
         if (selectons.imageCrop) {
@@ -517,7 +535,8 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
             imgParam.imageCropMaxX = impParams.imageCropMaxX;
             imgParam.imageCropMinY = impParams.imageCropMinY;
             imgParam.imageCropMaxY = impParams.imageCropMaxY;
-            imgParam.cropEnable = impParams.cropEnable;
+            imgParam.arbitraryRotation = impParams.arbitraryRotation;
+            imgParam.cropEnable = true;
             metaChg = true;
         }
         if (selectons.analysis) {
@@ -661,6 +680,31 @@ void image::loadParamJSONObj(imageParams* imgParam, copyPaste *&pasteOpts, nlohm
     if (!pasteOpts) {
         pasteOpts = new copyPaste;
         pasteOpts->fromLoad = true;
+    }
+
+    // Check OCIO Settings (if present)
+    if (obj.contains("ocioName")) {
+        imgParam->ocioName = obj["ocioName"].get<std::string>();
+        if (obj.contains("ocioColor")) {
+            imgParam->ocioColor = obj["ocioColor"].get<int>();
+        }
+        if (obj.contains("ocioDisp")) {
+            imgParam->ocioDisp = obj["ocioDisp"].get<int>();
+        }
+        if (obj.contains("ocioView")) {
+            imgParam->ocioView = obj["ocioView"].get<int>();
+        }
+        if (obj.contains("useDisplay")) {
+            imgParam->useDisplay = obj["useDisplay"].get<bool>();
+        }
+        if (obj.contains("inverse")) {
+            imgParam->inverse = obj["inverse"].get<bool>();
+        }
+        if ((imgParam->ocioColor != -1 && !imgParam->useDisplay) ||
+            (imgParam->ocioDisp != -1 && imgParam->ocioView != -1 && imgParam->useDisplay)) {
+            // We have an ocio name, and a valid selection
+            pasteOpts->ocio = true;
+        }
     }
 
 

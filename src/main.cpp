@@ -1,7 +1,6 @@
 #include <stdint.h>
 
 #include "logger.h"
-//#include "metalGPU.h"
 #include "window.h"
 
 #if defined (WIN32)
@@ -12,7 +11,7 @@ int main(void)
 {
     // Start Logger
     LOG_INFO("Logging started");
-    LOG_INFO("Version: {}.{}.{}", 1, 0, 0);
+    LOG_INFO("Version: {}.{}.{}", VERMAJOR, VERMINOR, VERPATCH);
     LOG_INFO("Build {:.8}-{}", GIT_COMMIT_HASH, BUILD_DATE);
 
     // Setup Threadpool
@@ -30,43 +29,18 @@ int main(void)
 }
 
 
-// TODO/Wishlist:
-//
-//
-// - Hotkeys
-// -- Printer lights? BP/WP?
-//
-// - Bugs
-// -* Add in import from image? (import the metadata or inversion settings)
-//
-// -* Bug when closing multiple rolls (maybe roll is loading?)
-// -- Get arrow keys to always switch images?
-// -- Hotkeys for BP/WP RGB?
-//
-// -* Make the min/max points adjustable??
-// -* Grade disabled notification? (Text on image view)
-// -* Undo/redo triggers zoom
-// --* Change zoom key?
-// -* BP/WP grade to happen in linear and not jplog
-// -* Import image metadata
-// -* Select images to sync metadata (import roll)
-// -* Select debayer method (preferences)
-// -* Disallow certain operations if the image is still loading (or queue it up?)
-// -* Add in scroll speed preferences (for mouse)
-// -* Mouse vs trackpad mode? - Preferences
-// -* Fix the damn histogram
-// -* remove legacy SDL code/variables
-// -* Metadata paste doesn't trigger save required?
-// -* Use same import window for image import (select meta or params)
-// -* Cycling quickly between rolls (with a lot loaded) slows it way down
-// -* Cycling quickly between rolls that are loading (while closing them) causes a crash, resizeproxy thread
-// -* Close roll/Image shortcut (Cmd + W?)
-// -* Check esc hotkey in popups to close them!
-// -* Rotation doesn't rollup
-
-// - Can't add images to new roll!
-// - OIIO Resizing incorrect
-// copy/paste rotation
+/* 20250625
+- Revamped OCIO backend
+- Added ACES 1.3 configuration
+- Images store which configuration was used, attempt to re-use on import
+- Added option to add border to exported images
+- Added roll contact sheet feature
+- Roll contact sheets can be used to import metadata
+- Fixed crop box display on specific rotation settings
+- Addressed an issue where existing image metadata wouldn't populate on open
+- Addressed issue where crop box wasn't editable
+- Updated CMake compatibility
+*/
 
 /* 20250617
 - Added saturation slider

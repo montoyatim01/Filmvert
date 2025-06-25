@@ -140,6 +140,7 @@ class mainWindow
         bool shortPopTrig = false;
         bool imMatchPopTrig = false;
         bool aboutPopTrig = false;
+        bool contactPopTrig = false;
         bool ImMatchRoll = false;
         bool badOcioText = false;
         char ackMsg[512];
@@ -195,6 +196,7 @@ class mainWindow
         std::vector<const char*> fileTypes;
         std::vector<const char*> bitDepths;
         std::vector<const char*> colorspaceSet;
+        std::vector<const char*> csBake;
         // Export OCIO Struct
         ocioSetting exportOCIO;
         int ocioEXPCS_Disp = 1;
@@ -203,6 +205,7 @@ class mainWindow
         int exportImgCount = 0;
         int exportProcCount = 0;
         unsigned int elapsedTime = 0;
+        int contactSheetWidth = 6;
 
         // Views
         void menuBar();
@@ -289,6 +292,7 @@ class mainWindow
         void shortcutsPopup();
         void importImMatchPopup();
         void aboutPopup();
+        void contactSheetPopup();
 
         void copyIntoParams();
         void pasteIntoParams();

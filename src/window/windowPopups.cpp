@@ -69,18 +69,19 @@ void mainWindow::importIDTSetting() {
         if (ocioCS_Disp == 0) {
             // Colorspace
             ImGui::Text("Colorspace:");
-            ImGui::Combo("###CS", &importOCIO.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
+            ImGui::Combo("###CS", &importOCIO.colorspace, ocioProc.activeConfig()->colorspaces.data(), ocioProc.activeConfig()->colorspaces.size());
             importOCIO.useDisplay = false;
         } else {
             ImGui::Text("Display:");
-            ImGui::Combo("###DSP", &importOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
+            ImGui::Combo("###DSP", &importOCIO.display, ocioProc.activeConfig()->displays.data(), ocioProc.activeConfig()->displays.size());
 
             ImGui::Text("View:");
-            ImGui::Combo("##VW", &importOCIO.view, ocioProc.views[importOCIO.display].data(), ocioProc.views[importOCIO.display].size());
+            ImGui::Combo("##VW", &importOCIO.view, ocioProc.activeConfig()->views[importOCIO.display].data(), ocioProc.activeConfig()->views[importOCIO.display].size());
             importOCIO.useDisplay = true;
         }
         importOCIO.inverse = true;
-        importOCIO.ext = appPrefs.prefs.ocioExt && ocioProc.validExternal;
+        ImGui::Checkbox("Overwrite Existing Setting", &importOCIO.impOverwrite);
+        ImGui::SetItemTooltip("Overrides any input colorspace previously set on an image.");
         ImGui::TreePop();
     }
 
@@ -312,7 +313,8 @@ void mainWindow::importRollPopup() {
                             //Found an image in root of selection
                             if (dir_entry.path().extension().string() != ".xmp" &&
                                 dir_entry.path().extension().string() != ".fvi" &&
-                                dir_entry.path().extension().string() != ".json")
+                                dir_entry.path().extension().string() != ".json" &&
+                                dir_entry.path().stem().string() != std::filesystem::path(importFiles[r]).stem().string())
                                 // Ignore files we make that are definitely not images
                                 images.push_back(dir_entry.path().string());
                         }
@@ -477,14 +479,14 @@ void mainWindow::batchRenderPopup() {
             if (expSetting.colorspaceOpt == 0) {
                 // Colorspace
                 ImGui::Text("Colorspace:");
-                ImGui::Combo("###CS", &exportOCIO.colorspace, ocioProc.colorspaces.data(), ocioProc.colorspaces.size());
+                ImGui::Combo("###CS", &exportOCIO.colorspace, ocioProc.activeConfig()->colorspaces.data(), ocioProc.activeConfig()->colorspaces.size());
                 exportOCIO.useDisplay = false;
             } else {
                 ImGui::Text("Display:");
-                ImGui::Combo("###DSP", &exportOCIO.display, ocioProc.displays.data(), ocioProc.displays.size());
+                ImGui::Combo("###DSP", &exportOCIO.display, ocioProc.activeConfig()->displays.data(), ocioProc.activeConfig()->displays.size());
 
                 ImGui::Text("View:");
-                ImGui::Combo("##VW", &exportOCIO.view, ocioProc.views[exportOCIO.display].data(), ocioProc.views[exportOCIO.display].size());
+                ImGui::Combo("##VW", &exportOCIO.view, ocioProc.activeConfig()->views[exportOCIO.display].data(), ocioProc.activeConfig()->views[exportOCIO.display].size());
                 exportOCIO.useDisplay = true;
             }
             exportOCIO.inverse = false;
@@ -495,7 +497,16 @@ void mainWindow::batchRenderPopup() {
         ImGui::Checkbox("Bake Crop & Rotation", &expSetting.bakeRotation);
         ImGui::SetItemTooltip("Bake in all crop and rotation settings to the image.\nWhat is seen in the viewport is what will be exported");
 
-        ImGui::Spacing();
+        ImGui::Checkbox("Add Border", &expSetting.border);
+        if (expSetting.border) {
+            float borderSizePercent = expSetting.borderSize * 100.0f;
+            if (ImGui::DragFloat("Border Size", &borderSizePercent, 0.1f, 0.0f, 25.0f, "%.1f%%")) {
+                expSetting.borderSize = borderSizePercent / 100.0f;
+            }
+            ImGui::ColorEdit3("Border Color", (float*)&expSetting.borderColor);
+        }
+
+        ImGui::Separator();
 
         ImGui::Checkbox("Overwrite Existing File(s)?", &expSetting.overwrite);
 
@@ -672,7 +683,6 @@ void mainWindow::pastePopup() {
         ImGui::Checkbox("Scanner", &pasteOptions.scanner);
         ImGui::Checkbox("Scanner Notes", &pasteOptions.scannotes);
         ImGui::Checkbox("Crop", &pasteOptions.imageCrop);
-        ImGui::InvisibleButton("##09", btnSize);
         ImGui::EndGroup();
 
 
@@ -1225,20 +1235,23 @@ void mainWindow::preferencesPopup() {
             tmpPrefs.maxSimExports > 256 ? 256 : tmpPrefs.maxSimExports;
 
         // OCIO
+        ImGui::Text("OCIO Configs:");
+        ImGui::Combo("###04", &ocioSel, ocioProc.getConfigList().data(), ocioProc.getConfigList().size());
+
         ImGui::Text("Custom OCIO Config:");
         ImGui::InputText("###03", ocioPath, IM_ARRAYSIZE(ocioPath));
         ImGui::SameLine();
         if (ImGui::Button("Open")) {
             auto selection = ShowFileOpenDialog(false);
             if (!selection.empty()) {
-                if (!ocioProc.initAltConfig(selection[0])) {
+                if (!ocioProc.initExtConfig(selection[0])) {
                     //We've supplied a bad config
-                    std::strcpy(ackMsg, "Unable to open OCIO Config!");
                     badOcioText = true;
                 } else {
                     badOcioText = false;
                     tmpPrefs.ocioPath = selection[0];
                     std::strcpy(ocioPath, tmpPrefs.ocioPath.c_str());
+                    ocioProc.setActiveConfig(-1);
                 }
             }
         }
@@ -1246,13 +1259,6 @@ void mainWindow::preferencesPopup() {
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255,0,0,255));
             ImGui::Text("Invalid Config!");
             ImGui::PopStyleColor();
-        }
-        if (ocioProc.validExternal) {
-            std::vector<const char*> ocioOpts;
-            ocioOpts.push_back("Internal");
-            ocioOpts.push_back("External");
-            ImGui::Text("Config");
-            ImGui::Combo("###04", &ocioSel, ocioOpts.data(), ocioOpts.size());
         }
 
         if (ImGui::Button("Cancel")) {
@@ -1262,14 +1268,11 @@ void mainWindow::preferencesPopup() {
         }
         ImGui::SameLine();
         if (ImGui::Button("Save")) {
-            if (ocioSel == 0) {
-                ocioProc.setIntActive();
-                tmpPrefs.ocioExt = false;
-            } else {
-                ocioProc.setExtActive();
-                tmpPrefs.ocioExt = true;
+            if (ocioSel != ocioProc.selectedConfig) {
+                ocioProc.setActiveConfig(ocioSel);
             }
             appPrefs.prefs = tmpPrefs;
+            appPrefs.prefs.ocioExt = ocioSel;
             std::memset(ocioPath, 0, sizeof(ocioPath));
             appPrefs.saveToFile();
             preferencesPopTrig = false;
@@ -1679,6 +1682,39 @@ void mainWindow::aboutPopup() {
             aboutPopTrig = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::EndPopup();
+    }
+}
+
+void mainWindow::contactSheetPopup() {
+    if (contactPopTrig)
+        ImGui::OpenPopup("Export Contact Sheet");
+    if (ImGui::BeginPopupModal("Export Contact Sheet", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text("File Format:");
+        ImGui::Combo("###FF", &expSetting.format, fileTypes.data(), fileTypes.size());
+        ImGui::SetItemTooltip("Format to save the contact sheet as. Contact sheets will\nbe saved using the roll name & directory.");
+
+
+        ImGui::Text("Image Width:");
+        ImGui::InputInt("###CSW", &contactSheetWidth);
+        ImGui::SetItemTooltip("How many images wide the contact sheet will be.");
+        contactSheetWidth = contactSheetWidth < 1 ? 1 : contactSheetWidth > 40 ? 40 : contactSheetWidth;
+
+        ImGui::Text("Bake Orientation:");
+        ImGui::Combo("###BO", &expSetting.csBakeRot, csBake.data(), csBake.size());
+        ImGui::SetItemTooltip("Bake the set orientation of the image. Allows baking only \nflips/mirrors, or baking all rotations");
+        ImGui::Separator();
+        if (ImGui::Button("Cancel")) {
+            contactPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save")) {
+            activeRoll()->generateContactSheet(contactSheetWidth, expSetting);
+            contactPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::Spacing();
         ImGui::EndPopup();
     }
 }

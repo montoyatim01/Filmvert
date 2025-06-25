@@ -47,94 +47,69 @@ class openglGPU {
         void processQueue();
         void clearImBuffer(image* img);
         void clearSmBuffer(image* img);
+        void copyFromTexFull(GLuint textureID, int width, int height, float* rgbaData);
+
 
         bool getStatus();
         void clearError();
         std::string getError();
 
-
-
-
         long long unsigned int histoTex(){return m_histoTex;}
 
-        gpuTimer rdTimer;
-        bool rendering = false;
+        bool m_rendering = false;
 
     private:
-        gpuStat status;
+        gpuStat m_status;
         bool m_initialized = false;
-        bool enableQueue = false;
-        std::thread queueThread;
-        std::deque<gpuQueue> renderQueue;
-        std::deque<image*> histQueue;
-        std::mutex queueLock;
+        std::deque<gpuQueue> m_renderQueue;
+        std::mutex m_queueLock;
 
+        image* m_prevIm;
 
-        image* prevIm;
+        ocioSetting m_prevOCIO;
 
-        ocioSetting prevOCIO;
-
-        unsigned long long imBufferSize = 0;
         unsigned int m_width = 0;
         unsigned int m_height = 0;
 
         // Histogram
-        std::thread histThread;
-        std::mutex histLock;
-        std::mutex histNoteLock;
-        std::condition_variable cv;
-        bool procHist = false;
-        bool histStop = true;
-        histFrame histObj;
-        uint64_t histBufSize = 0;
-        float* histPixels = nullptr;
-        float* imgPixels = nullptr;
+        uint64_t m_histBufSize = 0;
+        float* m_histPixels = nullptr;
+        float* m_imgPixels = nullptr;
 
         // histogram.cpp
         void procHistIm(image* img);
         void updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier);
 
-        void initBuffers();
-
+        // gpu.cpp
         void checkError(std::string location);
 
         void bufferCheck(image* _image);
         void updateUniforms(renderParams params);
         void cacheUniformLocations();
         void setupGeometry();
-        void loadOCIOTex(ocioSetting ocioSet);
-
-        void allocateAllTextures(OCIO::GpuShaderDescRcPtr &gpuDesc);
 
         GLuint compileShader(const std::string& source, GLenum type);
-        GLuint createShaderProgram(const std::string& vertexSource, const std::string& fragmentSource);
         bool createShaders(ocioSetting& ocioSet);
 
         void renderImage(image* _image, ocioSetting ocioSet);
-        void renderBlurPass(image* _image);
 
         bool copyToTex(GLuint textureID, int width, int height, float* rgbaData);
-        void copyFromTexFull(GLuint textureID, int width, int height, float* rgbaData);
+
         void getHistTexture(image* _img, float*& pixels, int &width, int &height);
         void setHistTexture(float* pixels);
 
-        OCIO::OpenGLBuilderRcPtr ocioBuilder;
+    private:
+        OCIO::OpenGLBuilderRcPtr m_ocioBuilder;
 
         GLuint m_framebuffer = 0;
         GLuint m_inputTexture = 0;
         GLuint m_histoTex = 0;
-        //GLuint m_outputTexture = 0;
 
         GLuint m_vertexArray = 0;
         GLuint m_vertexBuffer = 0;
         GLuint m_indexBuffer = 0;
-
-
         GLuint m_shaderProgram = 0;
-        GLuint quadVAO = 0;
-        GLuint inputTex = 0;
-        GLuint outputTex = 0;
-        GLuint fbo = 0;
+
 
         struct UniformLocations {
                 GLint inputTexture;

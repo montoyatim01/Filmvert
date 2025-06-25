@@ -14,24 +14,22 @@
 
 
 openglGPU::openglGPU() {
-    memset(&m_uniforms, -1, sizeof(m_uniforms));
+
 }
 
 
 openglGPU::~openglGPU() {
-    glDeleteTextures(1, &inputTex);
-    glDeleteTextures(1, &outputTex);
-    glDeleteFramebuffers(1, &fbo);
-    glDeleteVertexArrays(1, &quadVAO);
+
     glDeleteProgram(m_shaderProgram);
-    if (histObj.histData)
-        delete [] histObj.histData;
+
 }
 
 bool openglGPU::initialize(ocioSetting &ocioSet) {
     if (m_initialized) {
             return true;
     }
+
+    memset(&m_uniforms, -1, sizeof(m_uniforms));
 
     // Initialize GLEW if not already done
     if (glewInit() != GLEW_OK) {
@@ -59,35 +57,35 @@ bool openglGPU::initialize(ocioSetting &ocioSet) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     // Set up out histogram buffer
-    histPixels = new float[HISTWIDTH * HISTHEIGHT * 4];
+    m_histPixels = new float[HISTWIDTH * HISTHEIGHT * 4];
     m_initialized = true;
     return true;
 }
 
 void openglGPU::checkError(std::string location) {
-    if (!status.error) {
+    if (!m_status.error) {
         GLint err = glGetError();
         if (err != GL_NO_ERROR) {
-            status.error = true;
+            m_status.error = true;
             LOG_ERROR("Error after {}: 0x{:x}, {}", location, err, (char*)gluErrorString(err));
-            status.errorCode = err;
-            status.errString = "Error with " + location + ": " + (char*)gluErrorString(err);
+            m_status.errorCode = err;
+            m_status.errString = "Error with " + location + ": " + (char*)gluErrorString(err);
         }
     }
 }
 
 bool openglGPU::getStatus() {
-    return status.error;
+    return m_status.error;
 }
 
 void openglGPU::clearError() {
-    status.error = false;
-    status.errorCode = 0;
-    status.errString = "";
+    m_status.error = false;
+    m_status.errorCode = 0;
+    m_status.errString = "";
 }
 
 std::string openglGPU::getError() {
-    return status.errString;
+    return m_status.errString;
 }
 
 void openglGPU::cacheUniformLocations() {
@@ -186,16 +184,16 @@ bool openglGPU::createShaders(ocioSetting& ocioSet) {
         return false;
     }
 
-    if (ocioBuilder && prevOCIO != ocioSet) {
+    if (m_ocioBuilder && m_prevOCIO != ocioSet) {
         // Clear cached uniform locations
         memset(&m_uniforms, -1, sizeof(m_uniforms));
     }
 
-    ocioBuilder = OCIO::OpenGLBuilder::Create(gpuDesc);
+    m_ocioBuilder = OCIO::OpenGLBuilder::Create(gpuDesc);
 
     checkError("OCIO Processor Creation");
 
-    ocioBuilder->allocateAllTextures(1);
+    m_ocioBuilder->allocateAllTextures(1);
     checkError("OCIO Texture Allocation");
 
     std::string ocioKernText = glsl_process;
@@ -215,14 +213,14 @@ bool openglGPU::createShaders(ocioSetting& ocioSet) {
 
     try {
         // Build the fragment shader program.
-        ocioBuilder->buildProgram(ocioKernText.c_str(), false, vertexShader);
+        m_ocioBuilder->buildProgram(ocioKernText.c_str(), false, vertexShader);
     } catch (OCIO::Exception& e) {
         LOG_ERROR("Unable to build shaders: {}", e.what());
     }
 
-    m_shaderProgram = ocioBuilder->getProgramHandle();
+    m_shaderProgram = m_ocioBuilder->getProgramHandle();
     cacheUniformLocations();
-    prevOCIO = ocioSet;
+    m_prevOCIO = ocioSet;
 
     return true;
 }
@@ -429,13 +427,13 @@ void openglGPU::updateUniforms(renderParams params) {
 void openglGPU::addToRender(image *_image, renderType type, ocioSetting ocioSet) {
 
     if (_image) {
-        queueLock.lock();
+        m_queueLock.lock();
         _image->inRndQueue = true;
         if (type == r_sdt || type == r_blr)
-            renderQueue.push_front(gpuQueue(_image, type, ocioSet));
+            m_renderQueue.push_front(gpuQueue(_image, type, ocioSet));
         else
-            renderQueue.push_back(gpuQueue(_image, type, ocioSet));
-        queueLock.unlock();
+            m_renderQueue.push_back(gpuQueue(_image, type, ocioSet));
+        m_queueLock.unlock();
     }
 
 }
@@ -447,9 +445,9 @@ void openglGPU::addToRender(image *_image, renderType type, ocioSetting ocioSet)
 bool openglGPU::isInQueue(image* _image) {
     if (!_image)
         return false;
-    queueLock.lock();
-    std::deque<gpuQueue> searchQueue = renderQueue;
-    queueLock.unlock();
+    m_queueLock.lock();
+    std::deque<gpuQueue> searchQueue = m_renderQueue;
+    m_queueLock.unlock();
     while (!searchQueue.empty()) {
         if (_image == searchQueue.front()._img)
             return true;
@@ -466,13 +464,13 @@ bool openglGPU::isInQueue(image* _image) {
 void openglGPU::removeFromQueue(image* _image) {
     if (!_image)
         return;
-    queueLock.lock();
-    for (int i = 0; i < renderQueue.size(); i++){
-        if (renderQueue[i]._img == _image) {
-            renderQueue.erase(renderQueue.begin() + i);
+    m_queueLock.lock();
+    for (int i = 0; i < m_renderQueue.size(); i++){
+        if (m_renderQueue[i]._img == _image) {
+            m_renderQueue.erase(m_renderQueue.begin() + i);
         }
     }
-    queueLock.unlock();
+    m_queueLock.unlock();
 }
 
 //--- Process Queue ---//
@@ -488,22 +486,22 @@ void openglGPU::processQueue() {
 
 
         // While we've enabled the queue
-        if (renderQueue.size() > 0) {
-            rendering = true;
+        if (m_renderQueue.size() > 0) {
+            m_rendering = true;
             // If there are items in the queue
-            queueLock.lock();
-            image* img = renderQueue.front()._img;
-            renderType type = renderQueue.front()._type;
-            ocioSetting ocioSet = renderQueue.front()._ocioSet;
-            while (renderQueue.size() > 0 &&
-                renderQueue.front()._img == img &&
-                renderQueue.front()._type == type &&
-                renderQueue.front()._ocioSet == ocioSet) {
+            m_queueLock.lock();
+            image* img = m_renderQueue.front()._img;
+            renderType type = m_renderQueue.front()._type;
+            ocioSetting ocioSet = m_renderQueue.front()._ocioSet;
+            while (m_renderQueue.size() > 0 &&
+                m_renderQueue.front()._img == img &&
+                m_renderQueue.front()._type == type &&
+                m_renderQueue.front()._ocioSet == ocioSet) {
                 // Removing duplicates to only run a single
                 // instance of this image through the render
-                renderQueue.pop_front();
+                m_renderQueue.pop_front();
             }
-            queueLock.unlock();
+            m_queueLock.unlock();
             switch (type) {
                 case r_sdt:
                 case r_full:
@@ -517,7 +515,7 @@ void openglGPU::processQueue() {
 
         }
         else {
-            rendering = false;
+            m_rendering = false;
         }
 
 
@@ -547,7 +545,7 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     checkError("Geometry Setup");
 
     // OCIO Check
-    if (prevOCIO != ocioSet || prevIm != _image || _image->fullIm || _image->imgRst) {
+    if (m_prevOCIO != ocioSet || m_prevIm != _image || _image->fullIm || _image->imgRst) {
         if (!createShaders(ocioSet)){
             LOG_ERROR("Could not compile shaders!");
             return;
@@ -561,7 +559,7 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
             return;
         }
         checkError("Copying Image to Input Texture");
-        prevIm = _image;
+        m_prevIm = _image;
         _image->imgRst = false;
     }
 
@@ -605,8 +603,8 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     checkError("Binding Input Texture");
 
     // OCIO textures should be on units 1, 2, 3
-    ocioBuilder->useAllTextures();
-    ocioBuilder->useAllUniforms();
+    m_ocioBuilder->useAllTextures();
+    m_ocioBuilder->useAllUniforms();
     checkError("Setting OCIO Textures");
 
     // Render full-screen quad
@@ -667,8 +665,8 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     auto end = std::chrono::steady_clock::now();
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    rdTimer.renderTime = dur.count();
-    rdTimer.fps = 1000.0f / (float)dur.count();
+    //rdTimer.renderTime = dur.count();
+    //rdTimer.fps = 1000.0f / (float)dur.count();
 
     // Disable depth testing for 2D rendering
     glDisable(GL_DEPTH_TEST);
@@ -732,11 +730,11 @@ void openglGPU::getHistTexture(image* _img, float*& pixels, int &width, int &hei
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &gWidth);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &gHeight);
 
-    if (gWidth * gHeight * 4 > histBufSize || !pixels) {
-        histBufSize = gWidth * gHeight * 4;
+    if (gWidth * gHeight * 4 > m_histBufSize || !pixels) {
+        m_histBufSize = gWidth * gHeight * 4;
         if (pixels)
             delete [] pixels;
-        pixels = new float[histBufSize];
+        pixels = new float[m_histBufSize];
     }
 
     // Read texture data directly

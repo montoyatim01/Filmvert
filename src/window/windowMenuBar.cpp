@@ -103,8 +103,7 @@ void mainWindow::menuBar() {
             if (ImGui::MenuItem("Preferences")) {
                 badOcioText = false;
                 std::strcpy(ocioPath, appPrefs.prefs.ocioPath.c_str());
-                if (appPrefs.prefs.ocioExt)
-                    ocioSel = 1;
+                ocioSel = ocioProc.selectedConfig;
                 preferencesPopTrig = true;
                 tmpPrefs = appPrefs.prefs;
             }
@@ -180,27 +179,6 @@ void mainWindow::menuBar() {
                 }
 
             }
-
-            ImGui::Separator();
-
-            // Refresh Roll
-            if (ImGui::MenuItem("Refresh Roll")) {
-                for (int i = 0; i < activeRollSize(); i++) {
-                    imgRender(getImage(i), r_bg);
-                }
-            }
-
-            // Sort Roll by Index
-            if (ImGui::MenuItem("Sort Roll by Index")) {
-                if (validRoll()) {
-                    if (!activeRoll()->sortRoll()) {
-                        std::strcpy(ackMsg, "Unable to sort roll!");
-                        std::strcpy(ackError, "One or more images is in the render queue.\nWait a moment and try again.");
-                        ackPopTrig = true;
-                    }
-                }
-            }
-            // Undo/Redo?
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Metadata")) {
@@ -299,6 +277,44 @@ void mainWindow::menuBar() {
 
             ImGui::EndMenu();
         }
+        if (ImGui::BeginMenu("Roll")) {
+            if (ImGui::MenuItem("Sync Roll")) {
+                if (validIm()) {
+                    copyIntoParams();
+                    int itemCount = activeRollSize();
+                    for (int i = 0; i < itemCount; i++) {
+                            selection.SetItemSelected(selection.GetStorageIdFromIndex(i), true);
+                    }
+                    pasteTrigger = true;
+                }
+            }
+            // Refresh Roll
+            if (ImGui::MenuItem("Refresh Roll")) {
+                for (int i = 0; i < activeRollSize(); i++) {
+                    imgRender(getImage(i), r_bg);
+                }
+            }
+
+            // Sort Roll by Index
+            if (ImGui::MenuItem("Sort Roll by Index")) {
+                if (validRoll()) {
+                    if (!activeRoll()->sortRoll()) {
+                        std::strcpy(ackMsg, "Unable to sort roll!");
+                        std::strcpy(ackError, "One or more images is in the render queue.\nWait a moment and try again.");
+                        ackPopTrig = true;
+                    }
+                }
+            }
+
+            if (ImGui::MenuItem("Generate Contact Sheet")) {
+                if (validRoll()) {
+                    // Set output format to jpeg
+                    expSetting.format = 2;
+                    contactPopTrig = true;
+                }
+            }
+            ImGui::EndMenu();
+        }
 
         if (ImGui::BeginMenu("Help")) {
             if (ImGui::MenuItem("Keyboard Shortcuts")) {
@@ -355,7 +371,7 @@ void mainWindow::menuBar() {
         ImGui::Text("Display:");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.15f);
-        if (ImGui::Combo("##01", &dispOCIO.display, ocioProc.displays.data(), ocioProc.displays.size())) {
+        if (ImGui::Combo("##01", &dispOCIO.display, ocioProc.activeConfig()->displays.data(), ocioProc.activeConfig()->displays.size())) {
             renderCall |= true;
             rollRender();
         }
@@ -363,7 +379,7 @@ void mainWindow::menuBar() {
         ImGui::Text("View:");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20f);
-        if(ImGui::Combo("##02", &dispOCIO.view, ocioProc.views[dispOCIO.display].data(), ocioProc.views[dispOCIO.display].size())) {
+        if(ImGui::Combo("##02", &dispOCIO.view, ocioProc.activeConfig()->views[dispOCIO.display].data(), ocioProc.activeConfig()->views[dispOCIO.display].size())) {
             renderCall |= true;
             rollRender();
         }

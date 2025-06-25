@@ -5,7 +5,7 @@
 #include <array>
 
 #define VERMAJOR 1
-#define VERMINOR 0
+#define VERMINOR 1
 #define VERPATCH 0
 
 struct copyPaste {
@@ -51,6 +51,8 @@ struct copyPaste {
     bool rotation = false;
     bool imageCrop = false;
 
+    bool ocio = false;
+
     void analysisGlobal(){
         if (baseColor && cropPoints &&
             analysisBlur && analysis)
@@ -74,12 +76,12 @@ struct copyPaste {
                 make = model = lens = stock = focal =
                 fstop = exposure = date = location =
                 gps = notes = dev = chem = devnote =
-                scanner = scannotes = rotation = !devnote;
+                scanner = scannotes = rotation = imageCrop = !devnote;
         else
             make = model = lens = stock = focal =
             fstop = exposure = date = location =
             gps = notes = dev = chem = devnote =
-            scanner = scannotes = rotation = true;
+            scanner = scannotes = rotation = imageCrop = true;
     }
 };
 
@@ -93,6 +95,10 @@ struct exportParam {
   bool overwrite = false;
   int colorspaceOpt = 1;
   bool bakeRotation = true;
+  bool border = false;
+  float borderSize = 0.0f;
+  float borderColor[3] = {0.0f, 0.0f, 0.0f};
+  int csBakeRot = 1;
 };
 
 struct minMaxPoint {
@@ -118,12 +124,13 @@ struct rawSetting {
 };
 
 struct ocioSetting {
+    int ocioConfig = 0;
     int colorspace = 0;
     int display = 0;
     int view = 0;
     bool inverse = false;
     bool useDisplay = true;
-    bool ext = false;
+    bool impOverwrite = false;
 
     int texCount = 0;
     const float* texture[3];
@@ -137,7 +144,6 @@ struct ocioSetting {
                  view == other.view &&
                 inverse == other.inverse &&
                 useDisplay == other.useDisplay &&
-                ext == other.ext &&
                 texCount == other.texCount &&
                 texture[0] == other.texture[0] &&
                 texWidth[0] == other.texWidth[0] &&

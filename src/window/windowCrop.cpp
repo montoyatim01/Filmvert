@@ -126,7 +126,7 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
 
             // Handle corner dragging
             if (handleHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-                !draggingImageCrop && !dragging) {
+                !draggingImageCrop) {
                 draggingImageCrop = true;
                 draggedCropHandle = i;
                 dragStartMouse = mousePos;
@@ -201,16 +201,16 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
                 deltaY = -normDeltaY;
                 break;
             case 5: // Rotate 90 CCW + flip horizontal
-                deltaX = normDeltaY;
-                deltaY = normDeltaX;
+                deltaX = -normDeltaY;
+                deltaY = -normDeltaX;
                 break;
             case 6: // Rotate 90 CW
                 deltaX = normDeltaY;
                 deltaY = -normDeltaX;
                 break;
             case 7: // Rotate 90 CW + flip horizontal
-                deltaX = -normDeltaY;
-                deltaY = -normDeltaX;
+                deltaX = normDeltaY;
+                deltaY = normDeltaX;
                 break;
             case 8: // Rotate 90 CCW
                 deltaX = -normDeltaY;
@@ -267,22 +267,28 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
                     else if (draggedCropHandle == 3) logicalCorner = 0; // Visual BL -> Logical TL
                     break;
                 case 5: // Rotate 90 CCW + flip horizontal
-                    if (draggedCropHandle == 0) logicalCorner = 2;      // Visual TL -> Logical BR
-                    else if (draggedCropHandle == 1) logicalCorner = 3; // Visual TR -> Logical BL
-                    else if (draggedCropHandle == 2) logicalCorner = 0; // Visual BR -> Logical TL
-                    else if (draggedCropHandle == 3) logicalCorner = 1; // Visual BL -> Logical TR
+                    if (draggedCropHandle == 0) logicalCorner = 2;      // Visual TL -> Logical TR
+                    else if (draggedCropHandle == 1) logicalCorner = 1; // Visual TR -> Logical BR
+                    else if (draggedCropHandle == 2) logicalCorner = 0; // Visual BR -> Logical BL
+                    else if (draggedCropHandle == 3) logicalCorner = 3; // Visual BL -> Logical TL
                     break;
                 case 6: // Rotate 90 CW
-                    logicalCorner = (draggedCropHandle + 1) % 4;
+                    if (draggedCropHandle == 0) logicalCorner = 3;      // Visual TL -> Logical BL
+                    else if (draggedCropHandle == 1) logicalCorner = 0; // Visual TR -> Logical TL
+                    else if (draggedCropHandle == 2) logicalCorner = 1; // Visual BR -> Logical TR
+                    else if (draggedCropHandle == 3) logicalCorner = 2; // Visual BL -> Logical BR
                     break;
                 case 7: // Rotate 90 CW + flip horizontal
-                    if (draggedCropHandle == 0) logicalCorner = 0;      // Visual TL -> Logical TL
-                    else if (draggedCropHandle == 1) logicalCorner = 3; // Visual TR -> Logical BL
-                    else if (draggedCropHandle == 2) logicalCorner = 2; // Visual BR -> Logical BR
-                    else if (draggedCropHandle == 3) logicalCorner = 1; // Visual BL -> Logical TR
+                    if (draggedCropHandle == 0) logicalCorner = 3;      // Visual TL -> Logical BR
+                    else if (draggedCropHandle == 1) logicalCorner = 0; // Visual TR -> Logical BL
+                    else if (draggedCropHandle == 2) logicalCorner = 1; // Visual BR -> Logical TL
+                    else if (draggedCropHandle == 3) logicalCorner = 2; // Visual BL -> Logical TR
                     break;
                 case 8: // Rotate 90 CCW
-                    logicalCorner = (draggedCropHandle + 3) % 4;
+                    if (draggedCropHandle == 0) logicalCorner = 1;      // Visual TL -> Logical TR
+                    else if (draggedCropHandle == 1) logicalCorner = 2; // Visual TR -> Logical BR
+                    else if (draggedCropHandle == 2) logicalCorner = 3; // Visual BR -> Logical BL
+                    else if (draggedCropHandle == 3) logicalCorner = 0; // Visual BL -> Logical TL
                     break;
             }
 

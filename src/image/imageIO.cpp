@@ -4,7 +4,9 @@
 #include "preferences.h"
 #include "lancir.h"
 
+#include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
+#include <OpenImageIO/imageio.h>
 #include <variant>
 #include <filesystem>
 #include <stdexcept>
@@ -158,6 +160,31 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
         finalBuf = &reorientedBuf;
 
     }
+
+    OIIO::ImageBuf borderImg;
+    if (param.border) {
+        // Add a border to the rendered image
+        int borderSize = (int)((float)finalBuf->spec().width * param.borderSize);
+        int newWidth = finalBuf->spec().width + (2 * borderSize);
+        int newHeight = finalBuf->spec().height + (2 * borderSize);
+        imgMeta.borderPercentage = param.borderSize;
+
+        OIIO::ImageSpec borderSpec = finalBuf->spec();
+        borderSpec.width = newWidth;
+        borderSpec.height = newHeight;
+        borderImg = OIIO::ImageBuf(borderSpec);
+        if (OIIO::ImageBufAlgo::fill(borderImg, param.borderColor)) {
+            if(OIIO::ImageBufAlgo::paste(borderImg, borderSize, borderSize, 0, 0, *finalBuf)) {
+                finalBuf = &borderImg;
+            } else {
+                LOG_ERROR("Unable to add image to border: {}", OIIO::geterror(true));
+            }
+        } else {
+            LOG_ERROR("Unable to add image border: {}", OIIO::geterror(true));
+        }
+    }
+
+
 
     if (param.format == 2) {
         // Jpeg Compression
@@ -689,6 +716,34 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
             img.setCrop();
             img.readMetaFromFile();
             img.intOCIOSet = ocioSet;
+            if (!img.imgParam.ocioName.empty() && !ocioSet.impOverwrite) {
+                // If there was ocio data in the image metadata
+                bool goodConfig = false;
+                std::vector<std::string> configList = ocioProc.getConfigNames();
+                for (int i = 0; i < configList.size(); i++) {
+                    if (img.imgParam.ocioName == configList[i]) {
+                        goodConfig = true;
+                        img.intOCIOSet.ocioConfig = i;
+                    }
+                }
+                if (goodConfig) {
+                    img.intOCIOSet.colorspace = img.imgParam.ocioColor;
+                    img.intOCIOSet.display = img.imgParam.ocioDisp;
+                    img.intOCIOSet.view = img.imgParam.ocioView;
+                    img.intOCIOSet.useDisplay = img.imgParam.useDisplay;
+                    img.intOCIOSet.inverse = img.imgParam.inverse;
+                } else {
+                    LOG_WARN("Unable to locate config used by image, falling back to current selected config!");
+                }
+
+            } else {
+                img.imgParam.ocioName = ocioProc.activeConfig()->config->getName();
+                img.imgParam.ocioColor = img.intOCIOSet.colorspace;
+                img.imgParam.ocioDisp = img.intOCIOSet.display;
+                img.imgParam.ocioView = img.intOCIOSet.view;
+                img.imgParam.useDisplay = img.intOCIOSet.useDisplay;
+                img.imgParam.inverse = img.intOCIOSet.inverse;
+            }
             ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
             img.imageLoaded = true;
             img.isDataRaw = true;
@@ -982,9 +1037,35 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
 
     // Read metadata
     img.readMetaFromFile();
-
-    // Process IDT
     img.intOCIOSet = ocioSet;
+    if (!img.imgParam.ocioName.empty() && !ocioSet.impOverwrite) {
+        // If there was ocio data in the image metadata
+        bool goodConfig = false;
+        std::vector<std::string> configList = ocioProc.getConfigNames();
+        for (int i = 0; i < configList.size(); i++) {
+            if (img.imgParam.ocioName == configList[i]) {
+                goodConfig = true;
+                img.intOCIOSet.ocioConfig = i;
+            }
+        }
+        if (goodConfig) {
+            img.intOCIOSet.colorspace = img.imgParam.ocioColor;
+            img.intOCIOSet.display = img.imgParam.ocioDisp;
+            img.intOCIOSet.view = img.imgParam.ocioView;
+            img.intOCIOSet.useDisplay = img.imgParam.useDisplay;
+            img.intOCIOSet.inverse = img.imgParam.inverse;
+        } else {
+            LOG_WARN("Unable to locate config used by image, falling back to current selected config!");
+        }
+
+    } else {
+        img.imgParam.ocioName = ocioProc.activeConfig()->config->getName();
+        img.imgParam.ocioColor = img.intOCIOSet.colorspace;
+        img.imgParam.ocioDisp = img.intOCIOSet.display;
+        img.imgParam.ocioView = img.intOCIOSet.view;
+        img.imgParam.useDisplay = img.intOCIOSet.useDisplay;
+        img.imgParam.inverse = img.intOCIOSet.inverse;
+    }
     ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
     img.imageLoaded = true;
     img.isDataRaw = false;

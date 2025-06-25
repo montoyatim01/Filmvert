@@ -7,6 +7,7 @@
 
 #include "logger.h"
 #include "preferences.h"
+#include "structs.h"
 #include "threadPool.h"
 
 #include "nlohmann/json.hpp"
@@ -62,6 +63,7 @@ class filmRoll {
     void saveSelected();
 
     // rollMeta.cpp
+    std::string getRollMetaString(bool pretty = false);
     bool exportRollMetaJSON();
     bool exportRollCSV();
     bool importRollMetaJSON(const std::string& jsonFile);
@@ -76,6 +78,9 @@ class filmRoll {
     void rollRedo();
     bool rollUAvail();
     bool rollRAvil();
+
+    // rollContactSheet.cpp
+    void generateContactSheet(int imageWidth, exportParam expParam);
 
 
 

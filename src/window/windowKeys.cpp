@@ -11,7 +11,7 @@ void mainWindow::checkHotkeys() {
     if (unsavedPopTrigger || globalMetaPopTrig ||
         localMetaPopTrig || preferencesPopTrig ||
         ackPopTrig || anaPopTrig || shortPopTrig ||
-        imMatchPopTrig) {
+        imMatchPopTrig || contactPopTrig) {
             // Don't handle any of the key combos
             // if we have windows open already!
             return;
@@ -133,8 +133,7 @@ void mainWindow::checkHotkeys() {
         // Preferences
         badOcioText = false;
         std::strcpy(ocioPath, appPrefs.prefs.ocioPath.c_str());
-        if (appPrefs.prefs.ocioExt)
-            ocioSel = 1;
+        ocioSel = ocioProc.selectedConfig;
         preferencesPopTrig = true;
         tmpPrefs = appPrefs.prefs;
     }

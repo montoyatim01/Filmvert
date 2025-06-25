@@ -49,12 +49,22 @@ struct imageParams {
     // This is the EXIF rotation value
     int rotation = 1;
 
+    // OCIO Config Info (For replicating IDT processing)
+    std::string ocioName;
+    int ocioColor = -1;
+    int ocioDisp = -1;
+    int ocioView = -1;
+    bool useDisplay = true;
+    bool inverse = false;
+
+
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(imageParams, sampleX, sampleY,
         blurAmount, baseColor, whitePoint, blackPoint, minX, minY,
         maxX, maxY, temp, tint, saturation, g_blackpoint, g_whitepoint, g_lift,
         g_gain, g_mult, g_offset, g_gamma, cropBoxX, cropBoxY,
         imageCropMinX, imageCropMinY, imageCropMaxX, imageCropMaxY,
-        cropEnable, arbitraryRotation, rotation);
+        cropEnable, arbitraryRotation, rotation,
+        ocioName, ocioColor, ocioDisp, ocioDisp, useDisplay, inverse);
 
     // == operator for determing if re-render is needed
     // So only parameters affecting image

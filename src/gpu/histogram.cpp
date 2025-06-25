@@ -13,9 +13,9 @@ void openglGPU::procHistIm(image* img) {
     }
     int hWidth = 0;
     int hHeight = 0;
-    getHistTexture(img, imgPixels, hWidth, hHeight);
-    updateHistPixels(img, imgPixels, histPixels, hWidth, hHeight, appPrefs.prefs.histInt);
-    setHistTexture(histPixels);
+    getHistTexture(img, m_imgPixels, hWidth, hHeight);
+    updateHistPixels(img, m_imgPixels, m_histPixels, hWidth, hHeight, appPrefs.prefs.histInt);
+    setHistTexture(m_histPixels);
     return;
 
 }

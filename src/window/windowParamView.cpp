@@ -256,16 +256,14 @@ void mainWindow::paramView() {
                     fps,
                     activeImage()->rawWidth, activeImage()->rawHeight,
                     activeImage()->width, activeImage()->height);
-                ImGui::SameLine();
-                ImGui::Text("ROTATION: %i", activeImage()->imgParam.rotation);
             }
-            ImGui::Checkbox("Proxy", &toggleProxy);
+            /*ImGui::Checkbox("Proxy", &toggleProxy);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(ImGui::GetWindowWidth() * 0.20);
             renderCall |= ImGui::SliderFloat("###pxy", &appPrefs.prefs.proxyRes, 0.05f, 0.8f);
-            ImGui::SameLine();
+            ImGui::SameLine();*/
             std::string statusText;
-            if (gpu->rendering)
+            if (gpu->m_rendering)
                 statusText += "Rendering... ";
             if(validIm() && activeRoll()->imagesLoading) {
                 if (statusText.empty())

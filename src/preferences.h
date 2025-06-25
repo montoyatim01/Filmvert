@@ -13,6 +13,8 @@
 
 struct preferenceSet {
 
+    // VISIBLE SETTINGS
+
     // Max Undo States
     int undoLevels = 200;
 
@@ -27,9 +29,6 @@ struct preferenceSet {
     // Mouse settings
     bool trackpadMode = false;
 
-    // Viewer Setting
-    int viewerSetting = 0;
-
     // Performance Mode
     bool perfMode = true;
     int maxRes = 3000;
@@ -43,14 +42,23 @@ struct preferenceSet {
 
     // OCIO
     std::string ocioPath;
-    bool ocioExt = false;
+    int ocioExt = 0;
 
+    // HIDDEN SETTINGS
     // Auto-sort on import
     bool autoSort = true;
 
+    // Resolution of proxy buffer
+    // (only buffer left when roll is unloaded)
     float proxyRes = 0.35f;
 
     unsigned long renderTimeout = 90000;
+
+    // Viewer Setting (0 for Linear, 1 for nearest)
+    int viewerSetting = 0;
+
+    // Contact Sheet border size
+    float contactSheetBorder = 0.02f;
 
 
 
@@ -58,7 +66,7 @@ struct preferenceSet {
         autoSave, autoSFreq, histInt, histEnable, trackpadMode,
         viewerSetting, perfMode, maxRes, rollTimeout, debayerMode,
         maxSimExports, ocioPath, ocioExt, autoSort, proxyRes,
-        renderTimeout);
+        renderTimeout, contactSheetBorder);
 };
 
 class userPreferences {

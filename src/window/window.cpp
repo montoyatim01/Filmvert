@@ -96,6 +96,13 @@ int mainWindow::openWindow()
     glfwWindowHint(GLFW_ALPHA_BITS, 16);
 
     //--------------------------------------------------------------//
+    //
+    // Clear all text buffers initially
+    std::memset(ackMsg, 0, sizeof(ackMsg));
+    std::memset(ackError, 0, sizeof(ackError));
+    std::memset(ocioPath, 0, sizeof(ocioPath));
+    std::memset(rollNameBuf, 0, sizeof(rollNameBuf));
+    std::memset(rollPath, 0, sizeof(rollPath));
 
 
     // Setup Dear ImGui context
@@ -108,6 +115,9 @@ int mainWindow::openWindow()
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+
+    // Initialize GL Processor
+    gpu = new openglGPU();
 
     //Font Loading
     auto fs = cmrc::assets::get_filesystem();
@@ -124,6 +134,7 @@ int mainWindow::openWindow()
         return -1;
     }
 
+    // Add macOS cmd + opt characters, add the fonts
     ImFontConfig font_cfg;
     font_cfg.FontDataOwnedByAtlas = false;
     ImVector<ImWchar> ranges;
@@ -141,32 +152,56 @@ int mainWindow::openWindow()
       return -1;
     }
 
-    auto ocioConfigFile = fs.open("assets/studio-config-v3.0.0_aces-v2.0_ocio-v2.4.ocio");
-    if (!ocioConfigFile) {
-        LOG_ERROR("Error opening OCIO Config!");
-        return -1;
-    }
-    std::string configStream(static_cast<const char*>(ocioConfigFile->begin()), int(ocioConfigFile->size()));
-    //LOG_INFO("OCIO Config: {}", configStream.str());
-    if (!ocioProc.initialize(configStream)) {
-        return -1;
+    // Load in OCIO Configs
+    bool validConfig = false;
+    auto ocioConfigFileA = fs.open("assets/studio-config-v3.0.0_aces-v2.0_ocio-v2.4.ocio");
+    if (!ocioConfigFileA) {
+        LOG_ERROR("Error opening ACES 2.0 OCIO Config!");
+    } else {
+        std::string configStreamA(static_cast<const char*>(ocioConfigFileA->begin()), int(ocioConfigFileA->size()));
+
+        if (!ocioProc.addConfig(configStreamA, "ACES 2.0")) {
+            LOG_ERROR("Failed to load ACES 2.0 Config!");
+        } else {
+            validConfig = true;
+        }
     }
 
-    // Initialize GL Processor
-    gpu = new openglGPU();
-    // Initialize GL Kernels
-    gpu->initialize(dispOCIO);
+    auto ocioConfigFileB = fs.open("assets/studio-config-v2.2.0_aces-v1.3_ocio-v2.3.ocio");
+    if (!ocioConfigFileB) {
+        LOG_ERROR("Error opening ACES 1.3 OCIO Config!");
+    } else {
+        std::string configStreamB(static_cast<const char*>(ocioConfigFileB->begin()), int(ocioConfigFileB->size()));
 
+        if (!ocioProc.addConfig(configStreamB, "ACES 1.3")) {
+            LOG_ERROR("Failed to load ACES 1.3 Config!");
+        } else {
+            validConfig = true;
+        }
+    }
 
     // Load in user preferences
     appPrefs.loadFromFile();
 
     if (!appPrefs.prefs.ocioPath.empty()) {
-        if (ocioProc.initAltConfig(appPrefs.prefs.ocioPath) && appPrefs.prefs.ocioExt) {
-            ocioProc.setExtActive();
-        } else {
-            ocioProc.setIntActive();
+        if (ocioProc.initExtConfig(appPrefs.prefs.ocioPath) && appPrefs.prefs.ocioExt == 2) {
+            ocioProc.setActiveConfig(-1);
+            validConfig = true;
         }
+    }
+
+    if (!validConfig) {
+        // We were not able to load a config
+        // from either the internal, nor external
+        // Show a warning to user that program
+        // will likely crash?
+        std::strcpy(ackMsg, "OCIO Initialization Error:");
+        std::strcpy(ackError, "Filmvert was unable to load in any valid OCIO config.\nThe program will not function properly.");
+        ackPopTrig = true;
+    } else {
+        ocioProc.setActiveConfig(appPrefs.prefs.ocioExt);
+        // Initialize GL Kernels
+        gpu->initialize(dispOCIO);
     }
 
     // Load in logo file
@@ -192,13 +227,6 @@ int mainWindow::openWindow()
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     imguistyle();
-
-    // Clear all text buffers initially
-    std::memset(ackMsg, 0, sizeof(ackMsg));
-    std::memset(ackError, 0, sizeof(ackError));
-    std::memset(ocioPath, 0, sizeof(ocioPath));
-    std::memset(rollNameBuf, 0, sizeof(rollNameBuf));
-    std::memset(rollPath, 0, sizeof(rollPath));
 
 
     // Main loop
@@ -241,8 +269,9 @@ int mainWindow::openWindow()
         }
 
         glfwPollEvents();
-        if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
-        {
+        if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0) {
+            // Sleep a little bit and skip the rest
+            // if we're not maximized
             ImGui_ImplGlfw_Sleep(10);
             continue;
         }
@@ -328,9 +357,11 @@ int mainWindow::openWindow()
         analyzePopup();
         importImMatchPopup();
         aboutPopup();
+        contactSheetPopup();
 
-        // Check analyze timeout?
 
+        // Frame counter for checking unsaved changes
+        // Checking only happens periodically
         loopCounter++;
 
         if (demoWin)
