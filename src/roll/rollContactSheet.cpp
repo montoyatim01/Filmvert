@@ -129,7 +129,11 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
 
         // Add text
         OIIO::ImageBufAlgo::render_text(bdrOIIOBuf[im], bdrWidth/2, rotImHeight + (3 * bottomBorderSize),
+            #ifdef linux
+            images[im].srcFilename, 52, "JetBrainsMono", 1.0f,
+            #else
             images[im].srcFilename, 52, "Arial", 1.0f,
+            #endif
             OIIO::ImageBufAlgo::TextAlignX::Center,
             OIIO::ImageBufAlgo::TextAlignY::Center);
     } // Single image loop
@@ -175,7 +179,11 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
 
     // Add title
     OIIO::ImageBufAlgo::render_text(finalBuf, imgBlkWidth/2, titleHeight/2,
+        #ifdef linux
+        rollName, 140, "JetBrainsMono", 1.0f,
+        #else
         rollName, 140, "Arial", 1.0f,
+        #endif
         OIIO::ImageBufAlgo::TextAlignX::Center,
         OIIO::ImageBufAlgo::TextAlignY::Center);
 
