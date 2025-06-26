@@ -36,16 +36,7 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
     float imageScale = appPrefs.prefs.proxyRes;
 
 
-    std::vector<float*> rawImgBuffers;
-    std::vector<OIIO::ImageSpec> rawImgSpec;
-    std::vector<OIIO::ImageBuf> rawOIIOBuf;
-    std::vector<OIIO::ImageBuf> orientedOIIOBuf;
-
-    std::vector<OIIO::ImageBuf*> oiioImages;
     std::vector<OIIO::ImageBuf> bdrOIIOBuf;
-    for (size_t i = 0; i < images.size(); i++) {
-        rawImgBuffers.push_back(nullptr);
-    }
 
     for (size_t im = 0; im < images.size(); im++) {
         // If using full buffer instead of proxy
@@ -53,77 +44,85 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
         int imgWidth = (int)((float)images[im].dispW * imageScale);
         int imgHeight = (int)((float)images[im].dispH * imageScale);
 
+        float* rawImgBuffer = nullptr;
+
         // Allocate image buffer
-        rawImgBuffers[im] = new float[imgWidth * imgHeight * 4];
+        rawImgBuffer = new float[imgWidth * imgHeight * 4];
 
         // Copy image buffer from texture
-        tmpGPU.copyFromTexFull(images[im].glTextureSm, imgWidth, imgHeight, rawImgBuffers[im]);
+        tmpGPU.copyFromTexFull(images[im].glTextureSm, imgWidth, imgHeight, rawImgBuffer);
 
-        if (rawImgBuffers[im] == nullptr) {
+        if (rawImgBuffer == nullptr) {
             // Something went wrong fetching the image buffer
             // move to next image
             LOG_ERROR("[CS] Unable to copy image data from GPU");
             continue;
         }
         // Create the image spec and image buf from the buffer
-        rawImgSpec.push_back(OIIO::ImageSpec(imgWidth, imgHeight, 4, OIIO::TypeDesc::FLOAT));
-        rawOIIOBuf.push_back(OIIO::ImageBuf(rawImgSpec[im], rawImgBuffers[im]));
+        OIIO::ImageSpec rawImgSpec(imgWidth, imgHeight, 4, OIIO::TypeDesc::FLOAT);
+        OIIO::ImageBuf rawOIIOBuf(rawImgSpec, rawImgBuffer);
+
+        OIIO::ImageBuf* oiioImage;
 
         // Apply the image's orientation
         if (expParam.csBakeRot == 0) {
             // Don't bake anything
-            oiioImages.push_back(&rawOIIOBuf[im]);
+            oiioImage = &rawOIIOBuf;
         } else if (expParam.csBakeRot == 1) {
             // Bake only operations that don't modify width/height
             if (images[im].imgParam.rotation == 2 ||
                 images[im].imgParam.rotation == 3 ||
                 images[im].imgParam.rotation == 4) {
-                    rawOIIOBuf[im].specmod()["Orientation"] = images[im].imgParam.rotation;
-                    orientedOIIOBuf.emplace_back(OIIO::ImageBuf());
-                    if (!OIIO::ImageBufAlgo::reorient(orientedOIIOBuf.back(), rawOIIOBuf[im])) {
+                    rawOIIOBuf.specmod()["Orientation"] = images[im].imgParam.rotation;
+                    OIIO::ImageBuf orientedOIIOBuf;
+                    if (!OIIO::ImageBufAlgo::reorient(orientedOIIOBuf, rawOIIOBuf)) {
                         LOG_ERROR("[CS] Failed to reorient image: {}", OIIO::geterror());
-                        oiioImages.push_back(&rawOIIOBuf[im]);
+                        oiioImage = &rawOIIOBuf;
                     } else {
-                        oiioImages.push_back(&orientedOIIOBuf.back());
+                        oiioImage = &orientedOIIOBuf;
                     }
                 } else {
-                    oiioImages.push_back(&rawOIIOBuf[im]);
+                    oiioImage = &rawOIIOBuf;
                 }
         } else {
             // Bake everything
-            rawOIIOBuf[im].specmod()["Orientation"] = images[im].imgParam.rotation;
-            orientedOIIOBuf.emplace_back(OIIO::ImageBuf());
-            if (!OIIO::ImageBufAlgo::reorient(orientedOIIOBuf.back(), rawOIIOBuf[im])) {
+            rawOIIOBuf.specmod()["Orientation"] = images[im].imgParam.rotation;
+            OIIO::ImageBuf orientedOIIOBuf;
+            if (!OIIO::ImageBufAlgo::reorient(orientedOIIOBuf, rawOIIOBuf)) {
                 LOG_ERROR("[CS] Failed to reorient image: {}", OIIO::geterror());
-                oiioImages.push_back(&rawOIIOBuf[im]);
+                oiioImage = &rawOIIOBuf;
             } else {
-                oiioImages.push_back(&orientedOIIOBuf.back());
+                oiioImage = &orientedOIIOBuf;
             }
         }
 
 
         // Calculate the border size
-        int rotImWidth = oiioImages[im]->spec().width;
-        int rotImHeight = oiioImages[im]->spec().height;
+        int rotImWidth = oiioImage->spec().width;
+        int rotImHeight = oiioImage->spec().height;
         int borderSize = (int)((float)rotImWidth * appPrefs.prefs.contactSheetBorder);
         int bottomBorderSize = (int)((float)rotImWidth * (appPrefs.prefs.contactSheetBorder * 0.125f) + ((float)imgWidth * 0.02f));
         int bdrWidth = rotImWidth + (2 * borderSize);
         int bdrHeight = rotImHeight + (6 * bottomBorderSize);
         // Create the larger image buffer
         OIIO::ImageSpec bdrSpec(bdrWidth, bdrHeight, 4, OIIO::TypeDesc::FLOAT);
-        bdrOIIOBuf.push_back(OIIO::ImageBuf(bdrSpec));
+        bdrOIIOBuf.emplace_back(OIIO::ImageBuf(bdrSpec));
 
         // Fill our border buffer and paste our image into it
         if (OIIO::ImageBufAlgo::fill(bdrOIIOBuf[im], {0.0f, 0.0f, 0.0f, 1.0f})) {
             // Success filling the border buffer
-            if (OIIO::ImageBufAlgo::paste(bdrOIIOBuf[im], borderSize, borderSize, 0, 0, *oiioImages[im])) {
+            if (OIIO::ImageBufAlgo::paste(bdrOIIOBuf[im], borderSize, borderSize, 0, 0, *oiioImage)) {
                 // Success copying our image over
             } else {
                 LOG_ERROR("[CS] Failed to paste image to border-buffer! {}", OIIO::geterror());
+                if (rawImgBuffer)
+                    delete [] rawImgBuffer;
                 continue;
             }
         } else {
             LOG_ERROR("[CS] Failed to fill border-buffer! {}", OIIO::geterror());
+            if (rawImgBuffer)
+                delete [] rawImgBuffer;
             continue;
         }
 
@@ -131,6 +130,8 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
         OIIO::ImageBufAlgo::render_text(bdrOIIOBuf[im], bdrWidth/2, rotImHeight + (3 * bottomBorderSize),
             #ifdef linux
             images[im].srcFilename, 52, "JetBrainsMono", 1.0f,
+            #elif defined WIN32
+            images[im].srcFilename, 52, "C:\\Windows\\Fonts\\arial.ttf", 1.0f,
             #else
             images[im].srcFilename, 52, "Arial", 1.0f,
             #endif
@@ -170,10 +171,6 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
 
     if (!OIIO::ImageBufAlgo::fill(finalBuf, {0.0f, 0.0f, 0.0f, 1.0f})) {
         LOG_ERROR("[CS] Failed to fill final image! {}", OIIO::geterror());
-        for (size_t i = 0; i < rawImgBuffers.size(); i++) {
-            if (rawImgBuffers[i] != nullptr)
-                delete [] rawImgBuffers[i];
-        }
         return;
     }
 
@@ -181,6 +178,8 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
     OIIO::ImageBufAlgo::render_text(finalBuf, imgBlkWidth/2, titleHeight/2,
         #ifdef linux
         rollName, 140, "JetBrainsMono", 1.0f,
+        #elif defined WIN32
+        rollName, 140, "C:\\Windows\\Fonts\\arial.ttf", 1.0f,
         #else
         rollName, 140, "Arial", 1.0f,
         #endif
@@ -200,10 +199,6 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
             // Paste in the image
             if (!OIIO::ImageBufAlgo::paste(finalBuf, xOffset, yOffset, 0, 0, bdrOIIOBuf[index])) {
                 LOG_ERROR("[CS] Failed to paste to final image. Bailing out! {}", OIIO::geterror());
-                for (size_t i = 0; i < rawImgBuffers.size(); i++) {
-                    if (rawImgBuffers[i] != nullptr)
-                        delete [] rawImgBuffers[i];
-                }
                 return;
             }
             // Up our xOffset based on the width
@@ -249,15 +244,6 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
     // Write final image
     if (!finalBuf.write(filePath, outFormat)) {
         LOG_ERROR("Failed to write image: {}", OIIO::geterror());
-        for (size_t i = 0; i < rawImgBuffers.size(); i++) {
-            if (rawImgBuffers[i] != nullptr)
-                delete [] rawImgBuffers[i];
-        }
         return;
-    }
-
-    for (size_t i = 0; i < rawImgBuffers.size(); i++) {
-        if (rawImgBuffers[i] != nullptr)
-            delete [] rawImgBuffers[i];
     }
 }
