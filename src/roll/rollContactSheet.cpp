@@ -115,14 +115,19 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
                 // Success copying our image over
             } else {
                 LOG_ERROR("[CS] Failed to paste image to border-buffer! {}", OIIO::geterror());
-                if (rawImgBuffer)
+                if (rawImgBuffer) {
                     delete [] rawImgBuffer;
+                    rawImgBuffer = nullptr;
+                }
+
                 continue;
             }
         } else {
             LOG_ERROR("[CS] Failed to fill border-buffer! {}", OIIO::geterror());
-            if (rawImgBuffer)
+            if (rawImgBuffer) {
                 delete [] rawImgBuffer;
+                rawImgBuffer = nullptr;
+            }
             continue;
         }
 
@@ -137,6 +142,10 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
             #endif
             OIIO::ImageBufAlgo::TextAlignX::Center,
             OIIO::ImageBufAlgo::TextAlignY::Center);
+        if (rawImgBuffer) {
+            delete [] rawImgBuffer;
+            rawImgBuffer = nullptr;
+        }
     } // Single image loop
 
     int rowCount = images.size() / imageWidth;
