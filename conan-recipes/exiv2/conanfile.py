@@ -200,7 +200,8 @@ class Exiv2Conan(ConanFile):
         # component exiv2lib
         self.cpp_info.components["exiv2lib"].set_property("cmake_target_name", "exiv2lib")
         self.cpp_info.components["exiv2lib"].libs = ["exiv2"]
-        self.cpp_info.components["exiv2lib"].requires = [ "libiconv::libiconv"]
+        if self.settings.os != "Windows":
+            self.cpp_info.components["exiv2lib"].requires = [ "libiconv::libiconv"]
         if self.options.with_png:
             self.cpp_info.components["exiv2lib"].requires.extend(["libpng::libpng", "zlib::zlib"])
         if self.options.with_curl:
