@@ -32,6 +32,9 @@ set -x
   ## For OpenColorIO V2.4.2
   conan export conan-recipes/opencolorio
 
+  ## Trying to circumvent a bug with Exiv2 builds on windows
+  conan export conan-recipes/exiv2
+
   mkdir -p $BUILD_DIR
   CONAN_CMAKE_SYSTEM_PROCESSOR=x86_64 conan install -if $BUILD_DIR \
     -pr:b default \
