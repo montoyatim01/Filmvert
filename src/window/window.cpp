@@ -209,7 +209,18 @@ int mainWindow::openWindow()
     if (!logoFile) {
         LOG_ERROR("Error opening Logo File!");
     } else {
-        loadLogoTexture(logoFile);
+
+        int w, h, c;
+        std::vector<uint8_t> pixels;
+        loadLogoImageData(logoFile, w, h,c, pixels);
+        if (!pixels.empty())
+        {
+            GLFWimage logoImg{ w, h, pixels.data()};
+        	glfwSetWindowIcon(window, 1, &logoImg);
+        }
+
+
+        loadLogoTexture(w, h, c, pixels);
     }
 
     // Load in licenses text

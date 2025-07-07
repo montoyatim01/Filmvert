@@ -248,7 +248,10 @@ class mainWindow
 
         // windowIO.cpp
         void setIni();
+        bool loadLogoImageData(std::optional<cmrc::file> logoIm, int& width, int& height, int& channels,
+                               std::vector<unsigned char>& pixels);
         void loadLogoTexture(std::optional<cmrc::file> logoIm);
+        void loadLogoTexture(int width, int height, int channels, const std::vector<unsigned char>& pixels);
         void openImages();
         bool openJSON();
         bool openImageMeta();
