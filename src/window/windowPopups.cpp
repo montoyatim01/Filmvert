@@ -5,6 +5,8 @@
 #include "preferences.h"
 #include "structs.h"
 #include "window.h"
+#include "releaseNotes.h"
+
 #include <algorithm>
 #include <cstring>
 #include <imgui.h>
@@ -79,11 +81,12 @@ void mainWindow::importIDTSetting() {
             ImGui::Combo("##VW", &importOCIO.view, ocioProc.activeConfig()->views[importOCIO.display].data(), ocioProc.activeConfig()->views[importOCIO.display].size());
             importOCIO.useDisplay = true;
         }
-        importOCIO.inverse = true;
+
         ImGui::Checkbox("Overwrite Existing Setting", &importOCIO.impOverwrite);
         ImGui::SetItemTooltip("Overrides any input colorspace previously set on an image.");
         ImGui::TreePop();
     }
+    importOCIO.inverse = true;
 
 
     ImGui::Separator();
@@ -1714,6 +1717,47 @@ void mainWindow::contactSheetPopup() {
             contactPopTrig = false;
             ImGui::CloseCurrentPopup();
         }
+        ImGui::Spacing();
+        ImGui::EndPopup();
+    }
+}
+
+
+void mainWindow::releaseNotesPopup() {
+    if (relNotesPopTrig)
+        ImGui::OpenPopup("Release Notes");
+    if (ImGui::BeginPopupModal("Release Notes", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+
+        float windowWidth = 720;
+        float windowHeight = 320;
+        ImGui::Dummy(ImVec2(windowWidth, 2));
+
+        ImGui::BeginChild("###RelN", ImVec2(windowWidth - 8, windowHeight));
+        ImGui::PushID("REL");
+        ImGui::SetWindowFontScale(0.75);
+
+        ImGui::PushFont(ft_header);
+        ImGui::Text("Version 1.1.1");
+        ImGui::PopFont();
+        ImGui::Text("%s", relNotes_1_1_1.c_str());
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        ImGui::PushFont(ft_header);
+        ImGui::Text("Version 1.1.0");
+        ImGui::PopFont();
+        ImGui::Text("%s", relNotes_1_1_0.c_str());
+        ImGui::Spacing();
+        ImGui::PopID();
+        ImGui::EndChild();
+
+        if (ImGui::Button("Okay") || ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            relNotesPopTrig = false;
+            ImGui::CloseCurrentPopup();
+        }
+
         ImGui::Spacing();
         ImGui::EndPopup();
     }

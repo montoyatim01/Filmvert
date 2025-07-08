@@ -60,13 +60,16 @@ struct preferenceSet {
     // Contact Sheet border size
     float contactSheetBorder = 0.02f;
 
+    // Version String
+    std::string verString;
+
 
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(preferenceSet, undoLevels,
         autoSave, autoSFreq, histInt, histEnable, trackpadMode,
         viewerSetting, perfMode, maxRes, rollTimeout, debayerMode,
         maxSimExports, ocioPath, ocioExt, autoSort, proxyRes,
-        renderTimeout, contactSheetBorder);
+        renderTimeout, contactSheetBorder, verString);
 };
 
 class userPreferences {
@@ -77,6 +80,7 @@ class userPreferences {
 
     void loadFromFile();
     void saveToFile();
+    bool displayReleaseNotes();
 
 
     bool tmpAutoSave = false;

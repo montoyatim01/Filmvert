@@ -11,7 +11,7 @@ void mainWindow::checkHotkeys() {
     if (unsavedPopTrigger || globalMetaPopTrig ||
         localMetaPopTrig || preferencesPopTrig ||
         ackPopTrig || anaPopTrig || shortPopTrig ||
-        imMatchPopTrig || contactPopTrig) {
+        imMatchPopTrig || contactPopTrig || relNotesPopTrig) {
             // Don't handle any of the key combos
             // if we have windows open already!
             return;

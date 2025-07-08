@@ -173,9 +173,10 @@ void image::padToRGBA() {
             for (int x=0; x<rawWidth; x++)
             {
                 int index = (y * rawWidth) + x;
-                procImgData[4 * index] = nChannels >= 1 ? rawImgData[nChannels * index] : 0.0f; // R channel
-                procImgData[4 * index + 1] = nChannels >= 2 ? rawImgData[nChannels * index + 1] : 0.0f; // G channel
-                procImgData[4 * index + 2] = nChannels >= 3 ? rawImgData[nChannels * index + 2] : 0.0f; // B channel
+                float rChan = nChannels >= 1 ? rawImgData[nChannels * index] : 0.0f;
+                procImgData[4 * index] = rChan; // R channel
+                procImgData[4 * index + 1] = nChannels >= 2 ? rawImgData[nChannels * index + 1] : rChan; // G channel
+                procImgData[4 * index + 2] = nChannels >= 3 ? rawImgData[nChannels * index + 2] : rChan; // B channel
                 procImgData[4 * index + 3] = nChannels >= 4 ? rawImgData[nChannels * index + 3] : 1.0f; // A channel
             }
         }

@@ -234,7 +234,10 @@ void mainWindow::exportImages() {
         expStart = std::chrono::steady_clock::now();
 
         std::vector<std::future<void>> futures;
-        ThreadPool expPool(appPrefs.prefs.maxSimExports);
+        int maxSimExp = appPrefs.prefs.maxSimExports;
+        maxSimExp = maxSimExp < 1 ? 4 : maxSimExp;
+        LOG_INFO("Starting export with {} threads", maxSimExp);
+        ThreadPool expPool(maxSimExp);
 
         for (int i = 0; i < activeRollSize(); i++) {
             futures.push_back(expPool.submit([this, i]() {
@@ -312,7 +315,10 @@ LOG_INFO("Exporting {} Files", exportImgCount);
         expStart = std::chrono::steady_clock::now();
 
         std::vector<std::future<void>> futures;
-        ThreadPool expPool(appPrefs.prefs.maxSimExports);
+        int maxSimExp = appPrefs.prefs.maxSimExports;
+        maxSimExp = maxSimExp < 1 ? 4 : maxSimExp;
+        LOG_INFO("Starting export with {} threads", maxSimExp);
+        ThreadPool expPool(maxSimExp);
         for (int r = 0; r < activeRolls.size(); r++) {
             if (activeRolls[r].selected) {
                 for (int i = 0; i < activeRolls[r].rollSize(); i++) {

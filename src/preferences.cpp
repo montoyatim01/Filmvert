@@ -2,6 +2,7 @@
 #include "preferences.h"
 #include "nlohmann/json.hpp"
 #include "logger.h"
+#include "structs.h"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -25,8 +26,11 @@ void userPreferences::loadFromFile() {
         if (prefObj.contains("Preferences")) {
             prefs = prefObj["Preferences"].get<preferenceSet>();
             tmpAutoSave = prefs.autoSave;
-            if (prefs.maxSimExports < 1)
+            if (prefs.maxSimExports < 1) {
                 prefs.maxSimExports = std::thread::hardware_concurrency();
+                prefs.maxSimExports = prefs.maxSimExports < 1 ? 4 : prefs.maxSimExports;
+            }
+
         }
     }  catch (const std::exception& e) {
         LOG_WARN("Unable to import preferences file: {}", e.what());
@@ -109,4 +113,26 @@ std::string userPreferences::getPrefFile() {
     return homeStr;
 
     #endif
+}
+
+//--- Display Release Notes ---//
+/*
+    Checks the user preferences string against the
+    app's current version. If the app is newer than
+    what the preferences string is, then save the
+    preferences with the updated version, and return
+    true to display the release notes
+*/
+bool userPreferences::displayReleaseNotes() {
+
+    std::string currentVersion = fmt::format("{}.{}.{}", VERMAJOR, VERMINOR, VERPATCH);
+    if (prefs.verString != currentVersion) {
+        // We have a new version, update the preferences
+        // and display the popup
+        prefs.verString = currentVersion;
+        saveToFile();
+        return true;
+    }
+
+    return false;
 }

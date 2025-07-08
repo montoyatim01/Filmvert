@@ -6,7 +6,7 @@
 
 #define VERMAJOR 1
 #define VERMINOR 1
-#define VERPATCH 0
+#define VERPATCH 1
 
 struct copyPaste {
 

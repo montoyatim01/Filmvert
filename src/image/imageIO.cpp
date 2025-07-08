@@ -276,7 +276,7 @@ bool image::debayerImage(bool fullRes, int quality) {
     rawImgData = new float[processedImage->width * processedImage->height * 4];
 
     // Convert to float (assuming 16-bit output)
-    if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
+    if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP) {
         unsigned int numThreads = 2;//std::thread::hardware_concurrency();
         numThreads = numThreads == 0 ? 2 : numThreads;
         // Create a vector of threads
@@ -294,9 +294,15 @@ bool image::debayerImage(bool fullRes, int quality) {
                 {
                     int index = ((y * processedImage->width) + x) * processedImage->colors;
                     pIn[0] = static_cast<float>(raw_data[index + 0]) / 65535.0f;
-                    pIn[1] = static_cast<float>(raw_data[index + 1]) / 65535.0f;
-                    pIn[2] = static_cast<float>(raw_data[index + 2]) / 65535.0f;
-                    ap0_to_ap1(pIn, pOut);
+                    pIn[1] = processedImage->colors > 1 ? static_cast<float>(raw_data[index + 1]) / 65535.0f : pIn[0];
+                    pIn[2] = processedImage->colors > 2 ? static_cast<float>(raw_data[index + 2]) / 65535.0f : pIn[0];
+                    if (processedImage->colors == 3)
+                        ap0_to_ap1(pIn, pOut);
+                    else {
+                        pOut[0] = pIn[0];
+                        pOut[1] = pIn[1];
+                        pOut[2] = pIn[2];
+                    }
                     rawImgData[index + 0] = pOut[0] * 2.0f;
                     rawImgData[index + 1] = pOut[1] * 2.0f;
                     rawImgData[index + 2] = pOut[2] * 2.0f;
@@ -670,12 +676,6 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
                                 pIn[c] = static_cast<float>(value) / maxValue;
                             }
                         }
-                        if (x == 0 && y == 0) {
-                            LOG_INFO("First pixel values:");
-                            for (int c = 0; c < img.nChannels; c++) {
-                                LOG_INFO("Channel {}: {}", c, pIn[c]);
-                            }
-                        }
 
                         // Apply 2.2 gamma correction
                         for (int c = 0; c < img.nChannels; c++) {
@@ -852,9 +852,8 @@ auto c1 = std::chrono::steady_clock::now();
     img.rawHeight = processedImage->height;
     img.nChannels = processedImage->colors;
     img.rawImgData = new float[img.width * img.height * 4];
-
     // Convert to float (assuming 16-bit output)
-    if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP && processedImage->colors == 3) {
+    if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP) {
         unsigned int numThreads = 2;//std::thread::hardware_concurrency();
         numThreads = numThreads == 0 ? 2 : numThreads;
         // Create a vector of threads
@@ -872,9 +871,15 @@ auto c1 = std::chrono::steady_clock::now();
                 {
                     int index = ((y * processedImage->width) + x) * processedImage->colors;
                     pIn[0] = static_cast<float>(raw_data[index + 0]) / 65535.0f;
-                    pIn[1] = static_cast<float>(raw_data[index + 1]) / 65535.0f;
-                    pIn[2] = static_cast<float>(raw_data[index + 2]) / 65535.0f;
-                    ap0_to_ap1(pIn, pOut);
+                    pIn[1] = processedImage->colors > 1 ? static_cast<float>(raw_data[index + 1]) / 65535.0f : pIn[0];
+                    pIn[2] = processedImage->colors > 2 ? static_cast<float>(raw_data[index + 2]) / 65535.0f : pIn[0];
+                    if (processedImage->colors == 3)
+                        ap0_to_ap1(pIn, pOut);
+                    else {
+                        pOut[0] = pIn[0];
+                        pOut[1] = pIn[1];
+                        pOut[2] = pIn[2];
+                    }
                     img.rawImgData[index + 0] = pOut[0] * 2.0f;
                     img.rawImgData[index + 1] = pOut[1] * 2.0f;
                     img.rawImgData[index + 2] = pOut[2] * 2.0f;

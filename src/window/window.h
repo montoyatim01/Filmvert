@@ -86,6 +86,8 @@ class mainWindow
         ImVec2 dispSize;
         ImVec2 scroll;
         bool draggingImageCrop = false;
+        ImFont* ft_text;
+        ImFont* ft_header;
 
         unsigned long long logoTex = 0;
 
@@ -141,6 +143,8 @@ class mainWindow
         bool imMatchPopTrig = false;
         bool aboutPopTrig = false;
         bool contactPopTrig = false;
+        bool relNotesPopTrig = false;
+
         bool ImMatchRoll = false;
         bool badOcioText = false;
         char ackMsg[512];
@@ -293,6 +297,7 @@ class mainWindow
         void importImMatchPopup();
         void aboutPopup();
         void contactSheetPopup();
+        void releaseNotesPopup();
 
         void copyIntoParams();
         void pasteIntoParams();

@@ -177,8 +177,14 @@ bool image::writeExpMeta(std::string filename) {
             "Exif.Image.ImageWidth",
             "Exif.Image.ImageLength",
             "Exif.Photo.PixelXDimension",
-            "Exif.Photo.PixelYDimension"
-
+            "Exif.Photo.PixelYDimension",
+            "Exif.Image.NewSubfileType",
+            "Exif.Image.ImageWidth",
+            "Exif.Image.ImageLength",
+            "Exif.Image.Compression",
+            "Exif.Image.DNGVersion",
+            "Exif.Image.DNGBackwardVersion",
+            "Exif.Image.DNGPrivateData"
         };
 
         // Selective copy of Exif data
