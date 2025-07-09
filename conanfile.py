@@ -55,6 +55,8 @@ class FilmvertConan(ConanFile):
         self.requires("exiv2/0.28.2")
         self.requires("glfw/3.4")
         self.requires("glew/2.2.0")
+        if (platform.system != "Windows"):
+            self.requires("libgphoto2/2.5.31")
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -70,3 +72,7 @@ class FilmvertConan(ConanFile):
         self.copy("imgui_demo.cpp", dst="bindings", src="res/src")
         self.copy("imgui_widgets.cpp", dst="bindings", src="res/src")
         self.copy("license*", dst="licenses", folder=True, ignore_case=True)
+        self.copy("libgphoto2.6.dylib", dst="lib", src="lib")
+        self.copy("libgphoto2_port.12.dylib", dst="lib", src="lib")
+        self.copy("*", dst="lib/libgphoto2_port", src="lib/libgphoto2_port")
+        self.copy("*", dst="lib/libgphoto2", src="lib/libgphoto2")

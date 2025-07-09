@@ -41,6 +41,11 @@
 #include "threadPool.h"
 #include "windowUtils.h"
 
+#if defined(__APPLE__) || defined(linux)
+#include "tether.h"
+#define TETHEREN 1
+#endif
+
 
 // Declared functions from macOSFile.mm
 std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canChooseDirectories = false);
@@ -86,6 +91,8 @@ class mainWindow
         ImVec2 dispSize;
         ImVec2 scroll;
         bool draggingImageCrop = false;
+        ImFont* ft_header;
+        ImFont* ft_control;
 
         unsigned long long logoTex = 0;
 
@@ -97,6 +104,7 @@ class mainWindow
         bool wantClose = false;
         bool uiChanges = false;
         image* prevIm;
+        image tetherPreview;
         preferenceSet tmpPrefs;
 
         int ratingFrameCount = 120;
@@ -115,6 +123,7 @@ class mainWindow
 
         // UI Toggles
         bool cropDisplay = true;
+        bool tetherImage = false;
         bool minMaxDisp = false;
         bool sampleVisible = false;
         bool gradeBypass = false;
@@ -141,6 +150,9 @@ class mainWindow
         bool imMatchPopTrig = false;
         bool aboutPopTrig = false;
         bool contactPopTrig = false;
+        bool tetherCamPop = false;
+        bool tetherRollPop = false;
+
         bool ImMatchRoll = false;
         bool badOcioText = false;
         char ackMsg[512];
@@ -210,7 +222,7 @@ class mainWindow
         // Views
         void menuBar();
         void imageView();
-        void windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteracting, bool &currentlyInteracting);
+        void windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteracting, bool &currentlyInteracting, float scale);
         void paramView();
         void thumbView();
 
@@ -296,6 +308,15 @@ class mainWindow
 
         void copyIntoParams();
         void pasteIntoParams();
+
+        // windowTether.cpp
+        #ifdef TETHEREN
+        void fvCamDispWidget(fvCamParam* param, fvTether* cam, std::string disp, bool sameLine = false);
+        void setupTetherImage();
+        void tetherCamPopup();
+        void tetherRollPopup();
+        void tetherSettings();
+        #endif
 };
 
 #endif

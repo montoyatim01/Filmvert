@@ -26,6 +26,9 @@ find_package(imgui REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(GLEW REQUIRED)
+if (NOT WIN32)
+    find_package(libgphoto2 REQUIRED)
+endif()
 
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
@@ -48,6 +51,9 @@ include_directories(src/roll)
 include_directories(src/state)
 include_directories(src/window)
 include_directories("${CMAKE_BINARY_DIR}/bindings")
+if (NOT WIN32)
+    include_directories(src/tether)
+endif()
 
 
 
@@ -99,7 +105,7 @@ file(GLOB_RECURSE ROLL_SRCS src/roll/*.cpp)
 file(GLOB_RECURSE STATE_SRCS src/state/*.cpp)
 file(GLOB_RECURSE WINDOW_SRCS src/window/*.cpp)
 
-
+file(GLOB_RECURSE TETHER_SRCS src/tether/*.cpp)
 
 
 set(FILMVERT_SRCS
@@ -118,10 +124,16 @@ set(FILMVERT_SRCS
     src/preferences.cpp
     src/fileIO.cpp
 )
+if (NOT WIN32)
+    set(FILMVERT_SRCS ${FILMVERT_SRCS}
+    ${TETHER_SRCS})
+endif()
 
 
 if (APPLE)
     set(CMAKE_MACOSX_RPATH ON)
+    set(CMAKE_INSTALL_RPATH "@executable_path/../Frameworks")
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
     add_executable(Filmvert MACOSX_BUNDLE ${FILMVERT_SRCS} src/macOSFile.mm)
     set_target_properties(Filmvert PROPERTIES
     BUNDLE True
@@ -157,7 +169,8 @@ if (APPLE)
                   libraw::libraw
                   OpenImageIO::OpenImageIO
                   OpenColorIO::OpenColorIO
-                  exiv2::exiv2)
+                  exiv2::exiv2
+                  libgphoto2::libgphoto2)
 elseif (WIN32)
     add_executable(Filmvert WIN32 ${FILMVERT_SRCS} Icon/resources.rc)
     target_link_libraries(Filmvert wsock32 ws2_32 GDI32 USER32 gdiplus Crypt32 Wldap32
@@ -183,7 +196,8 @@ elseif (UNIX)
         libraw::libraw
         OpenImageIO::OpenImageIO
         OpenColorIO::OpenColorIO
-        exiv2::exiv2)
+        exiv2::exiv2
+        libgphoto2::libgphoto2)
 endif()
 
 target_compile_definitions(Filmvert PRIVATE
@@ -191,3 +205,20 @@ target_compile_definitions(Filmvert PRIVATE
     BUILD_DATE="${BUILD_DATE}"
     GIT_COMMIT_HASH="${GIT_COMMIT_HASH}"
 )
+
+if (APPLE)
+
+    add_custom_command(TARGET Filmvert
+                    POST_BUILD
+
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${CMAKE_BINARY_DIR}/lib/"
+                    "${CMAKE_BINARY_DIR}/bin/Filmvert.app/Contents/Frameworks/"
+
+                    COMMAND find "${CMAKE_BINARY_DIR}/bin/Filmvert.app/Contents/Frameworks/libgphoto2_port" -type f -exec install_name_tool -change /lib/libgphoto2.6.dylib @rpath/libgphoto2.6.dylib {} "\\$<SEMICOLON>"
+                    COMMAND find "${CMAKE_BINARY_DIR}/bin/Filmvert.app/Contents/Frameworks/libgphoto2_port" -type f -exec install_name_tool -change /lib/libgphoto2_port.12.dylib @rpath/libgphoto2_port.12.dylib {} "\\$<SEMICOLON>"
+
+                    COMMAND find "${CMAKE_BINARY_DIR}/bin/Filmvert.app/Contents/Frameworks/libgphoto2" -type f -exec install_name_tool -change /lib/libgphoto2.6.dylib @rpath/libgphoto2.6.dylib {} "\\$<SEMICOLON>"
+                    COMMAND find "${CMAKE_BINARY_DIR}/bin/Filmvert.app/Contents/Frameworks/libgphoto2" -type f -exec install_name_tool -change /lib/libgphoto2_port.12.dylib @rpath/libgphoto2_port.12.dylib {} "\\$<SEMICOLON>"
+)
+endif()

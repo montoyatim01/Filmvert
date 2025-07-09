@@ -98,6 +98,8 @@ class openglGPU {
         void getHistTexture(image* _img, float*& pixels, int &width, int &height);
         void setHistTexture(float* pixels);
 
+        void tetherTexture(image* _image);
+
     private:
         OCIO::OpenGLBuilderRcPtr m_ocioBuilder;
 

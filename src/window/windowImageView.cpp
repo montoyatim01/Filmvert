@@ -23,7 +23,18 @@ void mainWindow::imageView() {
 
     ImGui::Begin("Image Display", 0, winFlags);
     imageWinSize = ImGui::GetWindowSize();
+
     if (validIm()) {
+        // Calculate base scale to fit image in window
+        float baseScale;
+        int iWidth = activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ? activeImage()->height : activeImage()->width;
+        int iHeight = activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ? activeImage()->width : activeImage()->height;
+        float scaleX = ImGui::GetWindowSize().x / (iWidth + ((float)iWidth * 0.01f));
+        float scaleY = ImGui::GetWindowSize().y / (iHeight + ((float)iHeight * 0.01f));
+        baseScale = scaleX > scaleY ? scaleY : scaleX;
+
+        // Apply relative zoom on top of base scale
+        float actualScale = baseScale * dispScale;
         // Pre-calc
         int displayWidth, displayHeight;
         if (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ||
@@ -42,8 +53,12 @@ void mainWindow::imageView() {
             displayHeight = (int)((float)displayHeight * appPrefs.prefs.proxyRes);
             effecDisp = dispScale / appPrefs.prefs.proxyRes;
         }
-        dispSize = ImVec2(effecDisp * displayWidth,
-                        effecDisp * displayHeight);
+        float effectiveScale = actualScale;
+        if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading) {
+        } else {
+            effectiveScale = actualScale / appPrefs.prefs.proxyRes;
+        }
+        dispSize = ImVec2(effectiveScale * displayWidth, effectiveScale * displayHeight);
 
         cursorPos.x = (ImGui::GetWindowSize().x - dispSize.x) * 0.5f;
         cursorPos.y = (ImGui::GetWindowSize().y - dispSize.y) * 0.5f;
@@ -154,8 +169,8 @@ void mainWindow::imageView() {
                                  activeImage()->width, activeImage()->height);
 
             // Calculate screen positions with proper scroll offset
-            cropBoxScreen[i].x = imagePos.x + transformedX * dispScale;
-            cropBoxScreen[i].y = imagePos.y + transformedY * dispScale;
+            cropBoxScreen[i].x = imagePos.x + transformedX * actualScale;
+            cropBoxScreen[i].y = imagePos.y + transformedY * actualScale;
 
         }
 
@@ -165,7 +180,7 @@ void mainWindow::imageView() {
         float lineThickness = 2.0f;
 
         // Draw the lines connecting the corners - connect in order: top-left, top-right, bottom-right, bottom-left
-        if (cropDisplay && !cropVisible && !activeImage()->imgParam.cropEnable) {
+        if (cropDisplay && !cropVisible && !activeImage()->imgParam.cropEnable && !tetherImage) {
             drawList->AddLine(cropBoxScreen[0], cropBoxScreen[1], lineColor, lineThickness); // Top line
             drawList->AddLine(cropBoxScreen[1], cropBoxScreen[2], lineColor, lineThickness); // Right line
             drawList->AddLine(cropBoxScreen[2], cropBoxScreen[3], lineColor, lineThickness); // Bottom line
@@ -195,7 +210,7 @@ void mainWindow::imageView() {
             bool handleHovered = distSq <= (handleRadius * handleRadius);
 
             // Draw the handle with appropriate color
-            if (cropDisplay && !cropVisible && !activeImage()->imgParam.cropEnable) {
+            if (cropDisplay && !cropVisible && !activeImage()->imgParam.cropEnable && !tetherImage) {
                 drawList->AddCircleFilled(
                     cropBoxScreen[i],
                     handleRadius,
@@ -228,11 +243,11 @@ void mainWindow::imageView() {
                                          activeImage()->width, activeImage()->height);
 
                     ImVec2 minPoint;
-                    minPoint.x = imagePos.x + (float)minX * dispScale;
-                    minPoint.y = imagePos.y + (float)minY * dispScale;
+                    minPoint.x = imagePos.x + (float)minX * actualScale;
+                    minPoint.y = imagePos.y + (float)minY * actualScale;
                     ImVec2 maxPoint;
-                    maxPoint.x = imagePos.x + (float)maxX * dispScale;
-                    maxPoint.y = imagePos.y + (float)maxY * dispScale;
+                    maxPoint.x = imagePos.x + (float)maxX * actualScale;
+                    maxPoint.y = imagePos.y + (float)maxY * actualScale;
                     float pointRadius = 8.0f;
 
                     // Check if mouse is hovering
@@ -274,8 +289,8 @@ void mainWindow::imageView() {
 
                 // Convert to image space (rotated)
                 ImVec2 newPosRotated;
-                newPosRotated.x = (mousePos.x - imagePos.x) / dispScale;
-                newPosRotated.y = (mousePos.y - imagePos.y) / dispScale;
+                newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
+                newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
 
                 // Constrain to rotated images boundaries
                 int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
@@ -312,8 +327,8 @@ void mainWindow::imageView() {
                 ImVec2 mousePos = ImGui::GetIO().MousePos;
                 // Convert to image space (rotated)
                 ImVec2 newPosRotated;
-                newPosRotated.x = (mousePos.x - imagePos.x) / dispScale;
-                newPosRotated.y = (mousePos.y - imagePos.y) / dispScale;
+                newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
+                newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
                 // Constrain to rotated images boundaries
                 int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
                                     activeImage()->height : activeImage()->width;
@@ -348,8 +363,8 @@ void mainWindow::imageView() {
                 ImVec2 mousePos = ImGui::GetIO().MousePos;
                 // Convert to image space (rotated)
                 ImVec2 newPosRotated;
-                newPosRotated.x = (mousePos.x - imagePos.x) / dispScale;
-                newPosRotated.y = (mousePos.y - imagePos.y) / dispScale;
+                newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
+                newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
                 // Constrain to rotated images boundaries
                 int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
                                     activeImage()->height : activeImage()->width;
@@ -394,8 +409,8 @@ void mainWindow::imageView() {
 
             // Convert to rotated image coordinates
             ImVec2 mousePosInRotatedImage;
-            mousePosInRotatedImage.x = (mousePos.x - imagePos.x) / dispScale;
-            mousePosInRotatedImage.y = (mousePos.y - imagePos.y) / dispScale;
+            mousePosInRotatedImage.x = (mousePos.x - imagePos.x) / actualScale;
+            mousePosInRotatedImage.y = (mousePos.y - imagePos.y) / actualScale;
 
             // Convert from rotated to original image coordinates
             ImVec2 mousePosInImage = mousePosInRotatedImage;
@@ -413,7 +428,8 @@ void mainWindow::imageView() {
             mousePosInImage.y = ImClamp(mousePosInImage.y, 0.0f, (float)activeImage()->height);
 
             // Start selection when mouse is clicked while holding Ctrl+Shift
-            if (ctrlShiftPressed && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !isSelecting && !dragging && !cropVisible) {
+            if (ctrlShiftPressed && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !isSelecting &&
+                !dragging && !cropVisible && !activeImage()->imgParam.cropEnable) {
                 isSelecting = true;
                 selectionStart = mousePosInImage;  // This is in original image coordinates
                 selectionEnd = selectionStart;     // Initialize end position as same as start
@@ -456,7 +472,8 @@ void mainWindow::imageView() {
 
         // Draw the selection rectangle if actively selecting
         if (validIm()){
-            if (((isSelecting && ctrlShiftPressed ) || sampleVisible) && !cropVisible) {
+            if (((isSelecting && ctrlShiftPressed ) || sampleVisible) &&
+                !cropVisible && !activeImage()->imgParam.cropEnable) {
                 // Get selection coordinates in original image space
                 int stX = activeImage()->imgParam.sampleX[0] * activeImage()->width;
                 int stY = activeImage()->imgParam.sampleY[0] * activeImage()->height;
@@ -476,10 +493,10 @@ void mainWindow::imageView() {
 
                 // Convert to screen coordinates
                 ImVec2 selStartScreen, selEndScreen;
-                selStartScreen.x = imagePos.x + rotStX * dispScale;
-                selStartScreen.y = imagePos.y + rotStY * dispScale;
-                selEndScreen.x = imagePos.x + rotEdX * dispScale;
-                selEndScreen.y = imagePos.y + rotEdY * dispScale;
+                selStartScreen.x = imagePos.x + rotStX * actualScale;
+                selStartScreen.y = imagePos.y + rotStY * actualScale;
+                selEndScreen.x = imagePos.x + rotEdX * actualScale;
+                selEndScreen.y = imagePos.y + rotEdY * actualScale;
 
                 // Draw selection rectangle
                 ImU32 selectionColor = IM_COL32(0, 255, 255, 128); // Cyan with transparency
@@ -491,7 +508,7 @@ void mainWindow::imageView() {
         }
 
         // Handle the cropping
-        windowCrop(imagePos, dragging, isInteracting, currentlyInteracting);
+        windowCrop(imagePos, dragging, isInteracting, currentlyInteracting, actualScale);
 
 
         // Controls for panning and zooming the image
@@ -515,10 +532,12 @@ void mainWindow::imageView() {
                 // Adjust scale factor
                 float prevScale = dispScale;
                 dispScale = dispScale * pow(1.05f, ImGui::GetIO().MouseWheel);
-
-                // Clamp the scale
+                // Clamp the relative scale
                 if (dispScale < 0.1f) dispScale = 0.1f;
                 if (dispScale > 30.0f) dispScale = 30.0f;
+
+                // Recalculate actual scale
+                actualScale = baseScale * dispScale;
 
                 // Calculate new display size
                 dispSize = ImVec2(dispScale * activeImage()->width,
@@ -558,7 +577,8 @@ void mainWindow::imageView() {
                 float scaleX = ImGui::GetWindowSize().x / (iWidth + ((float)iWidth * 0.01f));
                 float scaleY = ImGui::GetWindowSize().y / (iHeight + ((float)iHeight * 0.01f));
 
-                dispScale = scaleX > scaleY ? scaleY : scaleX;
+                dispScale = 0.98f;
+                actualScale = baseScale * dispScale;
                 currentlyInteracting = true;
                 firstImage = false;
             }

@@ -55,6 +55,7 @@ struct image {
 
     bool isRawImage = false;
     bool isDataRaw = false;
+    bool isTetherLive = false;
 
     // Filenames/paths
     std::string srcFilename;
@@ -145,7 +146,7 @@ struct image {
     void rotRight();
     void flipV();
     void flipH();
-    void setCrop();
+    void setCrop(float buffer = 0.1f);
 
 
     // imageProcessing.cpp

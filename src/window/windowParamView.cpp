@@ -1,4 +1,5 @@
 #include "preferences.h"
+#include "tether.h"
 #include "window.h"
 #include "windowUtils.h"
 #include <imgui.h>
@@ -108,9 +109,23 @@ void mainWindow::paramView() {
             }
 
             ImGui::Separator();
+            // Tether Controls
+            #ifdef TETHEREN
+            if (gblTether.connected) {
+                if (ImGui::TreeNode("Camera Settings")) {
+                    // Call the tether panel
+                    tetherSettings();
+                    ImGui::TreePop();
+                    ImGui::Spacing();
+                }
+            }
+            #endif
 
             /* INVERSION PARAMS */
             if (validIm()) {
+                #ifdef TETHEREN
+                    if (!activeImage()->isTetherLive) {
+                #endif
                 ImGui::SetNextItemOpen(true, ImGuiCond_Once);
                 if (ImGui::TreeNode("Analysis")) {
 
@@ -156,12 +171,18 @@ void mainWindow::paramView() {
                     ImGui::TreePop();
                     ImGui::Spacing();
                 }
+                #ifdef TETHEREN
+                    }
+                #endif
             }
 
 
 
             /* GRADE PARAMS */
             if (validIm()) {
+                #ifdef TETHEREN
+                    if (!activeImage()->isTetherLive) {
+                #endif
                 ImGui::Separator();
                 if (ImGui::TreeNode("Grade")) {
                     ImGui::Text("Temperature");
@@ -221,7 +242,11 @@ void mainWindow::paramView() {
                     ImGui::TreePop();
                     ImGui::Spacing();
                 }
-            }
+                #ifdef TETHEREN
+                    }
+                #endif
+            } // Grade Params
+
 
         } ImGui::EndChild();
 

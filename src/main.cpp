@@ -2,6 +2,7 @@
 
 #include "logger.h"
 #include "window.h"
+#include "tether.h"
 
 #if defined (WIN32)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -21,6 +22,10 @@ int main(void)
     // Initialize Metal/CUDA Subsystem
     //metalGPU metalSubsystem;
 
+    // Tether testing
+    gblTether.initialize();
+    gblTether.detectCameras();
+
     // Start Window
     mainWindow window;
     //window.setGPU(&metalSubsystem);
@@ -28,6 +33,15 @@ int main(void)
 
 }
 
+// - Make it so images scale the same
+// -- Want it so that swapping between images maintains
+// -- the same zoom level/position
+
+/* 20250703
+- Disable base color selection when crop is enabled
+- Image viewer maintains scale between images
+- Addressed issue where images would import with incorrect colorspace settings
+*/
 
 /* 20250625
 - Revamped OCIO backend

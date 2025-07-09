@@ -6,6 +6,10 @@
 #include "preferences.h"
 #include "structs.h"
 
+#if defined(__APPLE__) || defined(linux)
+#include "tether.h"
+#endif
+
 #include <GLFW/glfw3.h>
 #include <cmath>
 
@@ -529,7 +533,19 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
         return; //We don't have our buffers yet
     if (!_image->rawImgData)
         return;
-
+#if defined(__APPLE__) || defined(linux)
+if (_image->isTetherLive) {
+    gblTether.imMutex.lock();
+    tetherTexture(_image);
+    copyToTex(_image->glTexture, _image->width, _image->height, _image->rawImgData);
+    //copyToTex(_image->glTextureSm, _image->width, _image->height, _image->rawImgData);
+    _image->dispW = _image->width;
+    _image->dispH = _image->height;
+    //procHistIm(_image);
+    gblTether.imMutex.unlock();
+    return;
+}
+#endif
     auto start = std::chrono::steady_clock::now();
     while(glGetError() != GL_NO_ERROR){} // Clear any errors from previous
 
@@ -678,6 +694,70 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     checkError("Clearing post-render");
 
     return;
+}
+
+void openglGPU::tetherTexture(image* _image) {
+    if (!_image)
+        return;
+    // Create output texture with cropped dimensions
+    if (_image->glTexture == 0 || !glIsTexture(_image->glTexture)) {
+        glGenTextures(1, (GLuint*)&_image->glTexture);
+        glBindTexture(GL_TEXTURE_2D, _image->glTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, _image->width, _image->height,
+                     0, GL_RGBA, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        checkError("Creating Output Texture");
+    } else {
+        glBindTexture(GL_TEXTURE_2D, _image->glTexture);
+        int oWidth, oHeight;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
+        checkError("Querying Output Texture");
+
+        if (oWidth != _image->width || oHeight != _image->height) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, _image->width, _image->height,
+                         0, GL_RGBA, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            checkError("Resizing Output Texture");
+        }
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Small Texture
+    if (_image->glTextureSm == 0 || !glIsTexture(_image->glTextureSm)) {
+        glGenTextures(1, (GLuint*)&_image->glTextureSm);
+        glBindTexture(GL_TEXTURE_2D, _image->glTextureSm);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, _image->width, _image->height,
+                     0, GL_RGBA, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        checkError("Creating Output Texture");
+    } else {
+        glBindTexture(GL_TEXTURE_2D, _image->glTextureSm);
+        int oWidth, oHeight;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
+        checkError("Querying Output Texture");
+
+        if (oWidth != _image->width || oHeight != _image->height) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, _image->width, _image->height,
+                         0, GL_RGBA, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            checkError("Resizing Output Texture");
+        }
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 

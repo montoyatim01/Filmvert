@@ -5,7 +5,7 @@
 // TODO:
 // -- Implement application for image EXIF rotation (strip meta)
 
-void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteracting, bool &currentlyInteracting) {
+void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteracting, bool &currentlyInteracting, float scale) {
     // Variables for rectangular crop handling
     //draggingImageCrop = false;
     static int draggedCropHandle = -1; // 0-3 for corners, 4 for entire rectangle
@@ -88,8 +88,8 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
     // Convert to screen coordinates (no rotation applied to crop box)
     ImVec2 cropCornersScreen[4];
     for (int i = 0; i < 4; i++) {
-        cropCornersScreen[i].x = imagePos.x + exifTransformedCorners[i].x * displayWidth * dispScale;
-        cropCornersScreen[i].y = imagePos.y + exifTransformedCorners[i].y * displayHeight * dispScale;
+        cropCornersScreen[i].x = imagePos.x + exifTransformedCorners[i].x * displayWidth * scale;
+        cropCornersScreen[i].y = imagePos.y + exifTransformedCorners[i].y * displayHeight * scale;
     }
 
     // Draw the crop rectangle
@@ -180,8 +180,8 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
         float screenDeltaY = currentMouse.y - dragStartMouse.y;
 
         // Convert to normalized coordinates
-        float normDeltaX = screenDeltaX / (displayWidth * dispScale);
-        float normDeltaY = screenDeltaY / (displayHeight * dispScale);
+        float normDeltaX = screenDeltaX / (displayWidth * scale);
+        float normDeltaY = screenDeltaY / (displayHeight * scale);
 
         // Apply inverse EXIF transformation to get delta in original image space
         float deltaX = normDeltaX;

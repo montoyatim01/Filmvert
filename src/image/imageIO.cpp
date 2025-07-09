@@ -1034,7 +1034,7 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
     if (appPrefs.prefs.perfMode)
         img.resizeProxy();
     img.setCrop();
-
+//TODO: FIX THIS BIG PROBLEM!
     // Read metadata
     img.readMetaFromFile();
     img.intOCIOSet = ocioSet;

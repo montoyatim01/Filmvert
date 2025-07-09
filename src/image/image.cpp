@@ -111,18 +111,19 @@ void image::flipH() {
 /*
     Set the initial crop state for an image
 */
-void image::setCrop() {
-    imgParam.cropBoxX[0] = 0.1;
-    imgParam.cropBoxY[0] = 0.1;
+void image::setCrop(float buffer) {
+    buffer = std::clamp(buffer, 0.0f, 1.0f);
+    imgParam.cropBoxX[0] = buffer;
+    imgParam.cropBoxY[0] = buffer;
 
-    imgParam.cropBoxX[1] = 0.9;
-    imgParam.cropBoxY[1] = 0.1;
+    imgParam.cropBoxX[1] = 1.0 - buffer;
+    imgParam.cropBoxY[1] = buffer;
 
-    imgParam.cropBoxX[2] = 0.9;
-    imgParam.cropBoxY[2] = 0.9;
+    imgParam.cropBoxX[2] = 1.0 - buffer;
+    imgParam.cropBoxY[2] = 1.0 - buffer;
 
-    imgParam.cropBoxX[3] = 0.1;
-    imgParam.cropBoxY[3] = 0.9;
+    imgParam.cropBoxX[3] = buffer;
+    imgParam.cropBoxY[3] = 1.0 - buffer;
 }
 
 //---Image to Param---//

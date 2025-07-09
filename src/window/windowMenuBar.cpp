@@ -3,6 +3,7 @@
 #include "ocioProcessor.h"
 #include "preferences.h"
 #include "structs.h"
+#include "tether.h"
 #include "window.h"
 #include <cstring>
 #include <imgui.h>
@@ -315,6 +316,19 @@ void mainWindow::menuBar() {
             }
             ImGui::EndMenu();
         }
+        #ifdef TETHEREN
+        if (ImGui::BeginMenu("Tether")) {
+            if (ImGui::MenuItem("Open Camera List")) {
+                tetherCamPop = true;
+                gblTether.detectCameras();
+            }
+            if (ImGui::MenuItem("Add Empty Roll")) {
+                tetherRollPop = true;
+            }
+
+            ImGui::EndMenu();
+        }
+        #endif
 
         if (ImGui::BeginMenu("Help")) {
             if (ImGui::MenuItem("Keyboard Shortcuts")) {
@@ -324,6 +338,19 @@ void mainWindow::menuBar() {
             if (ImGui::MenuItem("About")) {
                 aboutPopTrig = true;
             }
+
+            #ifdef DEBUG
+            if (demoWin) {
+                if (ImGui::MenuItem("Hide ImGui Demo")) {
+                    demoWin = false;
+                }
+            } else {
+                if (ImGui::MenuItem("Show ImGui Demo")) {
+                    demoWin = true;
+                }
+            }
+
+            #endif
 
             ImGui::EndMenu();
         }

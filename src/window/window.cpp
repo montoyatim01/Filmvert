@@ -134,8 +134,29 @@ int mainWindow::openWindow()
         return -1;
     }
 
+    // Setup High DPI Scaling
+    // credit to: https://github.com/ocornut/imgui/issues/6967#issuecomment-2833882081
+    ImVec2 content_scale;
+    int framebuffer_size_in_pixels_x;
+    int framebuffer_size_in_pixels_y;
+    ImVec2 imgui_coord_scale;
+    int window_size_in_points_x;
+    int window_size_in_points_y;
+    glfwGetWindowContentScale(window, &content_scale.x, &content_scale.y);
+    glfwGetFramebufferSize(window, &framebuffer_size_in_pixels_x, &framebuffer_size_in_pixels_y);
+    glfwGetWindowSize(window, &window_size_in_points_x, &window_size_in_points_y);
+    imgui_coord_scale.x = (float)framebuffer_size_in_pixels_x / window_size_in_points_x;
+    imgui_coord_scale.y = (float)framebuffer_size_in_pixels_y / window_size_in_points_y;
+    float sx = content_scale.x / imgui_coord_scale.x;
+    float sy = content_scale.y / imgui_coord_scale.y;
+
+    float imgui_additional_scale = std::max(sx, sy);
+    float fontScale = 18.0;// * imgui_additional_scale;
+    fontScale = std::floor(fontScale);
+
     // Add macOS cmd + opt characters, add the fonts
     ImFontConfig font_cfg;
+    //font_cfg.RasterizerDensity = std::max(imgui_coord_scale.x, imgui_coord_scale.y);
     font_cfg.FontDataOwnedByAtlas = false;
     ImVector<ImWchar> ranges;
     ImFontGlyphRangesBuilder builder;
@@ -143,14 +164,18 @@ int mainWindow::openWindow()
     builder.AddChar(0x2325);
     builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
     builder.BuildRanges(&ranges);
-    ImFont* ft_text = io.Fonts->AddFontFromMemoryTTF((void*)(regularFont->begin()), int(regularFont->size()), 18.0f, &font_cfg, ranges.Data);
-    ImFont* ft_header = io.Fonts->AddFontFromMemoryTTF((void*)(boldFont->begin()), int(boldFont->size()), 20.0f, &font_cfg, ranges.Data);
+    ImFont* ft_text = io.Fonts->AddFontFromMemoryTTF((void*)(regularFont->begin()), int(regularFont->size()), fontScale, &font_cfg, ranges.Data);
+    ft_header = io.Fonts->AddFontFromMemoryTTF((void*)(boldFont->begin()), int(boldFont->size()), fontScale, &font_cfg, ranges.Data);
+    ft_control = io.Fonts->AddFontFromMemoryTTF((void*)(regularFont->begin()), int(regularFont->size()), fontScale, &font_cfg, ranges.Data);
 
     if (!ft_text || !ft_header)
     {
       LOG_ERROR("Failed to load fonts for window");
       return -1;
     }
+    // Scale sizes
+    //ImGui::GetStyle() = style_backup;
+    //ImGui::GetStyle().ScaleAllSizes(imgui_additional_scale);
 
     // Load in OCIO Configs
     bool validConfig = false;
@@ -222,6 +247,9 @@ int mainWindow::openWindow()
 
     // Set ini location
     //setIni();
+
+    // Setup out Tether image
+    setupTetherImage();
 
 
     // Setup Dear ImGui style
@@ -358,6 +386,10 @@ int mainWindow::openWindow()
         importImMatchPopup();
         aboutPopup();
         contactSheetPopup();
+        #ifdef TETHEREN
+        tetherCamPopup();
+        tetherRollPopup();
+        #endif
 
 
         // Frame counter for checking unsaved changes

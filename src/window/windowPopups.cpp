@@ -199,6 +199,7 @@ void mainWindow::importImagePopup() {
                 for (size_t i = 0; i < importFiles.size(); ++i) {
                         const std::string& file = importFiles[i];
                         futures.push_back(tPool->submit([file, i, this]() -> IndexedResult {
+                            std::raise(SIGINT);
                             auto result = readImage(file, rawSet, importOCIO);
                             ++completedTasks; // Increment counter when done
                             return IndexedResult{i, std::move(result)};
