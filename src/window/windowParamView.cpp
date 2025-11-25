@@ -1,6 +1,7 @@
 #include "preferences.h"
 #include "window.h"
 #include "windowUtils.h"
+#include "osMacros.h"
 #include <imgui.h>
 
 //--- Main Parameter View Routine ---//
@@ -120,7 +121,7 @@ void mainWindow::paramView() {
 
                     ImGui::Text("Base Color:");
                     paramChange |= ImGui::ColorEdit3("##BC", (float*)activeImage()->imgParam.baseColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_PickerHueWheel);
-                    ImGui::SetItemTooltip("Hold ⌘ + shift, click and drag an area in the image\nto sample the base color.");
+                    ImGui::SetItemTooltip("Hold " FV_MOD_C " + shift, click and drag an area in the image\nto sample the base color.");
                     ImGui::SameLine();
                     if(ImGui::Button("Reset##a1")){activeImage()->imgParam.rstBC(); paramChange |= true;}
                     ImGui::Text("Analysis Bias");
@@ -168,19 +169,19 @@ void mainWindow::paramView() {
                     setTempColor(activeImage()->imgParam.temp);
                     paramChange |= ImGui::SliderFloat("##TMP", &activeImage()->imgParam.temp, -1.0f, 1.0f);
                     ImGui::PopStyleColor(3);
-                    ImGui::SetItemTooltip("Adjust the color temperature of the image.\n⌘ + Click to edit the value manually");
+                    ImGui::SetItemTooltip("Adjust the color temperature of the image.\n" FV_MOD_C " + Click to edit the value manually");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##03")){activeImage()->imgParam.rstTmp(); paramChange = true;}
                     ImGui::Text("Tint");
                     setTintColor(activeImage()->imgParam.tint);
                     paramChange |= ImGui::SliderFloat("##TNT", &activeImage()->imgParam.tint, -1.0f, 1.0f);
                     ImGui::PopStyleColor(3);
-                    ImGui::SetItemTooltip("Adjust the tint of the image.\n⌘ + Click to edit the value manually");
+                    ImGui::SetItemTooltip("Adjust the tint of the image.\n" FV_MOD_C " + Click to edit the value manually");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##04")){activeImage()->imgParam.rstTnt(); paramChange = true;}
                     ImGui::Text("Saturation");
                     paramChange |= ImGui::SliderFloat("##SAT", &activeImage()->imgParam.saturation, -1.0f, 1.0f);
-                    ImGui::SetItemTooltip("Adjust the saturation of the image.\n⌘ + Click to edit the value manually");
+                    ImGui::SetItemTooltip("Adjust the saturation of the image.\n" FV_MOD_C" + Click to edit the value manually");
                     ImGui::SameLine();
                     if (ImGui::Button("Reset##04s")){activeImage()->imgParam.rstSat(); paramChange = true;}
                     ImGui::Text("Black Point");
