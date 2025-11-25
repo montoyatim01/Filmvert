@@ -47,6 +47,45 @@ void mainWindow::setIni() {
     #endif
 }
 
+bool mainWindow::loadLogoImageData(std::optional<cmrc::file> logoIm, int& width, int& height, int& channels, std::vector<unsigned char>& pixels)
+{
+	// Create a buffer from the embedded data
+	std::vector<unsigned char> imageData(logoIm->begin(), logoIm->end());
+
+	auto in = OIIO::ImageInput::create("png");
+	if (! in  ||  ! in->supports ("ioproxy")) {
+		LOG_ERROR("OpenImageIO Logo Read Error");
+		return true;
+	}
+	OIIO::Filesystem::IOMemReader memreader(imageData);  // I/O proxy object
+
+	auto input = OIIO::ImageInput::open("logo.png", nullptr, &memreader);
+	if (!input)
+	{
+		LOG_ERROR("Failed to create ImageInput: " + OIIO::geterror());
+		return true;
+	}
+
+	// Get image specification
+	const OIIO::ImageSpec& spec = input->spec();
+	width = spec.width;
+	height = spec.height;
+	channels = spec.nchannels;
+
+    pixels.resize(width * height * channels);
+
+	// Read the image data
+	if (!input->read_image(OIIO::TypeDesc::UINT8, pixels.data()))
+	{
+		LOG_ERROR("Failed to read image data: " + input->geterror());
+		input->close();
+		return false;
+	}
+
+	input->close();
+	return true;
+}
+
 //--- Load Logo Texture ---//
 /*
     Load the logo image and create an
@@ -54,42 +93,20 @@ void mainWindow::setIni() {
     in the application
 */
 void mainWindow::loadLogoTexture(std::optional<cmrc::file> logoIm) {
-    // Create a buffer from the embedded data
-    std::vector<unsigned char> imageData(logoIm->begin(), logoIm->end());
-
-    auto in = OIIO::ImageInput::create("png");
-    if (! in  ||  ! in->supports ("ioproxy")) {
-        LOG_ERROR("OpenImageIO Logo Read Error");
+    int width;
+    int height;
+    int channels;
+    std::vector<unsigned char> pixels;
+    if (!loadLogoImageData(logoIm, width, height, channels, pixels))
         return;
-    }
-    OIIO::Filesystem::IOMemReader memreader(imageData);  // I/O proxy object
 
-    auto input = OIIO::ImageInput::open("logo.png", nullptr, &memreader);
-    if (!input)
-    {
-        LOG_ERROR("Failed to create ImageInput: " + OIIO::geterror());
-        return;
-    }
+    loadLogoTexture(width, height, channels, pixels);
+}
 
-    // Get image specification
-    const OIIO::ImageSpec& spec = input->spec();
-    int width = spec.width;
-    int height = spec.height;
-    int channels = spec.nchannels;
+void mainWindow::loadLogoTexture(int width, int height, int channels, const std::vector<unsigned char>& pixels)
+{
 
-    // Allocate buffer for pixel data
-    std::vector<unsigned char> pixels(width * height * channels);
-
-    // Read the image data
-    if (!input->read_image(OIIO::TypeDesc::UINT8, pixels.data()))
-    {
-        LOG_ERROR("Failed to read image data: " + input->geterror());
-        input->close();
-        return;
-    }
-
-    input->close();
-    // Generate OpenGL texture
+	// Generate OpenGL texture
     glGenTextures(1, (GLuint*)&logoTex);
     glBindTexture(GL_TEXTURE_2D, logoTex);
 
