@@ -1,6 +1,7 @@
 #include "roll.h"
 #include "structs.h"
 #include "exifUtils.h"
+#include <filesystem>
 
 //--- Get Roll Metadata String ---//
 /*
@@ -37,8 +38,47 @@ std::string filmRoll::getRollMetaString(bool pretty) {
 */
 bool filmRoll::exportRollMetaJSON() {
     try {
-        std::string jDump = getRollMetaString(true);
         std::string outPath = rollPath + "/" + rollName + ".fvi";
+        std::string jDump;
+        bool merge = true;
+        // Attempt to merge the roll file
+        if (std::filesystem::exists(outPath)) {
+            // If the roll file already exists,
+            // read and replace only the changed images
+            nlohmann::json jIn;
+            std::ifstream f(outPath);
+            if (f) { // File read successfully
+                jIn = nlohmann::json::parse(f);
+                if (!jIn.empty()) { // File parsed successfully
+                    auto first_item = jIn.begin();
+                    std::string rollNameImp = first_item.key();
+                    if (rollName == rollNameImp) { // Matching file roll to current roll
+                        nlohmann::json jRoll = first_item.value();
+
+                        for (int i = 0; i < images.size(); i++) {
+                            image* img = getImage(i);
+                            if (img) {
+                                std::optional<nlohmann::json> met = img->getJSONMeta();
+                                if (met.has_value())
+                                    jRoll[img->srcFilename.c_str()] = met.value();
+                            }
+                        }
+                        nlohmann::json j;
+                        j[rollName.c_str()] = jRoll;
+                        jDump = j.dump(4);
+                    } else {
+                        merge = false;
+                    }
+                } else {
+                    merge = false;
+                }
+            } else {
+                merge = false;
+            }
+        } else {
+            merge = false;
+        }
+
         std::ofstream jsonFile(outPath, std::ios::out | std::ios::trunc);
         if (!jsonFile) {
             LOG_ERROR("Unable to open JSON file for roll metadata export!");

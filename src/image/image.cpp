@@ -16,17 +16,17 @@ void image::rotRight() {
         case 1: // Normal -> 90° CW
             imgParam.rotation = 6; break;
         case 2: // H flip -> 90° CW + H flip
-            imgParam.rotation = 7; break;
+            imgParam.rotation = 5; break;
         case 3: // 180° -> 90° CCW
             imgParam.rotation = 8; break;
         case 4: // V flip -> 90° CCW + H flip
-            imgParam.rotation = 5; break;
+            imgParam.rotation = 7; break;
         case 5: // 90° CCW + H flip -> Normal + H flip
-            imgParam.rotation = 2; break;
+            imgParam.rotation = 4; break;
         case 6: // 90° CW -> 180°
             imgParam.rotation = 3; break;
         case 7: // 90° CW + H flip -> V flip
-            imgParam.rotation = 4; break;
+            imgParam.rotation = 2; break;
         case 8: // 90° CCW -> Normal
             imgParam.rotation = 1; break;
     }
@@ -41,17 +41,17 @@ void image::rotLeft() {
         case 1: // Normal -> 90° CCW
             imgParam.rotation = 8; break;
         case 2: // H flip -> 90° CCW + H flip
-            imgParam.rotation = 5; break;
+            imgParam.rotation = 7; break;
         case 3: // 180° -> 90° CW
             imgParam.rotation = 6; break;
         case 4: // V flip -> 90° CW + H flip
-            imgParam.rotation = 7; break;
+            imgParam.rotation = 5; break;
         case 5: // 90° CCW + H flip -> V flip
-            imgParam.rotation = 4; break;
+            imgParam.rotation = 2; break;
         case 6: // 90° CW -> Normal
             imgParam.rotation = 1; break;
         case 7: // 90° CW + H flip -> H flip
-            imgParam.rotation = 2; break;
+            imgParam.rotation = 4; break;
         case 8: // 90° CCW -> 180°
             imgParam.rotation = 3; break;
     }
@@ -111,18 +111,19 @@ void image::flipH() {
 /*
     Set the initial crop state for an image
 */
-void image::setCrop() {
-    imgParam.cropBoxX[0] = 0.1;
-    imgParam.cropBoxY[0] = 0.1;
+void image::setCrop(float buffer) {
+    buffer = std::clamp(buffer, 0.0f, 1.0f);
+    imgParam.cropBoxX[0] = buffer;
+    imgParam.cropBoxY[0] = buffer;
 
-    imgParam.cropBoxX[1] = 0.9;
-    imgParam.cropBoxY[1] = 0.1;
+    imgParam.cropBoxX[1] = 1.0 - buffer;
+    imgParam.cropBoxY[1] = buffer;
 
-    imgParam.cropBoxX[2] = 0.9;
-    imgParam.cropBoxY[2] = 0.9;
+    imgParam.cropBoxX[2] = 1.0 - buffer;
+    imgParam.cropBoxY[2] = 1.0 - buffer;
 
-    imgParam.cropBoxX[3] = 0.1;
-    imgParam.cropBoxY[3] = 0.9;
+    imgParam.cropBoxX[3] = buffer;
+    imgParam.cropBoxY[3] = 1.0 - buffer;
 }
 
 //---Image to Param---//

@@ -317,9 +317,13 @@ void mainWindow::importRollPopup() {
                             if (dir_entry.path().extension().string() != ".xmp" &&
                                 dir_entry.path().extension().string() != ".fvi" &&
                                 dir_entry.path().extension().string() != ".json" &&
-                                dir_entry.path().stem().string() != std::filesystem::path(importFiles[r]).stem().string())
-                                // Ignore files we make that are definitely not images
-                                images.push_back(dir_entry.path().string());
+                                !is_hidden(dir_entry.path()) &&
+                                dir_entry.path().stem().string() != std::filesystem::path(importFiles[r]).stem().string()) {
+                                    // Ignore files we make that are definitely not images
+                                    images.push_back(dir_entry.path().string());
+
+                                }
+
                         }
                     }
                     // Sort the images
@@ -473,6 +477,8 @@ void mainWindow::batchRenderPopup() {
         } else if (expSetting.format == 3 || expSetting.format == 4) {
             ImGui::SliderInt("Compression (loseless)", &expSetting.compression, 1, 9);
         }
+        ImGui::Checkbox("Greyscale Mode", &expSetting.greyscale);
+        ImGui::SetItemTooltip("Export as a single-channel greyscale image.\nUsed for black & white images.");
 
         ImGui::Separator();
         ImGui::Spacing();
@@ -496,7 +502,6 @@ void mainWindow::batchRenderPopup() {
             ImGui::TreePop();
         }
         ImGui::Separator();
-
         ImGui::Checkbox("Bake Crop & Rotation", &expSetting.bakeRotation);
         ImGui::SetItemTooltip("Bake in all crop and rotation settings to the image.\nWhat is seen in the viewport is what will be exported");
 
@@ -535,6 +540,9 @@ void mainWindow::batchRenderPopup() {
             exportPopup = false;
             ImGui::CloseCurrentPopup();
         }
+
+        if (std::string(buf1).empty())  // If save path is empty
+            disableSet = true;
 
         if (disableSet) {
             ImGui::BeginDisabled();
@@ -1233,7 +1241,7 @@ void mainWindow::preferencesPopup() {
         ImGui::Separator();
         ImGui::Text("Max Simultaneous Exports");
         ImGui::InputInt("###SM1", &tmpPrefs.maxSimExports);
-        ImGui::SetItemTooltip("Set the maximum number of simultaneous images to\nprocess when exporting.");
+        ImGui::SetItemTooltip("Set the maximum number of simultaneous images to\nprocess when importing/exporting.");
         tmpPrefs.maxSimExports = tmpPrefs.maxSimExports < 1 ? 1 :
             tmpPrefs.maxSimExports > 256 ? 256 : tmpPrefs.maxSimExports;
 
@@ -1735,6 +1743,15 @@ void mainWindow::releaseNotesPopup() {
         ImGui::BeginChild("###RelN", ImVec2(windowWidth - 8, windowHeight));
         ImGui::PushID("REL");
         ImGui::SetWindowFontScale(0.75);
+
+        ImGui::PushFont(ft_header);
+        ImGui::Text("Version 1.1.2");
+        ImGui::PopFont();
+        ImGui::Text("%s", relNotes_1_1_2.c_str());
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Spacing();
 
         ImGui::PushFont(ft_header);
         ImGui::Text("Version 1.1.1");

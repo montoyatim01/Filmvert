@@ -36,6 +36,7 @@ void mainWindow::thumbView() {
             }
 
             rollChange = false;
+            flagVisibleImage();
         }
 
 
@@ -43,6 +44,7 @@ void mainWindow::thumbView() {
         for (int i = 0; i < activeRollSize(); i++) {
             bool imgui_selected = selection.Contains((ImGuiID)i);
             getImage(i)->selected = imgui_selected;
+            flagVisibleImage();
         }
 
         // Handle keyboard navigation

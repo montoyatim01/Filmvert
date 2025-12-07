@@ -3,6 +3,30 @@
 
 #include <string.h>
 
+const std::string relNotes_1_1_2(R"V0G0N(
+New Features:
+- Added the ability to export greyscale images
+- Added a CPU render mode utilizing a Mitchell sampling algorithm
+- Saving roll metadata now merges changes instead of overwriting
+
+UI Enhancements:
+- Image viewer scale is image agnostic. Different resolution/orientation images now display at the same scale
+- (macOS) The dock icon now bounces when trying to close with unsaved changes
+- (macOS) The export window now allows folder creation
+- The export dialog will be disabled until a path is selected
+
+Bug Fixes:
+- Addressed an issue where the histogram wouldn't update with an image visible, but not selected
+- Addressed an issue where the copied saturation value wouldn't paste to other images
+- (UNIX) Hidden files are now ignored while importing a roll
+- Addressed an issue where some images would import with the wrong library resulting in incorrect colors
+- Image exports will fail-over to CPU rendering if GPU rendering fails
+- Simultaneous image loading follows max simultaneous exports preference number
+- Addressed an issue where images may still export cropped with the bake crop option de-selected
+- Addressed an issue where in some cases rotating an image left or right would perform the opposite of intended operation
+
+)V0G0N");
+
 const std::string relNotes_1_1_1(R"V0G0N(
 UI Enhancements:
 - Added release notes popups for new versions

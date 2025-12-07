@@ -126,7 +126,7 @@ void mainWindow::paramView() {
                     if(ImGui::Button("Reset##a1")){activeImage()->imgParam.rstBC(); paramChange |= true;}
                     ImGui::Text("Analysis Bias");
                     paramChange |= ImGui::SliderFloat("##AB", &activeImage()->imgParam.blurAmount, 0.5f, 20.0f);
-                    ImGui::SetItemTooltip("The amount of blur to apply to the image before analyzing.\nThis smooths out extreme pixel values for a \npotentially more accurate analysis.");
+                    ImGui::SetItemTooltip("The amount of blur to apply to the image before analyzing.\nThis smooths out extreme pixel values for \npotentially a more accurate analysis.");
                     ImGui::SameLine();
                     if(ImGui::Button("Reset##a2")){activeImage()->imgParam.rstBLR();}
                     ImGui::Checkbox("Display Analysis Region", &cropDisplay);
@@ -144,6 +144,8 @@ void mainWindow::paramView() {
                     ImGui::SameLine();
                     ImGui::Checkbox("Display Min/Max Points", &minMaxDisp);
                     ImGui::SetItemTooltip("Display the detected min/max luma points in the image\nused to sample the analyzed black point and white point.");
+                    ImGui::Spacing();
+                    ImGui::Spacing();
                     ImGui::Text("Analyzed Black Point");
                     paramChange |= ColorEdit4WithFineTune("##BP", (float*)activeImage()->imgParam.blackPoint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_PickerHueWheel);
                     ImGui::SetItemTooltip("Adjust the analyzed black point.\nThe Alpha value acts as a global multiplier for RGB channels");

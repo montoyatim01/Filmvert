@@ -75,16 +75,19 @@ struct image {
     // Status flags
     bool blurReady = false;
     bool renderReady = false;
+    bool cpuRender = false;
     bool imageLoaded = false;
     bool fullIm = false;
     bool analyzed = false;
     bool selected = false;
+    bool visible = false;
     bool inRndQueue = false;
     bool needRndr = false;
     bool imgRst = false;
     bool minSel = false;
     bool reloading = false;
     uint64_t histQueue = 0;
+    int activeExpCount = 1;
 
     // Display/Render flags
     bool renderBypass = true;
@@ -121,7 +124,7 @@ struct image {
 
 
     // imageIO.cpp
-    bool exportPreProcess(std::string outPath);
+    bool exportPreProcess(std::string outPath, int exportImgCount);
     void exportPostProcess();
     bool writeImg(const exportParam param, ocioSetting ocioSet);
     bool debayerImage(bool fullRes, int quality);
@@ -145,7 +148,7 @@ struct image {
     void rotRight();
     void flipV();
     void flipH();
-    void setCrop();
+    void setCrop(float buffer = 0.1f);
 
 
     // imageProcessing.cpp
@@ -155,6 +158,7 @@ struct image {
     void setMinMax();
     void calcProxyDim();
     void resizeProxy();
+    void processCPU(ocioSetting ocioSet);
 
 };
 
@@ -166,5 +170,140 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
 
 // image.cpp
 renderParams img_to_param(image* _img);
+
+struct float4 {
+    float x;
+    float y;
+    float z;
+    float w;
+
+    float4(){}
+    float4(float x) : x(x), y(x), z(x), w(x){}
+    float4(float x, float y, float z) : x(x), y(y), z(z){}
+    //float4(const float arr[3]) : x(arr[0]), y(arr[1]), z(arr[2]), w(0.0f) {}
+    float4(const float arr[4]) : x(arr[0]), y(arr[1]), z(arr[2]), w(arr[3]) {}
+    float4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w){}
+
+    // Component-wise addition
+    float4 operator+(const float4& other) const {
+        return float4(x + other.x, y + other.y, z + other.z, w + other.w);
+    }
+
+    // Scalar addition
+    float4 operator+(float scalar) const {
+        return float4(x + scalar, y + scalar, z + scalar, w + scalar);
+    }
+
+    // Component-wise subtraction
+    float4 operator-(const float4& other) const {
+        return float4(x - other.x, y - other.y, z - other.z, w - other.w);
+    }
+
+    // Scalar subtraction
+    float4 operator-(float scalar) const {
+        return float4(x - scalar, y - scalar, z - scalar, w - scalar);
+    }
+
+    // Component-wise multiplication
+    float4 operator*(const float4& other) const {
+        return float4(x * other.x, y * other.y, z * other.z, w * other.w);
+    }
+
+    // Scalar multiplication
+    float4 operator*(float scalar) const {
+        return float4(x * scalar, y * scalar, z * scalar, w * scalar);
+    }
+
+    // Component-wise division
+    float4 operator/(const float4& other) const {
+        return float4(x / other.x, y / other.y, z / other.z, w / other.w);
+    }
+
+    // Scalar division
+    float4 operator/(float scalar) const {
+        return float4(x / scalar, y / scalar, z / scalar, w / scalar);
+    }
+
+    // Assignment operators for convenience
+    float4& operator+=(const float4& other) {
+        x += other.x; y += other.y; z += other.z; w += other.w;
+        return *this;
+    }
+
+    float4& operator+=(float scalar) {
+        x += scalar; y += scalar; z += scalar; w += scalar;
+        return *this;
+    }
+
+    float4& operator-=(const float4& other) {
+        x -= other.x; y -= other.y; z -= other.z; w -= other.w;
+        return *this;
+    }
+
+    float4& operator-=(float scalar) {
+        x -= scalar; y -= scalar; z -= scalar; w -= scalar;
+        return *this;
+    }
+
+    float4& operator*=(const float4& other) {
+        x *= other.x; y *= other.y; z *= other.z; w *= other.w;
+        return *this;
+    }
+
+    float4& operator*=(float scalar) {
+        x *= scalar; y *= scalar; z *= scalar; w *= scalar;
+        return *this;
+    }
+
+    float4& operator/=(const float4& other) {
+        x /= other.x; y /= other.y; z /= other.z; w /= other.w;
+        return *this;
+    }
+
+    float4& operator/=(float scalar) {
+        x /= scalar; y /= scalar; z /= scalar; w /= scalar;
+        return *this;
+    }
+
+};
+
+// Free functions for scalar operations where scalar is on the left side
+inline float4 operator+(float scalar, const float4& vec) {
+    return vec + scalar;
+}
+
+inline float4 operator-(float scalar, const float4& vec) {
+    return float4(scalar - vec.x, scalar - vec.y, scalar - vec.z, scalar - vec.w);
+}
+
+inline float4 operator*(float scalar, const float4& vec) {
+    return vec * scalar;
+}
+
+inline float4 operator/(float scalar, const float4& vec) {
+    return float4(scalar / vec.x, scalar / vec.y, scalar / vec.z, scalar / vec.w);
+}
+
+inline float4 max(float4 a, float4 b) {
+    return float4(a.x > b.x ? a.x : b.x,
+        a.y > b.y ? a.y : b.y,
+        a.z > b.z ? a.z : b.z,
+        a.w > b.w ? a.w : b.w);
+}
+
+inline float4 pow(float4 a, float4 b) {
+    return float4(pow(a.x, b.x),
+    pow(a.y, b.y),
+    pow(a.z, b.z),
+    pow(a.w, b.w));
+}
+
+inline float4 clamp(float4 a, float4 b, float4 c) {
+    return float4(a.x < b.x ? b.x : a.x > c.x ? c.x : a.x,
+        a.y < b.y ? b.y : a.y > c.y ? c.y : a.y,
+        a.z < b.z ? b.z : a.z > c.z ? c.z : a.z,
+        a.w < b.w ? b.w : a.w > c.w ? c.w : a.w
+    );
+}
 
 #endif

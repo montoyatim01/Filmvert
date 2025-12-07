@@ -65,7 +65,6 @@ const std::string glsl_process(R"V0G0N(
 
         // Get crop rectangle dimensions and center
         vec2 cropSize = imageCropMax - imageCropMin;
-        vec2 cropCenter = (imageCropMin + imageCropMax) * 0.5;
 
         // If crop is enabled, map output UV to crop region
         vec2 workingUV = uv;

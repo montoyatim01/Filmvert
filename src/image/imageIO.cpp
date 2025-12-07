@@ -7,6 +7,7 @@
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
 #include <OpenImageIO/imageio.h>
+#include <cstddef>
 #include <variant>
 #include <filesystem>
 #include <stdexcept>
@@ -28,10 +29,11 @@
 
     Allocate necessary buffers for processing
 */
-bool image::exportPreProcess(std::string outPath) {
+bool image::exportPreProcess(std::string outPath, int exportImgCount) {
     fullIm = true;
     expFullPath = outPath;
     renderReady = false;
+    activeExpCount = exportImgCount;
     if (isRawImage) {
         if (imageLoaded){
             clearBuffers();
@@ -80,6 +82,7 @@ void image::exportPostProcess() {
     renderReady = false;
     imgRst = true;
     needRndr = true;
+    activeExpCount = 1;
 }
 
 //---Write Image---//
@@ -146,7 +149,9 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
     // Apply the orientation to the image
     OIIO::ImageBuf srcBuf(inspec, tmpOutData);
     OIIO::ImageBuf* finalBuf = &srcBuf;
+    OIIO::ImageBuf* writeBuf = &srcBuf;
     OIIO::ImageBuf reorientedBuf;
+    OIIO::ImageBuf greyscaleBuf;
 
     if (applyCrops && imgParam.rotation != 1) {
         // Set the orientation metadata in the source buffer
@@ -201,8 +206,15 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
         finalBuf->specmod()["tiff:zipquality"] = param.compression;
     }
 
+    writeBuf = finalBuf;
+    if (param.greyscale) {
+        greyscaleBuf = OIIO::ImageBufAlgo::channels(*finalBuf, 1, {0}, {}, {"Y"});
+        writeBuf = &greyscaleBuf;
+    }
+
+
     // Write Image Data
-    if (!finalBuf->write(filePath, outFormat)) {
+    if (!writeBuf->write(filePath, outFormat)) {
         LOG_ERROR("Failed to write image: {}", OIIO::geterror());
         return false;
     }
@@ -213,6 +225,7 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
     writeExpMeta(filePath);
 
     imgParam.rotation = prevRot;
+    LOG_INFO("Completed write for {}", srcFilename);
 
     return true;
 
@@ -241,7 +254,7 @@ bool image::debayerImage(bool fullRes, int quality) {
     // Open the raw file
     int result = rawProcessor->open_file(fullPath.c_str());
     if (result != LIBRAW_SUCCESS) {
-        LOG_ERROR("Error opening file: {}", fullPath);
+        LOG_WARN("Error opening file: {}", fullPath);
         LOG_ERROR("{}", libraw_strerror(result));
         return false;
     }
@@ -359,8 +372,11 @@ bool image::oiioReload() {
     //width = inputSpec.width;
     //height = inputSpec.height;
     //nChannels = inputSpec.nchannels;
-    if (rawImgData)
+    if (rawImgData) {
         delete [] rawImgData;
+        rawImgData = nullptr;
+    }
+
     rawImgData = new float[rawWidth * rawHeight * 4];
     if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)rawImgData))
     {
@@ -419,8 +435,11 @@ bool image::dataReload() {
     int bytesPerChannel = (intRawSet.bitDepth > 8) ? (intRawSet.bitDepth > 16 ? 4 : 2) : 1;
     int planeSize = rawWidth * rawHeight * bytesPerChannel;
 
-    if (rawImgData)
+    if (rawImgData) {
         delete [] rawImgData;
+        rawImgData = nullptr;
+    }
+
     rawImgData = new float[rawWidth * rawHeight * 4];
 
     // Load in the image and pre-process to Linear AP1
@@ -611,6 +630,7 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
             std::ifstream file(imagePath, std::ios::binary | std::ios::ate);
             if (!file) {
                 delete [] img.rawImgData;
+                img.rawImgData = nullptr;
                 throw std::runtime_error("Error: Unable to open input file: " + imagePath);
             }
 
@@ -781,6 +801,20 @@ std::variant<image, std::string> readRawImage(std::string imagePath, bool backgr
     img.srcFilename = imgP.stem().string();
     img.srcPath = imgP.parent_path().string();
     img.fullPath = imagePath;
+    std::string fileExtension = imgP.extension().string();
+    std::transform(fileExtension.begin(), fileExtension.end(), fileExtension.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+
+    if (fileExtension == ".tif" || fileExtension == ".tiff" ||
+        fileExtension == ".jpeg" || fileExtension == ".jpg" ||
+        fileExtension == ".png" || fileExtension == ".dpx" ||
+        fileExtension == ".exr" || fileExtension == ".bmp" ||
+        fileExtension == ".cin" || fileExtension == ".heic" ||
+        fileExtension == ".avif" || fileExtension == ".heif" ||
+        fileExtension == ".tga" || fileExtension == ".webp") {
+        // Ignore all of these non-raw image extensions
+        return "non-raw image";
+    }
 
     // Create a LibRaw processor instance
     std::unique_ptr<LibRaw> rawProcessor(new LibRaw);
@@ -1029,6 +1063,7 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
         LOG_ERROR("[oiio] Failed to read image: {}", imagePath);
         LOG_ERROR("[oiio] Error: {}", inputImage->geterror());
         delete [] img.rawImgData;
+        img.rawImgData = nullptr;
         return "Could not read image";
     }
 

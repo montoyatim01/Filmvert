@@ -13,4 +13,6 @@ void inverseTransformCoordinates(int& x, int& y, int rotation, int width, int he
 
 ImVec2 transformPointToCroppedDisplay(float origX, float origY, image* img, float dispScale, ImVec2 imagePos);
 bool inverseTransformFromCroppedDisplay(ImVec2 displayPos, ImVec2 imagePos, image* img, float dispScale, float& origX, float& origY);
+
+bool is_hidden(const std::filesystem::path& p);
 #endif

@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "logger.h"
+#include "preferences.h"
 #include "window.h"
 
 #if defined (WIN32)
@@ -14,16 +15,17 @@ int main(void)
     LOG_INFO("Version: {}.{}.{}", VERMAJOR, VERMINOR, VERPATCH);
     LOG_INFO("Build {:.8}-{}", GIT_COMMIT_HASH, BUILD_DATE);
 
+    // Load preferences
+    appPrefs.loadFromFile();
+
     // Setup Threadpool
-    unsigned int numThreads = std::thread::hardware_concurrency();
+    unsigned int numThreads = appPrefs.prefs.maxSimExports;
+    numThreads = numThreads < 1 ? 2 : numThreads;
     LOG_INFO("Starting thread pool with {} threads", numThreads);
     tPool = new ThreadPool(numThreads);
-    // Initialize Metal/CUDA Subsystem
-    //metalGPU metalSubsystem;
 
     // Start Window
     mainWindow window;
-    //window.setGPU(&metalSubsystem);
     return window.openWindow();
 
 }

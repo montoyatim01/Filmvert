@@ -63,13 +63,16 @@ struct preferenceSet {
     // Version String
     std::string verString;
 
+    // CPU renders (full renders only)
+    bool cpuRender = false;
+
 
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(preferenceSet, undoLevels,
         autoSave, autoSFreq, histInt, histEnable, trackpadMode,
         viewerSetting, perfMode, maxRes, rollTimeout, debayerMode,
         maxSimExports, ocioPath, ocioExt, autoSort, proxyRes,
-        renderTimeout, contactSheetBorder, verString);
+        renderTimeout, contactSheetBorder, verString, cpuRender);
 };
 
 class userPreferences {

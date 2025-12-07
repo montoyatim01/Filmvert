@@ -46,6 +46,7 @@ class filmRoll {
 
     void selectAll();
     void clearSelection();
+    void clearVisible();
 
     bool unsavedImages() const;
     bool unsavedIndividual();

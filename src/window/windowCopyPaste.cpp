@@ -11,6 +11,7 @@ void mainWindow::copyIntoParams() {
         copyParams.blurAmount = activeImage()->imgParam.blurAmount;
         copyParams.temp = activeImage()->imgParam.temp;
         copyParams.tint = activeImage()->imgParam.tint;
+        copyParams.saturation = activeImage()->imgParam.saturation;
         copyParams.baseColor[0] = activeImage()->imgParam.baseColor[0];
         copyParams.baseColor[1] = activeImage()->imgParam.baseColor[1];
         copyParams.baseColor[2] = activeImage()->imgParam.baseColor[2];

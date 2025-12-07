@@ -225,10 +225,10 @@ bool openglGPU::createShaders(ocioSetting& ocioSet) {
     return true;
 }
 
-void openglGPU::bufferCheck(image* _image)
+bool openglGPU::bufferCheck(image* _image)
 {
     if (!_image)
-        return;
+        return false;
 
     unsigned int nWidth = _image->fullIm ? _image->rawWidth : _image->width;
     unsigned int nHeight = _image->fullIm ? _image->rawHeight : _image->height;
@@ -263,6 +263,8 @@ void openglGPU::bufferCheck(image* _image)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, originalWidth, originalHeight,
                      0, GL_RGBA, GL_FLOAT, nullptr);
         checkError("Allocating Input Texture");
+        if (m_status.error)
+            return false;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -373,6 +375,7 @@ void openglGPU::bufferCheck(image* _image)
     // Unbind
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
+    return true;
 }
 
 void openglGPU::clearImBuffer(image* img) {
@@ -530,6 +533,22 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     if (!_image->rawImgData)
         return;
 
+    int32_t maxTextureSize = 0; // Check image dimensions against max texture size
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+    if (
+        (_image->fullIm && appPrefs.prefs.cpuRender && !_image->cpuRender) ||
+        (_image->fullIm && (_image->rawWidth > maxTextureSize || _image->rawHeight > maxTextureSize))
+        ) {
+            LOG_INFO("Image too large for GPU. Sending to CPU for processing");
+        // Send the CPU render to another thread to not block the UI
+        std::thread cpuRender = std::thread([_image, ocioSet]{
+            _image->processCPU(ocioSet);
+            });
+        cpuRender.detach();
+
+        return;
+    }
+
     auto start = std::chrono::steady_clock::now();
     while(glGetError() != GL_NO_ERROR){} // Clear any errors from previous
 
@@ -537,8 +556,20 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     renderParams _renderParams = img_to_param(_image);
 
     // Resize framebuffer if needed
-    bufferCheck(_image);
-    checkError("Buffer Validation");
+    if (!bufferCheck(_image)) {
+        if (_image->fullIm && !_image->cpuRender) {
+            LOG_ERROR("Could not allocate buffers! Falling back to CPU processing for {}", _image->srcFilename);
+            std::thread cpuRender = std::thread([_image, ocioSet]{
+                _image->processCPU(ocioSet);
+                });
+            cpuRender.detach();
+            clearError();
+            return;
+        } else {
+
+        }
+
+    }
 
     // Setup Geometry
     setupGeometry();
@@ -547,7 +578,17 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     // OCIO Check
     if (m_prevOCIO != ocioSet || m_prevIm != _image || _image->fullIm || _image->imgRst) {
         if (!createShaders(ocioSet)){
-            LOG_ERROR("Could not compile shaders!");
+            if (_image->fullIm && !_image->cpuRender) {
+                LOG_ERROR("Could not compile shaders! Falling back to CPU processing");
+                // Send the CPU render to another thread to not block the UI
+                std::thread cpuRender = std::thread([_image, ocioSet]{
+                    _image->processCPU(ocioSet);
+                    });
+                cpuRender.detach();
+                return;
+            } else {
+                LOG_ERROR("Could not compile shaders!");
+            }
             return;
         }
         // Always use original dimensions for input texture
@@ -658,7 +699,7 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     if (!isInQueue(_image))
         _image->inRndQueue = false;
 
-    if (_image->selected && !_image->fullIm)
+    if (_image->visible && !_image->fullIm)
         procHistIm(_image);
     _image->reloading = false;
 

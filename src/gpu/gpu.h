@@ -83,7 +83,7 @@ class openglGPU {
         // gpu.cpp
         void checkError(std::string location);
 
-        void bufferCheck(image* _image);
+        bool bufferCheck(image* _image);
         void updateUniforms(renderParams params);
         void cacheUniformLocations();
         void setupGeometry();

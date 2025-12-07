@@ -48,6 +48,7 @@ std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true);
 
 #ifdef __APPLE__
 void setMacOSWindowModified(GLFWwindow* window, bool modified);
+void bounceMacOSDockIcon(bool critical);
 #endif
 
 std::string find_key_by_value(const std::map<std::string, int>& my_map, int value);
@@ -214,7 +215,7 @@ class mainWindow
         // Views
         void menuBar();
         void imageView();
-        void windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteracting, bool &currentlyInteracting);
+        void windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteracting, bool &currentlyInteracting, float scale);
         void paramView();
         void thumbView();
 
@@ -234,6 +235,7 @@ class mainWindow
         bool unsavedChanges();
         void selectForward();
         void selectBackward();
+        void flagVisibleImage();
 
         // windowMeta.cpp
         void checkMeta();

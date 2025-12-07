@@ -64,6 +64,16 @@ void filmRoll::clearSelection() {
     }
 }
 
+//--- Clear Visible ---//
+/*
+    Clear all visible image flags
+*/
+void filmRoll::clearVisible() {
+    for (int i = 0; i < images.size(); i++) {
+        images[i].visible = false;
+    }
+}
+
 
 //--- Unsaved Images ---//
 /*

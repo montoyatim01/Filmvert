@@ -6,7 +6,7 @@
 
 #define VERMAJOR 1
 #define VERMINOR 1
-#define VERPATCH 1
+#define VERPATCH 2
 
 struct copyPaste {
 
@@ -99,6 +99,7 @@ struct exportParam {
   float borderSize = 0.0f;
   float borderColor[3] = {0.0f, 0.0f, 0.0f};
   int csBakeRot = 1;
+  bool greyscale = false;
 };
 
 struct minMaxPoint {

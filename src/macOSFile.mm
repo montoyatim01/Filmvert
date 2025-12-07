@@ -14,7 +14,7 @@ std::vector<std::string> ShowFileOpenDialog(bool allowMultiple = true, bool canC
         [panel setCanChooseFiles:YES];
         [panel setAllowsMultipleSelection:allowMultiple];
         [panel setCanChooseDirectories:canChooseDirectories];
-        [panel setCanCreateDirectories:NO];
+        [panel setCanCreateDirectories:YES];
         [panel setResolvesAliases:YES];
         [panel setTitle:@"Select File(s)"];
         [panel setPrompt:@"Choose"];
@@ -38,7 +38,7 @@ std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true) {
         [panel setCanChooseFiles:NO];
         [panel setCanChooseDirectories:YES];
         [panel setAllowsMultipleSelection:allowMultiple];
-        [panel setCanCreateDirectories:NO];
+        [panel setCanCreateDirectories:YES];
         [panel setResolvesAliases:YES];
         [panel setTitle:@"Select Folder(s)"];
         [panel setPrompt:@"Choose"];
@@ -58,5 +58,14 @@ void setMacOSWindowModified(GLFWwindow* window, bool modified) {
     NSWindow* nswindow = glfwGetCocoaWindow(window);
     if (nswindow) {
         [nswindow setDocumentEdited:modified ? YES : NO];
+    }
+}
+
+void bounceMacOSDockIcon(bool critical) {
+    NSApplication* app = [NSApplication sharedApplication];
+    if (app) {
+        NSRequestUserAttentionType type = critical ?
+            NSCriticalRequest : NSInformationalRequest;
+        [app requestUserAttention:type];
     }
 }

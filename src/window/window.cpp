@@ -205,9 +205,6 @@ int mainWindow::openWindow()
         }
     }
 
-    // Load in user preferences
-    appPrefs.loadFromFile();
-
     // Check Release Notes Popup
     relNotesPopTrig = appPrefs.displayReleaseNotes();
 
@@ -302,6 +299,9 @@ int mainWindow::openWindow()
         if (glfwWindowShouldClose(window)) {
             if (unsavedChanges()) {
                 // Don't quit immediately
+                #ifdef __APPLE__
+                bounceMacOSDockIcon(true);
+                #endif
                 unsavedPopTrigger = true;
                 closeMd = c_app;
                 glfwSetWindowShouldClose(window, done);

@@ -160,6 +160,11 @@ bool ColorEdit4WithFineTune(const char* label, float col[4], ImGuiColorEditFlags
     return value_changed;
 }
 
+bool is_hidden(const std::filesystem::path& p) {
+    auto filename = p.filename().string();
+    return !filename.empty() && filename[0] == '.';
+}
+
 
 
 // Function to calculate display dimensions while maintaining aspect ratio
@@ -855,6 +860,7 @@ void mainWindow::selectForward() {
     activeRoll()->selIm = newSel;
     selection.SetItemSelected(newSel, true);
     getImage(newSel)->selected = true;
+    flagVisibleImage();
 }
 
 //--- Select Backward ---//
@@ -878,6 +884,16 @@ void mainWindow::selectBackward() {
     activeRoll()->selIm = newSel;
     selection.SetItemSelected(newSel, true);
     getImage(newSel)->selected = true;
+    flagVisibleImage();
+}
+
+void mainWindow::flagVisibleImage() {
+    if (validRoll()) {
+        activeRoll()->clearVisible();
+        if (validIm()) {
+            activeImage()->visible = true;
+        }
+    }
 }
 
 

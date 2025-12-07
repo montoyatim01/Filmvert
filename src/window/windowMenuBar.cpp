@@ -321,6 +321,10 @@ void mainWindow::menuBar() {
                 shortPopTrig = true;
             }
 
+            if (ImGui::MenuItem("Release Notes")) {
+                relNotesPopTrig = true;
+            }
+
             if (ImGui::MenuItem("About")) {
                 aboutPopTrig = true;
             }
@@ -360,6 +364,7 @@ void mainWindow::menuBar() {
                             activeRolls[i].loadBuffers();
                         }
                     }
+                    flagVisibleImage();
                 }
                 ImGui::SetItemTooltip("Roll selection");
 

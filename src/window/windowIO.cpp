@@ -246,6 +246,7 @@ void mainWindow::exportImages() {
         if (getImage(i) && getImage(i)->selected)
             exportImgCount++;
     }
+    LOG_INFO("Image Export: {} Files to {}", exportImgCount, expSetting.outPath);
     exportProcCount = 0;
     exportThread = std::thread{[this]() {
         expStart = std::chrono::steady_clock::now();
@@ -253,7 +254,7 @@ void mainWindow::exportImages() {
         std::vector<std::future<void>> futures;
         int maxSimExp = appPrefs.prefs.maxSimExports;
         maxSimExp = maxSimExp < 1 ? 4 : maxSimExp;
-        LOG_INFO("Starting export with {} threads", maxSimExp);
+        LOG_INFO("Starting export with {} simultaneous", maxSimExp);
         ThreadPool expPool(maxSimExp);
 
         for (int i = 0; i < activeRollSize(); i++) {
@@ -267,22 +268,26 @@ void mainWindow::exportImages() {
                     getImage(i)->applyCrops = expSetting.bakeRotation;
                     if (expSetting.bakeRotation)
                         getImage(i)->imgParam.cropEnable = true;
-                    getImage(i)->exportPreProcess(expSetting.outPath);
+                    else
+                        getImage(i)->imgParam.cropEnable = false;
+                    getImage(i)->exportPreProcess(expSetting.outPath, exportImgCount);
                     gpu->addToRender(getImage(i), r_full, exportOCIO);
                     auto start = std::chrono::steady_clock::now();
                     bool retry = false;
+                    uint32_t timeout = appPrefs.prefs.renderTimeout;
                     while (!getImage(i)->renderReady) {
                         auto end = std::chrono::steady_clock::now();
                         auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-                        if (dur.count() > appPrefs.prefs.renderTimeout) {
+                        timeout = getImage(i)->cpuRender ? 300000 : timeout;
+                        if (dur.count() > timeout) {
                             if (retry) {
                                 // Bailing out after waiting 90 seconds for GL to finish rendering..
                                 LOG_ERROR("Stuck waiting for GPU render. Cannot export file: {}!", getImage(i)->srcFilename);
                                 return;
                             }
                             // Try to re-queue the render to the front
-                            gpu->addToRender(getImage(i), r_sdt, exportOCIO);
+                            if (!getImage(i)->cpuRender)
+                                gpu->addToRender(getImage(i), r_sdt, exportOCIO);
                             start = std::chrono::steady_clock::now();
                             retry = true;
                         }
@@ -326,7 +331,7 @@ void mainWindow::exportRolls() {
             }
         }
     } // Total file count
-LOG_INFO("Exporting {} Files", exportImgCount);
+    LOG_INFO("Roll Export: {} Files to {}", exportImgCount, expSetting.outPath);
     exportProcCount = 0;
     exportThread = std::thread{[this]() {
         expStart = std::chrono::steady_clock::now();
@@ -334,7 +339,7 @@ LOG_INFO("Exporting {} Files", exportImgCount);
         std::vector<std::future<void>> futures;
         int maxSimExp = appPrefs.prefs.maxSimExports;
         maxSimExp = maxSimExp < 1 ? 4 : maxSimExp;
-        LOG_INFO("Starting export with {} threads", maxSimExp);
+        LOG_INFO("Starting export with {} simultaneous", maxSimExp);
         ThreadPool expPool(maxSimExp);
         for (int r = 0; r < activeRolls.size(); r++) {
             if (activeRolls[r].selected) {
@@ -350,7 +355,9 @@ LOG_INFO("Exporting {} Files", exportImgCount);
                             getImage(r, i)->applyCrops = expSetting.bakeRotation;
                             if (expSetting.bakeRotation)
                                 getImage(r, i)->imgParam.cropEnable = true;
-                            getImage(r, i)->exportPreProcess(expSetting.outPath + activeRolls[r].rollName);
+                            else
+                                getImage(r, i)->imgParam.cropEnable = false;
+                            getImage(r, i)->exportPreProcess(expSetting.outPath + activeRolls[r].rollName, exportImgCount);
                             if (!std::filesystem::exists(getImage(r, i)->expFullPath)) {
                                 std::filesystem::create_directories(getImage(r, i)->expFullPath);
                             }
@@ -358,18 +365,20 @@ LOG_INFO("Exporting {} Files", exportImgCount);
                             gpu->addToRender(getImage(r, i), r_full, exportOCIO);
                             auto start = std::chrono::steady_clock::now();
                             bool retry = false;
+                            uint32_t timeout = appPrefs.prefs.renderTimeout;
                             while (!getImage(r, i)->renderReady) {
                                 auto end = std::chrono::steady_clock::now();
                                 auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-                                if (dur.count() > appPrefs.prefs.renderTimeout) {
+                                timeout = getImage(i)->cpuRender ? 300000 : timeout;
+                                if (dur.count() > timeout) {
                                     if (retry) {
                                         // Bailing out after waiting 90 seconds for GL to finish rendering..
                                         LOG_ERROR("Stuck waiting for GPU render. Cannot export file: {}!", getImage(r, i)->srcFilename);
                                         return;
                                     }
                                     // Try to re-queue the render to the front
-                                    gpu->addToRender(getImage(r, i), r_sdt, exportOCIO);
+                                    if (!getImage(i)->cpuRender)
+                                        gpu->addToRender(getImage(r, i), r_sdt, exportOCIO);
                                     start = std::chrono::steady_clock::now();
                                     retry = true;
 
