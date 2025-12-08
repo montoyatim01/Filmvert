@@ -18,7 +18,7 @@ class OpenColorIOConan(ConanFile):
     homepage = "https://opencolorio.org/"
     url = "https://github.com/conan-io/conan-center-index"
     topics = ("colors", "visual", "effects", "animation")
-    settings = "os", "arch", "compiler", "build_type", "cppstd"
+    settings = "os", "arch", "compiler", "build_type"
     package_type = "library"
     options = {
         "shared": [True, False],
@@ -43,10 +43,6 @@ class OpenColorIOConan(ConanFile):
     def configure(self):
         if self.options.shared:
             self.options.rm_safe("fPIC")
-        if not self.settings.cppstd:
-            self.settings.cppstd = "17"
-        if not self.settings.compiler.cppstd:
-            self.settings.compiler.cppstd = "17"
 
     def layout(self):
         cmake_layout(self, src_folder="src")
@@ -59,8 +55,8 @@ class OpenColorIOConan(ConanFile):
         if Version(self.version) < "2.2.0":
             self.requires("openexr/2.5.7")
         else:
-            self.requires("openexr/3.3.2")
-            self.requires("imath/3.1.9")
+            self.requires("openexr/3.4.4")
+            self.requires("imath/3.2.1")
 
         if Version(self.version) < "2.0.0":
             self.requires("tinyxml/2.6.2")
@@ -70,7 +66,7 @@ class OpenColorIOConan(ConanFile):
             self.requires("yaml-cpp/0.8.0")
 
         if Version(self.version) >= "2.3.0":
-            self.requires("minizip-ng/4.0.3")
+            self.requires("minizip-ng/4.0.7")
         elif Version(self.version) >= "2.2.0":
             self.requires("minizip-ng/3.0.9")
 

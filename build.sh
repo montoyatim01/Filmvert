@@ -33,17 +33,20 @@ set -x
   conan export conan-recipes/opencolorio
 
   mkdir -p $BUILD_DIR
-  CONAN_CMAKE_SYSTEM_PROCESSOR=x86_64 conan install -if $BUILD_DIR \
-    -pr:b default \
-    -pr:h default \
+  conan install . \
+    --output-folder=$BUILD_DIR \
     --build=missing \
-    -s build_type=$BUILD_TYPE \
-    -b missing .
+    --settings:host build_type=$BUILD_TYPE \
+    --settings:host arch=x86_64 \
+    --profile:host=default \
+    --profile:build=default
 
 python "licenses.py" $BUILD_DIR
 
-  CONAN_CMAKE_SYSTEM_PROCESSOR=x86_64 cmake \
-    -B $BUILD_DIR -S $SOURCE_DIR \
-    -DCMAKE_TOOLCHAIN_FILE="$BUILD_DIR/$arch/conan_toolchain.cmake" \
+  cmake \
+    -B $BUILD_DIR \
+    -S $SOURCE_DIR \
+    -DCMAKE_TOOLCHAIN_FILE="$BUILD_DIR/conan_toolchain.cmake" \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+
   cmake --build $BUILD_DIR --target Filmvert --config $BUILD_TYPE -j8 || exit 255

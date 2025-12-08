@@ -126,7 +126,7 @@ void mainWindow::thumbView() {
                 }
             }
 
-            ImGui::SetItemAllowOverlap();
+            ImGui::SetNextItemAllowOverlap();
             ImGui::SetCursorPos(ImVec2(pos.x, pos.y));
             ImVec2 IMscreenPos = ImGui::GetCursorScreenPos();
 

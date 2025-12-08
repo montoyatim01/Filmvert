@@ -75,7 +75,7 @@ bool mainWindow::loadLogoImageData(std::optional<cmrc::file> logoIm, int& width,
     pixels.resize(width * height * channels);
 
 	// Read the image data
-	if (!input->read_image(OIIO::TypeDesc::UINT8, pixels.data()))
+	if (!input->read_image(0, 0, 0, channels, OIIO::TypeDesc::UINT8, pixels.data()))
 	{
 		LOG_ERROR("Failed to read image data: " + input->geterror());
 		input->close();

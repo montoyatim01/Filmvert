@@ -378,7 +378,7 @@ bool image::oiioReload() {
     }
 
     rawImgData = new float[rawWidth * rawHeight * 4];
-    if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)rawImgData))
+    if(!inputImage->read_image(0, 0, 0, nChannels, OIIO::TypeDesc::FLOAT, (void*)rawImgData))
     {
         LOG_ERROR("[oiio] Failed to read image: {}", srcFilename);
         LOG_ERROR("[oiio] Error: {}", inputImage->geterror());
@@ -1058,7 +1058,7 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
     //LOG_INFO("Reading in image with size: {}x{}x{}", img.width, img.height, img.nChannels);
 
     img.rawImgData = new float[img.width * img.height * 4];
-    if(!inputImage->read_image(OIIO::TypeDesc::FLOAT, (void*)img.rawImgData))
+    if(!inputImage->read_image(0, 0, 0, inputSpec.nchannels, OIIO::TypeDesc::FLOAT, (void*)img.rawImgData))
     {
         LOG_ERROR("[oiio] Failed to read image: {}", imagePath);
         LOG_ERROR("[oiio] Error: {}", inputImage->geterror());
