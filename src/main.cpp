@@ -20,7 +20,15 @@ int main(void)
 
     // Setup Threadpool
     unsigned int numThreads = appPrefs.prefs.maxSimExports;
-    numThreads = numThreads < 1 ? 2 : numThreads;
+
+    if (numThreads == 0 || numThreads > 4096) {
+        // It's unlikely anyone has set this high, so cap it back to a sensible number
+        // This should also catch the case where std::thread::hardware_concurrency returns
+        // bad values too
+        LOG_WARN("Threads set to {}, resetting to 2", numThreads);
+        numThreads = 2;
+    }
+
     LOG_INFO("Starting thread pool with {} threads", numThreads);
     tPool = new ThreadPool(numThreads);
 

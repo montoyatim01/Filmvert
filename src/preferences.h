@@ -38,7 +38,7 @@ struct preferenceSet {
     int debayerMode = 10;
 
     // Max simultaneous exports
-    int maxSimExports = -1;
+    int maxSimExports = 0;
 
     // OCIO
     std::string ocioPath;
