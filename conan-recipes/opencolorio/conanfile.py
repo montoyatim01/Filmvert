@@ -72,6 +72,9 @@ class OpenColorIOConan(ConanFile):
 
         # for tools only
         self.requires("lcms/2.16")
+        self.requires("glew/2.2.0")
+        self.requires("glfw/3.4")
+        self.requires("freeglut/3.4.0") # Added for GLUT dependency
         # TODO: add GLUT (needed for ociodisplay tool)
 
     def validate(self):
@@ -109,53 +112,20 @@ class OpenColorIOConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.variables["CMAKE_VERBOSE_MAKEFILE"] = True
-        if Version(self.version) >= "2.1.0":
-            tc.variables["OCIO_BUILD_PYTHON"] = False
-        else:
-            tc.variables["OCIO_BUILD_SHARED"] = self.options.shared
-            tc.variables["OCIO_BUILD_STATIC"] = not self.options.shared
-            tc.variables["OCIO_BUILD_PYGLUE"] = False
+        tc.variables["OCIO_BUILD_PYTHON"] = "OFF"
+        tc.variables["OCIO_BUILD_TESTS"] = "OFF"
 
-            tc.variables["USE_EXTERNAL_YAML"] = True
-            tc.variables["USE_EXTERNAL_TINYXML"] = True
-            tc.variables["TINYXML_OBJECT_LIB_EMBEDDED"] = False
-            tc.variables["USE_EXTERNAL_LCMS"] = True
+        # Always set GLEW_ROOT and GLFW_ROOT for opencolorio's CMake
+        # It asks for GLEW_ROOT and GLUT_ROOT. Let's try to map glfw to GLUT.
+        glew_dep = self.dependencies["glew"]
+        glfw_dep = self.dependencies["glfw"] # Assuming glfw is available if glew is
+        freeglut_dep = self.dependencies["freeglut"] # Get freeglut dependency
 
-        tc.variables["OCIO_USE_SSE"] = self.options.get_safe("use_sse", False)
+        tc.variables["GLEW_ROOT"] = glew_dep.package_folder.replace("\\", "/")
+        tc.variables["GLFW_ROOT"] = glfw_dep.package_folder.replace("\\", "/")
+        tc.variables["GLUT_ROOT"] = freeglut_dep.package_folder.replace("\\", "/")
 
-        # openexr 2.x provides Half library
-        tc.variables["OCIO_USE_OPENEXR_HALF"] = True
-
-        tc.variables["OCIO_BUILD_APPS"] = True
-        tc.variables["OCIO_BUILD_DOCS"] = False
-        tc.variables["OCIO_BUILD_TESTS"] = False
-        tc.variables["OCIO_BUILD_GPU_TESTS"] = False
-        tc.variables["OCIO_USE_BOOST_PTR"] = False
-
-        # avoid downloading dependencies
-        tc.variables["OCIO_INSTALL_EXT_PACKAGE"] = "NONE"
-
-        if is_msvc(self) and not self.options.shared:
-            # define any value because ifndef is used
-            tc.variables["OpenColorIO_SKIP_IMPORTS"] = True
-
-        tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0077"] = "NEW"
-        tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0091"] = "NEW"
-
-        if self.settings.os == "Windows":
-            # glew/glut
-            glew_dep = self.dependencies["glew"]
-            freeglut_dep = self.dependencies["freeglut"]
-
-            # Convert Windows paths to use forward slashes for CMake
-            glew_root = glew_dep.package_folder.replace("\\", "/")
-            glut_root = freeglut_dep.package_folder.replace("\\", "/")
-
-            tc.variables["GLEW_ROOT"] = glew_root
-            tc.variables["GLUT_ROOT"] = glut_root
-
-            # Set specific GLEW variables that OpenColorIO expects
-            tc.variables["GLEW_INCLUDE_DIRS"] = f"{glew_root}/include"
+        tc.variables["GLEW_INCLUDE_DIRS"] = f"{glew_dep.package_folder.replace("\\", "/")}/include"
 
         tc.generate()
 

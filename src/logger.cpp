@@ -1,11 +1,12 @@
 #include "logger.h"
-
+#include <iostream>
 
 
 std::shared_ptr<spdlog::logger> glLog::s_logger = nullptr;
 
 std::shared_ptr<spdlog::logger>& glLog::GetLogger() {
     if(s_logger == nullptr) {
+      try {
       #if defined(WIN32)  //Log to file
         std::string appData;
         char szPath[MAX_PATH];
@@ -40,6 +41,9 @@ std::shared_ptr<spdlog::logger>& glLog::GetLogger() {
 
         #else
         char* homeDir = getenv("HOME");
+        if (!homeDir) {
+            homeDir = "/tmp";
+        }
         std::string homeStr = homeDir;
         std::string logPath = homeStr + "/.local/Filmvert";
         logPath += std::string("/Filmvert.log");
@@ -49,6 +53,9 @@ std::shared_ptr<spdlog::logger>& glLog::GetLogger() {
         s_logger->flush_on(spdlog::level::info);
         s_logger->set_pattern("[%Y-%m-%d %T.%e] [%n] [%l] %v");
         #endif
+      } catch (const spdlog::spdlog_ex &ex) {
+        std::cout << "Log init failed: " << ex.what() << std::endl;
+      }
     }
     return s_logger;
 }

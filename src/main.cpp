@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <thread>
 
 #include "logger.h"
 #include "preferences.h"
@@ -10,6 +11,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 int main(void)
 #endif
 {
+    printf("Starting Filmvert\n");
     // Start Logger
     LOG_INFO("Logging started");
     LOG_INFO("Version: {}.{}.{}", VERMAJOR, VERMINOR, VERPATCH);
@@ -19,8 +21,12 @@ int main(void)
     appPrefs.loadFromFile();
 
     // Setup Threadpool
-    unsigned int numThreads = appPrefs.prefs.maxSimExports;
-    numThreads = numThreads < 1 ? 2 : numThreads;
+    int numThreadsI = appPrefs.prefs.maxSimExports;
+    if (numThreadsI < 1) {
+        numThreadsI = std::thread::hardware_concurrency();
+        numThreadsI = numThreadsI < 1 ? 2 : numThreadsI;
+    }
+    unsigned int numThreads = numThreadsI;
     LOG_INFO("Starting thread pool with {} threads", numThreads);
     tPool = new ThreadPool(numThreads);
 
