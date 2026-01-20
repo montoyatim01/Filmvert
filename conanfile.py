@@ -31,8 +31,6 @@ libraw_options = {"libraw*:build_thread_safe": True}
 
 class FilmvertConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
-
     default_options = {
         **spdlog_options,
         **openimageio_options,
@@ -59,7 +57,10 @@ class FilmvertConan(ConanFile):
         self.requires("glew/2.2.0")
 
     def generate(self):
-        output_dir = self.folders.generators
+        CMakeToolchain(self).generate()
+        CMakeDeps(self).generate()
+
+        output_dir = self.build_folder
         imgui_dep = self.dependencies.get("imgui")
         if imgui_dep:
             # Copy ImGui bindings to a "bindings" subfolder in the output directory

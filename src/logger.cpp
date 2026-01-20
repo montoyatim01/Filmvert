@@ -40,7 +40,7 @@ std::shared_ptr<spdlog::logger>& glLog::GetLogger() {
 
 
         #else
-        char* homeDir = getenv("HOME");
+        const char* homeDir = getenv("HOME");
         if (!homeDir) {
             homeDir = "/tmp";
         }

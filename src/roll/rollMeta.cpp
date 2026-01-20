@@ -199,11 +199,11 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
         //    sortRoll();
         return true;
 
-    } catch (const std::exception& e) {
-        LOG_WARN("Unable to import roll from JSON file: {}", e.what());
-        return false;
     } catch (const Exiv2::Error& e) {
         LOG_ERROR("Exiv2 image exception: {}", e.what());
+        return false;
+    } catch (const std::exception& e) {
+        LOG_WARN("Unable to import roll from JSON file: {}", e.what());
         return false;
     }
 

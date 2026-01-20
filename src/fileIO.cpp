@@ -168,7 +168,8 @@ std::vector<std::string> ShowFolderSelectionDialog(bool allowMultiple = true) {
 std::string exec_command(const char* cmd) {
     char buffer[128];
     std::string result = "";
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    using PipeCloser = int (*)(FILE*);
+    std::unique_ptr<FILE, PipeCloser> pipe(popen(cmd, "r"), pclose);
     if (!pipe) {
         return result;
     }

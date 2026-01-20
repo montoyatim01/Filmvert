@@ -1430,7 +1430,7 @@ void mainWindow::shortcutsPopup() {
         ImGui::Spacing();
         ImGui::Text("Reset view to fit image");
         ImGui::Text("Zoom in/out of image");
-        ImGui::Text("");
+        ImGui::NewLine();
         ImGui::Text("Previous Image");
         ImGui::Text("Next Image");
         ImGui::Text("Refresh Image");
