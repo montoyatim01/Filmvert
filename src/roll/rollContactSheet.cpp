@@ -62,37 +62,29 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
         OIIO::ImageSpec rawImgSpec(imgWidth, imgHeight, 4, OIIO::TypeDesc::FLOAT);
         OIIO::ImageBuf rawOIIOBuf(rawImgSpec, rawImgBuffer);
 
-        OIIO::ImageBuf* oiioImage;
+        OIIO::ImageBuf orientedOIIOBuf;
+        OIIO::ImageBuf* oiioImage = &rawOIIOBuf;
 
         // Apply the image's orientation
-        if (expParam.csBakeRot == 0) {
-            // Don't bake anything
-            oiioImage = &rawOIIOBuf;
-        } else if (expParam.csBakeRot == 1) {
+        if (expParam.csBakeRot == 1) {
             // Bake only operations that don't modify width/height
             if (images[im].imgParam.rotation == 2 ||
                 images[im].imgParam.rotation == 3 ||
                 images[im].imgParam.rotation == 4) {
                     rawOIIOBuf.specmod()["Orientation"] = images[im].imgParam.rotation;
-                    OIIO::ImageBuf orientedOIIOBuf;
-                    if (!OIIO::ImageBufAlgo::reorient(orientedOIIOBuf, rawOIIOBuf)) {
-                        LOG_ERROR("[CS] Failed to reorient image: {}", OIIO::geterror());
-                        oiioImage = &rawOIIOBuf;
-                    } else {
+                    if (OIIO::ImageBufAlgo::reorient(orientedOIIOBuf, rawOIIOBuf)) {
                         oiioImage = &orientedOIIOBuf;
+                    } else {
+                        LOG_ERROR("[CS] Failed to reorient image: {}", OIIO::geterror());
                     }
-                } else {
-                    oiioImage = &rawOIIOBuf;
                 }
-        } else {
+        } else if (expParam.csBakeRot == 2) {
             // Bake everything
             rawOIIOBuf.specmod()["Orientation"] = images[im].imgParam.rotation;
-            OIIO::ImageBuf orientedOIIOBuf;
-            if (!OIIO::ImageBufAlgo::reorient(orientedOIIOBuf, rawOIIOBuf)) {
-                LOG_ERROR("[CS] Failed to reorient image: {}", OIIO::geterror());
-                oiioImage = &rawOIIOBuf;
-            } else {
+            if (OIIO::ImageBufAlgo::reorient(orientedOIIOBuf, rawOIIOBuf)) {
                 oiioImage = &orientedOIIOBuf;
+            } else {
+                LOG_ERROR("[CS] Failed to reorient image: {}", OIIO::geterror());
             }
         }
 
@@ -134,7 +126,7 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
         // Add text
         OIIO::ImageBufAlgo::render_text(bdrOIIOBuf[im], bdrWidth/2, rotImHeight + (3 * bottomBorderSize),
             #ifdef linux
-            images[im].srcFilename, 52, "JetBrainsMono", 1.0f,
+            images[im].srcFilename, 52, "monospace", 1.0f,
             #elif defined WIN32
             images[im].srcFilename, 52, "C:\\Windows\\Fonts\\arial.ttf", 1.0f,
             #else
@@ -186,7 +178,7 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
     // Add title
     OIIO::ImageBufAlgo::render_text(finalBuf, imgBlkWidth/2, titleHeight/2,
         #ifdef linux
-        rollName, 140, "JetBrainsMono", 1.0f,
+        rollName, 140, "monospace", 1.0f,
         #elif defined WIN32
         rollName, 140, "C:\\Windows\\Fonts\\arial.ttf", 1.0f,
         #else
