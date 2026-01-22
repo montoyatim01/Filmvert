@@ -53,20 +53,23 @@ For full documentation on all features and workflows, take a look at the [projec
 ## 🚚 Building from source
 **Requirements**
 
-- Conan 1.66.0
+- Conan 2.x
 
 - Cmake 3.18 or greater
 
 - Python 3
 
-- (Windows) [Git Bash](https://gitforwindows.org/)
+- (Windows) [Git Bash](https://gitforwindows.org/) or use `build.bat`
 
 Simply execute the build script based on your platform, using either 'Debug' or 'Release' to specify the build type.
 ```./build.sh Release```
 
-If you get a warning about missing conan profiles, run the command:
-```conan profile new default --detect```
-to generate default profiles
+On Windows, you can use:
+```build.bat Release```
+
+If you get a warning about missing Conan profiles, run the command:
+```conan profile detect```
+to generate the default profile
 
 ## ⭐️ Contributing
 If there are any features you'd like to see, submit a PR for inclusion into the codebase.

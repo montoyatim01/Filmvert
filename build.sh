@@ -38,8 +38,6 @@ set -x
     --build=missing \
     --settings:host build_type=$BUILD_TYPE \
     --settings:host arch=x86_64 \
-    --profile:host=default \
-    --profile:build=default \
     -c tools.system.package_manager:mode=skip
 
 python "licenses.py" $BUILD_DIR

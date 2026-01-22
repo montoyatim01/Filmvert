@@ -72,9 +72,10 @@ class OpenColorIOConan(ConanFile):
 
         # for tools only
         self.requires("lcms/2.16")
-        self.requires("glew/2.2.0")
         self.requires("glfw/3.4")
-        self.requires("freeglut/3.4.0") # Added for GLUT dependency
+        if self.settings.os != "Windows":
+            self.requires("glew/2.2.0")
+            self.requires("freeglut/3.4.0") # Added for GLUT dependency
         # TODO: add GLUT (needed for ociodisplay tool)
 
     def validate(self):

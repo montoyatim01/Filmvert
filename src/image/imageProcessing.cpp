@@ -7,6 +7,7 @@
 #include "utils.h"
 #include "lancir.h"
 #include <string>
+#include <numbers>
 
 //---Process Base Color---//
 /*
@@ -514,7 +515,7 @@ void image::processCPU(ocioSetting ocioSet) {
     float4 G_lift = float4(_renderParams.G_lift);
     float4 G_offset = float4(_renderParams.G_offset);
     float4 G_gamma = float4(_renderParams.G_gamma);
-    _renderParams.arbitraryRotation = imgParam.arbitraryRotation * (M_PI / 180.0f);
+    _renderParams.arbitraryRotation = imgParam.arbitraryRotation * (std::numbers::pi_v<float> / 180.0f);
 
     // Get system thread count
     int threadCount = std::thread::hardware_concurrency();

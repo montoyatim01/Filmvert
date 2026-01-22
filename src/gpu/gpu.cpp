@@ -8,6 +8,7 @@
 
 #include <GLFW/glfw3.h>
 #include <cmath>
+#include <numbers>
 
 #include <csignal>
 #include <ostream>
@@ -413,7 +414,7 @@ void openglGPU::updateUniforms(renderParams params) {
     glUniform2f(m_uniforms.imageCropMax, params.imageCropMaxX, params.imageCropMaxY);
 
     // Convert degrees to radians for shader
-    float rotationRad = params.arbitraryRotation * M_PI / 180.0f;
+    float rotationRad = params.arbitraryRotation * std::numbers::pi_v<float> / 180.0f;
     glUniform1f(m_uniforms.arbitraryRotation, rotationRad);
 
     glUniform1i(m_uniforms.cropEnabled, params.cropEnable ? 1 : 0);

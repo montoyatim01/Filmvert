@@ -2,6 +2,7 @@
 #include "window.h"
 #include <filesystem>
 #include <imgui.h>
+#include <numbers>
 
 //--- ImGui Style ---//
 /*
@@ -654,7 +655,7 @@ ImVec2 transformPointToCroppedDisplay(float origX, float origY, image* img, floa
             rotationAngle = -rotationAngle;
         }
 
-        float rotRad = rotationAngle * M_PI / 180.0f;
+        float rotRad = rotationAngle * std::numbers::pi_v<float> / 180.0f;
         float cosR = cos(rotRad);
         float sinR = sin(rotRad);
 
@@ -764,7 +765,7 @@ bool inverseTransformFromCroppedDisplay(ImVec2 displayPos, ImVec2 imagePos, imag
             rotationAngle = -rotationAngle;
         }
 
-        float rotRad = -rotationAngle * M_PI / 180.0f; // Negative for inverse
+        float rotRad = -rotationAngle * std::numbers::pi_v<float> / 180.0f; // Negative for inverse
         float cosR = cos(rotRad);
         float sinR = sin(rotRad);
 
