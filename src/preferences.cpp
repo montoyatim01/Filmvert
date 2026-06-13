@@ -19,8 +19,11 @@ userPreferences appPrefs;
 void userPreferences::loadFromFile() {
     try {
         std::ifstream f(getPrefFile().c_str());
-        if (!f)
+        if (!f) {
+            LOG_INFO("No preferences file found, or file handle invalid.");
             return;
+        }
+
         nlohmann::json prefObj;
         prefObj = nlohmann::json::parse(f);
         if (prefObj.contains("Preferences")) {
