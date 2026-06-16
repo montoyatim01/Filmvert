@@ -27,14 +27,14 @@ void image::processBaseColor() {
     x0 = sampleX[0] < sampleX[1] ? sampleX[0] : sampleX[1];
     x1 = sampleX[0] > sampleX[1] ? sampleX[0] : sampleX[1];
 
-    x0 = std::clamp(x0, 0u, width - 2);
-    x1 = std::clamp(x0, 0u, width - 2);
+    x0 = std::clamp(x0, 0u, width - 1);
+    x1 = std::clamp(x1, 0u, width - 1);
 
     y0 = sampleY[0] < sampleY[1] ? sampleY[0] : sampleY[1];
     y1 = sampleY[0] > sampleY[1] ? sampleY[0] : sampleY[1];
 
-    y0 = std::clamp(y0, 0u, height - 2);
-    y1 = std::clamp(y0, 0u, height - 2);
+    y0 = std::clamp(y0, 0u, height - 1);
+    y1 = std::clamp(y1, 0u, height - 1);
 
     unsigned int pixCount = 0;
     float rTotal = 0.0f;
@@ -91,16 +91,20 @@ void image::blurImage() {
         for (int y=startRow; y<endRow; y++)
         {
             for (int x=0; x < width; x++) {
-                for (int ch = 0; ch < 3; ch++) {
-                    float outPix = 0.0f;
-                    int kernelCounterx = 0;
-                    for (int i = -halfSize; i <= halfSize; i++)
-                    {
-                        outPix += blurKern[kernelCounterx] * rawImgData[(((y * width) + std::clamp(x + i, 0, (int)width - 1)) * 4 )+ch];
-                        kernelCounterx++;
-                    }
-                    tmpOutData[(((y * width) + x) * 4 ) + ch] = outPix;
+                float outPix[3] = {0.0f, 0.0f, 0.0f};
+                for (int i = -halfSize; i <= halfSize; i++)
+                {
+                    int sx = std::clamp(x + i, 0, (int)width - 1);
+                    float w = blurKern[i + halfSize];
+                    const float* pix = rawImgData + ((y * width + sx) * 4);
+                    outPix[0] += w * pix[0];
+                    outPix[1] += w * pix[1];
+                    outPix[2] += w * pix[2];
                 }
+                float* out = tmpOutData + ((y * width + x) * 4);
+                out[0] = outPix[0];
+                out[1] = outPix[1];
+                out[2] = outPix[2];
             }
         }
     };
@@ -157,7 +161,7 @@ void image::blurImage() {
     The brightest becomes the analysed white point.
     The darkest becomes the analysed black point.
 */
-void image::processMinMax() {
+void image::processMinMax(ocioSetting ocioSet) {
 
     if (!blurImgData) {
             LOG_ERROR("Cannot analyze {}. No Blur Buffer!", srcFilename);
@@ -200,6 +204,15 @@ void image::processMinMax() {
         }
     }
 
+    // Apply Display Transform Minimum Offset
+    float zeroPix[4] = {appPrefs.prefs.minOffset, appPrefs.prefs.minOffset, appPrefs.prefs.minOffset, 1.0f};
+    ocioSet.inverse = true;
+    ocioProc.processImage(zeroPix, 1, 1, ocioSet);
+
+    imgParam.blackPoint[0] -= zeroPix[0];
+    imgParam.blackPoint[1] -= zeroPix[1];
+    imgParam.blackPoint[2] -= zeroPix[2];
+
     imgParam.minX = (float)minX / width;
     imgParam.minY = (float)minY / height;
     imgParam.maxX = (float)maxX / width;
@@ -208,8 +221,16 @@ void image::processMinMax() {
     LOG_INFO("Analysis finished for {}!", srcFilename);
     LOG_INFO("Min Pixel: {},{}", imgParam.minX, imgParam.minY);
     LOG_INFO("Min Values: {}, {}, {}", imgParam.blackPoint[0], imgParam.blackPoint[1], imgParam.blackPoint[2]);
+    int minIndex = (minY * width) + minX;
+    int maxIndex = (maxY * width) + maxX;
+    float min[3] = {buffer[4 * minIndex + 0], buffer[4 * minIndex + 1], buffer[4 * minIndex + 2]};
+    float max[3] = {buffer[4 * maxIndex + 0], buffer[4 * maxIndex + 1], buffer[4 * maxIndex + 2]};
+    float minSat = oklab_Chroma(min[0], min[1], min[2]);
+    float maxSat = oklab_Chroma(max[0], max[1], max[2]);
+    LOG_INFO("Min Value Chrominance: {}", minSat);
     LOG_INFO("Max Pixel: {},{}", imgParam.maxX, imgParam.maxY);
     LOG_INFO("Max Values: {}, {}, {}", imgParam.whitePoint[0], imgParam.whitePoint[1], imgParam.whitePoint[2]);
+    LOG_INFO("Max Value Chrominance: {}", maxSat);
 }
 
 //--- Set MinMax ---//
@@ -218,7 +239,7 @@ void image::processMinMax() {
     point based on the set blur amount. Set the
     min/max point based on the blur
 */
-void image::setMinMax() {
+void image::setMinMax(ocioSetting ocioSet) {
 
     // Kernel size and half-kernel size
     int kernelSize = (int)(imgParam.blurAmount * KERNELSIZE) + 1;
@@ -250,6 +271,14 @@ void image::setMinMax() {
         imgParam.blackPoint[0] = (imgParam.baseColor[0] / (outPix[0] / sumWeights)) * 0.1f;
         imgParam.blackPoint[1] = (imgParam.baseColor[1] / (outPix[1] / sumWeights)) * 0.1f;
         imgParam.blackPoint[2] = (imgParam.baseColor[2] / (outPix[2] / sumWeights)) * 0.1f;
+        // Apply Display Transform Minimum Offset
+        float zeroPix[4] = {appPrefs.prefs.minOffset, appPrefs.prefs.minOffset, appPrefs.prefs.minOffset, 1.0f};
+        ocioSet.inverse = true;
+        ocioProc.processImage(zeroPix, 1, 1, ocioSet);
+
+        imgParam.blackPoint[0] -= zeroPix[0];
+        imgParam.blackPoint[1] -= zeroPix[1];
+        imgParam.blackPoint[2] -= zeroPix[2];
     } else {
         imgParam.whitePoint[0] = (imgParam.baseColor[0] / (outPix[0] / sumWeights)) * 0.1f;
         imgParam.whitePoint[1] = (imgParam.baseColor[1] / (outPix[1] / sumWeights)) * 0.1f;
@@ -265,11 +294,11 @@ void image::setMinMax() {
 void image::calcProxyDim() {
     if (std::max(rawWidth, rawHeight) < appPrefs.prefs.maxRes)
         return; // Our image is small enough, don't resize
-    unsigned int newWidth, newHeight;
+
     float ratio = rawWidth > rawHeight ? (float)appPrefs.prefs.maxRes / (float)rawWidth : (float)appPrefs.prefs.maxRes / (float)rawHeight;
 
-    newWidth = rawWidth * ratio;
-    newHeight = rawHeight * ratio;
+    width = rawWidth * ratio;
+    height = rawHeight * ratio;
     return;
 }
 
@@ -305,9 +334,11 @@ void image::resizeProxy() {
     if (rawImgData) {
         delete [] rawImgData;
         rawImgData = nullptr;
+        rawBufSize = 0;
     }
 
     rawImgData = new float[newWidth * newHeight * 4];
+    rawBufSize = newWidth * newHeight * 4 * sizeof(float);
 
     // Copy back from the temp buffer to the raw image buffer
     memcpy(rawImgData, tmpOutData, newWidth * newHeight * 4 * sizeof(float));
@@ -444,10 +475,10 @@ float4 JPLogtoLin(float4 inputPixel)
 {
     float4 outPixel;
 
-    const float ALOGSM1_LIN_BRKPNT = 0.006801176276;
-    const float ALOGSM1_LOG_BRKPNT = 0.16129032258064516129;
-    const float ALOGSM1_LINTOLOG_SLOPE = 10.36773919972907075549;
-    const float ALOGSM1_LINTOLOG_YINT = 0.09077750069969257965;
+    const float ALOGSM1_LIN_BRKPNT = 0.006801176276f;
+    const float ALOGSM1_LOG_BRKPNT = 0.16129032258064516129f;
+    const float ALOGSM1_LINTOLOG_SLOPE = 10.36773919972907075549f;
+    const float ALOGSM1_LINTOLOG_YINT = 0.09077750069969257965f;
 
     outPixel.x = inputPixel.x <= ALOGSM1_LOG_BRKPNT ? (inputPixel.x - ALOGSM1_LINTOLOG_YINT) / ALOGSM1_LINTOLOG_SLOPE : pow(2.0f, inputPixel.x * 20.46f - 10.5f);
     outPixel.y = inputPixel.y <= ALOGSM1_LOG_BRKPNT ? (inputPixel.y - ALOGSM1_LINTOLOG_YINT) / ALOGSM1_LINTOLOG_SLOPE : pow(2.0f, inputPixel.y * 20.46f - 10.5f);
@@ -460,20 +491,86 @@ float4 LintoJPLog(float4 inputPixel)
 {
     float4 outPixel;
 
-    const float ALOGSM1_LIN_BRKPNT = 0.006801176276;
-    const float ALOGSM1_LOG_BRKPNT = 0.16129032258064516129;
-    const float ALOGSM1_LINTOLOG_SLOPE = 10.36773919972907075549;
-    const float ALOGSM1_LINTOLOG_YINT = 0.09077750069969257965;
+    const float ALOGSM1_LIN_BRKPNT = 0.006801176276f;
+    const float ALOGSM1_LOG_BRKPNT = 0.16129032258064516129f;
+    const float ALOGSM1_LINTOLOG_SLOPE = 10.36773919972907075549f;
+    const float ALOGSM1_LINTOLOG_YINT = 0.09077750069969257965f;
 
-    outPixel.x = inputPixel.x <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.x + ALOGSM1_LINTOLOG_YINT : (log(inputPixel.x)/log(2.0) + 10.5) / 20.46;
-    outPixel.y = inputPixel.y <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.y + ALOGSM1_LINTOLOG_YINT : (log(inputPixel.y)/log(2.0) + 10.5) / 20.46;
-    outPixel.z = inputPixel.z <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.z + ALOGSM1_LINTOLOG_YINT : (log(inputPixel.z)/log(2.0) + 10.5) / 20.46;
+    outPixel.x = inputPixel.x <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.x + ALOGSM1_LINTOLOG_YINT : (log(inputPixel.x)/log(2.0f) + 10.5f) / 20.46f;
+    outPixel.y = inputPixel.y <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.y + ALOGSM1_LINTOLOG_YINT : (log(inputPixel.y)/log(2.0f) + 10.5f) / 20.46f;
+    outPixel.z = inputPixel.z <= ALOGSM1_LIN_BRKPNT ? ALOGSM1_LINTOLOG_SLOPE * inputPixel.z + ALOGSM1_LINTOLOG_YINT : (log(inputPixel.z)/log(2.0f) + 10.5f) / 20.46f;
 
     return outPixel;
 }
 float luma(float4 inputPixel)
 {
-    return inputPixel.x * 0.3439664498 + inputPixel.y * 0.7281660966 + inputPixel.z * -0.0721325464;
+    return inputPixel.x * 0.2722287168f + inputPixel.y * 0.6740817658f + inputPixel.z * 0.0536895174f;
+}
+
+// Monotone cubic Hermite spline — mirrors GLSL evalCurve.
+// curve is the interleaved layout produced by img_to_param:
+//   curve[i*2]   = px[i]   (input value)
+//   curve[i*2+1] = py[i]   (output value)
+// n is the number of active control points (2 … CURVE_MAX_PTS).
+// Values outside [px[0], px[n-1]] are linearly extrapolated.
+float evalCurve(float v, const float* curve, int n) {
+    auto px = [&](int i) { return curve[i * 2];     };
+    auto py = [&](int i) { return curve[i * 2 + 1]; };
+
+    // --- Linear extrapolation below black point ---
+    if (v < px(0)) {
+        float dx0 = std::max(px(1) - px(0), 0.0001f);
+        float s0  = (py(1) - py(0)) / dx0;
+        return py(0) + s0 * (v - px(0));
+    }
+
+    // --- Linear extrapolation above white point ---
+    if (v > px(n - 1)) {
+        float dxN = std::max(px(n-1) - px(n-2), 0.0001f);
+        float sN  = (py(n-1) - py(n-2)) / dxN;
+        return py(n-1) + sN * (v - px(n-1));
+    }
+
+    // Find the segment [seg, seg+1] containing v
+    int seg = n - 2;
+    for (int i = 0; i < n - 1; i++) {
+        if (v < px(i + 1)) { seg = i; break; }
+    }
+    int pprev = std::max(seg - 1, 0);
+    int pnext = std::min(seg + 2, n - 1);
+
+    float pax = px(seg),    pay = py(seg);
+    float pbx = px(seg+1),  pby = py(seg+1);
+
+    float dx = pbx - pax;
+    if (dx < 0.0001f) return pay;
+
+    // Non-uniform Catmull-Rom slopes (output / input units)
+    float dxPrev = std::max(pbx       - px(pprev), 0.0001f);
+    float dxNext = std::max(px(pnext) - pax,       0.0001f);
+    float m0 = (pby       - py(pprev)) / dxPrev;
+    float m1 = (py(pnext) - pay)       / dxNext;
+
+    // Fritsch-Carlson monotonicity: clamp slope ratio to [-3, 3]
+    float delta = (pby - pay) / dx;
+    if (std::abs(delta) < 0.0001f) {
+        m0 = 0.0f; m1 = 0.0f;
+    } else {
+        m0 = std::clamp(m0 / delta, -3.0f, 3.0f) * delta;
+        m1 = std::clamp(m1 / delta, -3.0f, 3.0f) * delta;
+    }
+
+    // Cubic Hermite basis
+    float u  = (v - pax) / dx;
+    float u2 = u  * u;
+    float u3 = u2 * u;
+    float h00 =  2.0f*u3 - 3.0f*u2 + 1.0f;
+    float h10 =       u3 - 2.0f*u2 + u;
+    float h01 = -2.0f*u3 + 3.0f*u2;
+    float h11 =       u3 -      u2;
+
+    // No output clamp — monotone spline stays within segment bounds naturally.
+    return h00*pay + h10*dx*m0 + h01*pby + h11*dx*m1;
 }
 
 //--- CPU Render ---//
@@ -589,6 +686,12 @@ void image::processCPU(ocioSetting ocioSet) {
                 // Process grade bp/wp in linear
                 tempPix = (tempPix - G_blackpoint) / (G_whitepoint - G_blackpoint);
 
+                // Color Matrix
+                float4 inPix = tempPix;
+                tempPix.x = (inPix.x * _renderParams.G_matrixR[0] + inPix.y * _renderParams.G_matrixR[1] + inPix.z * _renderParams.G_matrixR[2]);
+                tempPix.y = (inPix.x * _renderParams.G_matrixG[0] + inPix.y * _renderParams.G_matrixG[1] + inPix.z * _renderParams.G_matrixG[2]);
+                tempPix.z = (inPix.x * _renderParams.G_matrixB[0] + inPix.y * _renderParams.G_matrixB[1] + inPix.z * _renderParams.G_matrixB[2]);
+
                 // Lin to Log for grading
                 tempPix = LintoJPLog(tempPix);
 
@@ -626,6 +729,34 @@ void image::processCPU(ocioSetting ocioSet) {
     }
 
     ocioProc.processImage(procImgData, outputWidth, outputHeight, ocioSet);
+
+    // Process our curves after the ODT space for better feel
+    if (renderBypass != 1 && gradeBypass != 1) {
+        auto curveRows = [&](int startRow, int endRow) {
+            for (int y = startRow; y < endRow; y++) {
+                for (int x = 0; x < outputWidth; x++) {
+                    int index = ((y * outputWidth) + x) * 4;
+                    // RGB Curves
+                    procImgData[index + 0] = evalCurve(procImgData[index + 0], _renderParams.curveR, _renderParams.curveR_n);
+                    procImgData[index + 1] = evalCurve(procImgData[index + 1], _renderParams.curveG, _renderParams.curveG_n);
+                    procImgData[index + 2] = evalCurve(procImgData[index + 2], _renderParams.curveB, _renderParams.curveB_n);
+
+                    // Luma Curve
+                    procImgData[index + 0] = evalCurve(procImgData[index + 0], _renderParams.curveW, _renderParams.curveW_n);
+                    procImgData[index + 1] = evalCurve(procImgData[index + 1], _renderParams.curveW, _renderParams.curveW_n);
+                    procImgData[index + 2] = evalCurve(procImgData[index + 2], _renderParams.curveW, _renderParams.curveW_n);
+                }
+            }
+        };
+        std::vector<std::thread> curveThreads(numThreads);
+        for (size_t i = 0; i < numThreads; i++) {
+            int startRow = i * rowsPerThread;
+            int endRow = (i == numThreads - 1) ? outputHeight : (i + 1) * rowsPerThread;
+            curveThreads[i] = std::thread(curveRows, startRow, endRow);
+        }
+        for (auto& t : curveThreads)
+            t.join();
+    }
 
     rndrW = outputWidth;
     rndrH = outputHeight;

@@ -21,6 +21,7 @@ openglGPU::openglGPU() {
 openglGPU::~openglGPU() {
 
     glDeleteProgram(m_shaderProgram);
+    glDeleteFramebuffers(1, &m_smallFBO);
 
 }
 
@@ -58,6 +59,10 @@ bool openglGPU::initialize(ocioSetting &ocioSet) {
 
     // Set up out histogram buffer
     m_histPixels = new float[HISTWIDTH * HISTHEIGHT * 4];
+
+    // Persistent FBO used for the proxy blit every render
+    glGenFramebuffers(1, &m_smallFBO);
+
     m_initialized = true;
     return true;
 }
@@ -103,8 +108,24 @@ void openglGPU::cacheUniformLocations() {
     m_uniforms.G_temp = glGetUniformLocation(m_shaderProgram, "G_temp");
     m_uniforms.G_tint = glGetUniformLocation(m_shaderProgram, "G_tint");
     m_uniforms.G_sat = glGetUniformLocation(m_shaderProgram, "G_sat");
+    m_uniforms.G_matrixR = glGetUniformLocation(m_shaderProgram, "G_matrixR");
+    m_uniforms.G_matrixG = glGetUniformLocation(m_shaderProgram, "G_matrixG");
+    m_uniforms.G_matrixB = glGetUniformLocation(m_shaderProgram, "G_matrixB");
+    m_uniforms.G_sharpen = glGetUniformLocation(m_shaderProgram, "G_sharpen");
+    m_uniforms.G_sharpenRadius = glGetUniformLocation(m_shaderProgram, "G_sharpenRadius");
+    m_uniforms.G_curveW   = glGetUniformLocation(m_shaderProgram, "G_curveW[0]");
+    m_uniforms.G_curveW_n = glGetUniformLocation(m_shaderProgram, "G_curveW_n");
+    m_uniforms.G_curveR   = glGetUniformLocation(m_shaderProgram, "G_curveR[0]");
+    m_uniforms.G_curveR_n = glGetUniformLocation(m_shaderProgram, "G_curveR_n");
+    m_uniforms.G_curveG   = glGetUniformLocation(m_shaderProgram, "G_curveG[0]");
+    m_uniforms.G_curveG_n = glGetUniformLocation(m_shaderProgram, "G_curveG_n");
+    m_uniforms.G_curveB   = glGetUniformLocation(m_shaderProgram, "G_curveB[0]");
+    m_uniforms.G_curveB_n = glGetUniformLocation(m_shaderProgram, "G_curveB_n");
     m_uniforms.bypass = glGetUniformLocation(m_shaderProgram, "bypass");
     m_uniforms.gradeBypass = glGetUniformLocation(m_shaderProgram, "gradeBypass");
+    m_uniforms.secEnable = glGetUniformLocation(m_shaderProgram, "secEnable");
+    m_uniforms.showClip = glGetUniformLocation(m_shaderProgram, "showClip");
+    m_uniforms.channelView = glGetUniformLocation(m_shaderProgram, "channelView");
     // Crop variables
     m_uniforms.imageCropMin = glGetUniformLocation(m_shaderProgram, "imageCropMin");
     m_uniforms.imageCropMax = glGetUniformLocation(m_shaderProgram, "imageCropMax");
@@ -112,6 +133,7 @@ void openglGPU::cacheUniformLocations() {
     m_uniforms.cropEnabled = glGetUniformLocation(m_shaderProgram, "cropEnabled");
     m_uniforms.cropVisible = glGetUniformLocation(m_shaderProgram, "cropVisible");
     m_uniforms.imageSize = glGetUniformLocation(m_shaderProgram, "imageSize");
+    m_uniforms.proxyPass = glGetUniformLocation(m_shaderProgram, "proxyPass");
 }
 
 void openglGPU::setupGeometry()
@@ -262,6 +284,7 @@ bool openglGPU::bufferCheck(image* _image)
         // Input texture should always be original size
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, originalWidth, originalHeight,
                      0, GL_RGBA, GL_FLOAT, nullptr);
+        activeInputBytes = originalWidth * originalHeight * 4 * sizeof(float);
         checkError("Allocating Input Texture");
         if (m_status.error)
             return false;
@@ -276,18 +299,19 @@ bool openglGPU::bufferCheck(image* _image)
     }
 
     // Create output texture with cropped dimensions
-    if (_image->glTexture == 0 || !glIsTexture(_image->glTexture)) {
-        glGenTextures(1, (GLuint*)&_image->glTexture);
-        glBindTexture(GL_TEXTURE_2D, _image->glTexture);
+    if (m_displayTexture == 0 || !glIsTexture(m_displayTexture)) {
+        glGenTextures(1, (GLuint*)&m_displayTexture);
+        glBindTexture(GL_TEXTURE_2D, m_displayTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
                      0, GL_RGBA, GL_FLOAT, nullptr);
+        activeDisplayBytes = (nWidth * nHeight * 4 * sizeof(uint16_t));
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         checkError("Creating Output Texture");
     } else {
-        glBindTexture(GL_TEXTURE_2D, _image->glTexture);
+        glBindTexture(GL_TEXTURE_2D, m_displayTexture);
         int oWidth, oHeight;
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
@@ -296,6 +320,7 @@ bool openglGPU::bufferCheck(image* _image)
         if (oWidth != nWidth || oHeight != nHeight) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
                          0, GL_RGBA, GL_FLOAT, nullptr);
+            activeDisplayBytes = (nWidth * nHeight * 4 * sizeof(uint16_t));
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -304,6 +329,38 @@ bool openglGPU::bufferCheck(image* _image)
         }
     }
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Create clean output texture with cropped dimensions
+    /*if (m_cleanOutTex == 0 || !glIsTexture(m_cleanOutTex)) {
+        glGenTextures(1, (GLuint*)&m_cleanOutTex);
+        glBindTexture(GL_TEXTURE_2D, m_cleanOutTex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
+                     0, GL_RGBA, GL_FLOAT, nullptr);
+        cleanActiveBytes = (nWidth * nHeight * 4 * sizeof(uint16_t));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        checkError("Creating Output Texture");
+    } else {
+        glBindTexture(GL_TEXTURE_2D, m_cleanOutTex);
+        int oWidth, oHeight;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &oWidth);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &oHeight);
+        checkError("Querying Output Texture");
+
+        if (oWidth != nWidth || oHeight != nHeight) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, nWidth, nHeight,
+                         0, GL_RGBA, GL_FLOAT, nullptr);
+            cleanActiveBytes = (nWidth * nHeight * 4 * sizeof(uint16_t));
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, appPrefs.prefs.viewerSetting == 1 ? GL_NEAREST : GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            checkError("Resizing Output Texture");
+        }
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);*/
 
     // Create small output texture
     float scaleFactor = appPrefs.prefs.proxyRes;
@@ -314,6 +371,7 @@ bool openglGPU::bufferCheck(image* _image)
         int smHeight = std::max(1, (int)((float)nHeight * scaleFactor));
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, smWidth, smHeight,
                      0, GL_RGBA, GL_FLOAT, nullptr);
+        _image->glSmBufSize = (smWidth * smHeight * 4 * sizeof(uint8_t));
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -330,6 +388,7 @@ bool openglGPU::bufferCheck(image* _image)
         if (oWidth != smWidth || oHeight != smHeight) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, smWidth, smHeight,
                          0, GL_RGBA, GL_FLOAT, nullptr);
+            _image->glSmBufSize = (smWidth * smHeight * 4 * sizeof(uint8_t));
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -348,9 +407,17 @@ bool openglGPU::bufferCheck(image* _image)
 
     // Attach output texture to framebuffer
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                          GL_TEXTURE_2D, _image->glTexture, 0);
+                          GL_TEXTURE_2D, m_displayTexture, 0);
     checkError("Attaching Output to Framebuffer");
 
+    // Attach small texture to framebuffer
+    /*glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1,
+                           GL_TEXTURE_2D, m_cleanOutTex, 0);
+    checkError("Attaching Proxy to Framebuffer");
+
+    GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, drawBuffers);
+    checkError("Setting Draw Buffers");*/
     GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0};
     glDrawBuffers(1, drawBuffers);
     checkError("Setting Draw Buffers");
@@ -379,15 +446,17 @@ bool openglGPU::bufferCheck(image* _image)
 }
 
 void openglGPU::clearImBuffer(image* img) {
-    if (glIsTexture(img->glTexture)) {
+/*if (glIsTexture(img->glTexture)) {
         glDeleteTextures(1, (GLuint*)&img->glTexture);
         img->glTexture = 0;
-    }
+        img->glBufSize = 0;
+    }*/
 }
 void openglGPU::clearSmBuffer(image* img) {
     if (glIsTexture(img->glTextureSm)) {
         glDeleteTextures(1, (GLuint*)&img->glTextureSm);
         img->glTextureSm = 0;
+        img->glSmBufSize = 0;
     }
 }
 
@@ -403,11 +472,27 @@ void openglGPU::updateUniforms(renderParams params) {
     glUniform4fv(m_uniforms.G_mult, 1, params.G_mult);
     glUniform4fv(m_uniforms.G_offset, 1, params.G_offset);
     glUniform4fv(m_uniforms.G_gamma, 1, params.G_gamma);
+    glUniform3fv(m_uniforms.G_matrixR, 1, params.G_matrixR);
+    glUniform3fv(m_uniforms.G_matrixG, 1, params.G_matrixG);
+    glUniform3fv(m_uniforms.G_matrixB, 1, params.G_matrixB);
     glUniform1f(m_uniforms.G_temp, params.temp);
     glUniform1f(m_uniforms.G_tint, params.tint);
     glUniform1f(m_uniforms.G_sat, params.saturation);
+    glUniform1f(m_uniforms.G_sharpen, params.sharpen);
+    glUniform1f(m_uniforms.G_sharpenRadius, params.sharpenRadius);
+    glUniform2fv(m_uniforms.G_curveW, params.curveW_n, params.curveW);
+    glUniform1i (m_uniforms.G_curveW_n, params.curveW_n);
+    glUniform2fv(m_uniforms.G_curveR, params.curveR_n, params.curveR);
+    glUniform1i (m_uniforms.G_curveR_n, params.curveR_n);
+    glUniform2fv(m_uniforms.G_curveG, params.curveG_n, params.curveG);
+    glUniform1i (m_uniforms.G_curveG_n, params.curveG_n);
+    glUniform2fv(m_uniforms.G_curveB, params.curveB_n, params.curveB);
+    glUniform1i (m_uniforms.G_curveB_n, params.curveB_n);
     glUniform1i(m_uniforms.bypass, params.bypass);
     glUniform1i(m_uniforms.gradeBypass, params.gradeBypass);
+    glUniform1i(m_uniforms.secEnable, params.secEnable);
+    glUniform1i(m_uniforms.showClip, params.showClip);
+    glUniform1i(m_uniforms.channelView, params.channelView);
     // Crop Variables
     glUniform2f(m_uniforms.imageCropMin, params.imageCropMinX, params.imageCropMinY);
     glUniform2f(m_uniforms.imageCropMax, params.imageCropMaxX, params.imageCropMaxY);
@@ -571,10 +656,6 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
 
     }
 
-    // Setup Geometry
-    setupGeometry();
-    checkError("Geometry Setup");
-
     // OCIO Check
     if (m_prevOCIO != ocioSet || m_prevIm != _image || _image->fullIm || _image->imgRst) {
         if (!createShaders(ocioSet)){
@@ -629,7 +710,6 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     checkError("Clearing Framebuffer");
 
     // Use shader program
-    glUseProgram(0);
     glUseProgram(m_shaderProgram);
     checkError("Setting Program");
 
@@ -650,27 +730,25 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
 
     // Render full-screen quad
     glBindVertexArray(m_vertexArray);
+    glUniform1i(m_uniforms.proxyPass, 0);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     checkError("Render");
 
     // Create small version
-    GLuint smallFBO;
-    glGenFramebuffers(1, &smallFBO);
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_framebuffer);  // Source: full texture
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, smallFBO);       // Dest: small texture
-
-    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                          GL_TEXTURE_2D, _image->glTextureSm, 0);
-
     int smallWidth = std::max(1, (int)((float)outputWidth * appPrefs.prefs.proxyRes));
     int smallHeight = std::max(1, (int)((float)outputHeight * appPrefs.prefs.proxyRes));
 
-    glBlitFramebuffer(0, 0, outputWidth, outputHeight,
-                     0, 0, smallWidth, smallHeight,
-                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_smallFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                           GL_TEXTURE_2D, _image->glTextureSm, 0);
+    GLenum smallBuf = GL_COLOR_ATTACHMENT0;
+    glDrawBuffers(1, &smallBuf);
 
-    glDeleteFramebuffers(1, &smallFBO);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+        glUniform1i(m_uniforms.proxyPass, 1);
+        glViewport(0, 0, smallWidth, smallHeight);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);  // same shader/uniforms
+    }
 
     // Unbind
     glBindVertexArray(0);
@@ -686,14 +764,17 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     _image->rndrW = outputWidth;
     _image->rndrH = outputHeight;
 
+    // Set the rendered image pointer
+    m_dispBufIm = _image;
+
     // Copy Completed Image
     if (_image->fullIm) {
         _image->allocProcBuf();
-        copyFromTexFull(_image->glTexture, outputWidth, outputHeight, _image->procImgData);
+        copyFromTexFull(m_displayTexture, outputWidth, outputHeight, _image->procImgData);
         checkError("Copying Full Image for write");
         _image->renderReady = true;
-        glDeleteTextures(1, (GLuint*)&_image->glTexture);
-        _image->glTexture = 0;
+        //glDeleteTextures(1, (GLuint*)&_image->glTexture);
+        //_image->glTexture = 0;
     }
 
     if (!isInQueue(_image))
@@ -714,9 +795,9 @@ void openglGPU::renderImage(image* _image, ocioSetting ocioSet) {
     checkError("Depth Test Disable");
 
     // Set clear color and clear
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    checkError("Clearing post-render");
+    //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    //glClear(GL_COLOR_BUFFER_BIT);
+    //checkError("Clearing post-render");
 
     return;
 }

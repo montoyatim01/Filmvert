@@ -4,6 +4,7 @@
 #include "preferences.h"
 #include "structs.h"
 #include "threadPool.h"
+#include "updateCheck.h"
 
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
@@ -208,6 +209,20 @@ int mainWindow::openWindow()
     // Check Release Notes Popup
     relNotesPopTrig = appPrefs.displayReleaseNotes();
 
+    // Check for updates
+    if (appPrefs.prefs.checkUpdates) {
+        std::thread([this]() {
+
+                auto result = checkForUpdates(newVersion, newVersionBody, appPrefs.prefs.lastCheck);
+
+                uiChanges = true;
+                if (result && (result.value() > appPrefs.prefs.lastFound || !appPrefs.prefs.clickThrough)) {
+                    appPrefs.prefs.lastFound = result.value();
+                    newReleasePopTrig.store(true);
+                }
+            }).detach();
+    }
+
     if (!appPrefs.prefs.ocioPath.empty()) {
         if (ocioProc.initExtConfig(appPrefs.prefs.ocioPath) && appPrefs.prefs.ocioExt == 2) {
             ocioProc.setActiveConfig(-1);
@@ -257,7 +272,7 @@ int mainWindow::openWindow()
     }
 
     // Set ini location
-    //setIni();
+    setIni();
 
 
     // Setup Dear ImGui style
@@ -353,12 +368,19 @@ int mainWindow::openWindow()
         thumbView();
 
         // Hotkeys
-        checkHotkeys();
+        if (!popupCheck())
+            checkHotkeys();
+
+        if (validRoll() && !activeRoll()->imagesLoading && activeRollLoading) {
+            activeRollLoading = false;
+            renderCall = true;
+        }
 
         if (validIm()) {
             if (activeImage() != prevIm && activeImage()->imageLoaded) {
                 prevIm = activeImage();
                 renderCall = true;
+                activeImage()->channelView = channelView;
             }
         }
 
@@ -401,6 +423,7 @@ int mainWindow::openWindow()
         aboutPopup();
         contactSheetPopup();
         releaseNotesPopup();
+        newReleasePopup();
 
 
         // Frame counter for checking unsaved changes

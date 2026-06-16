@@ -18,7 +18,7 @@ class OpenColorIOConan(ConanFile):
     homepage = "https://opencolorio.org/"
     url = "https://github.com/conan-io/conan-center-index"
     topics = ("colors", "visual", "effects", "animation")
-    settings = "os", "arch", "compiler", "build_type", "cppstd"
+    settings = "os", "arch", "compiler", "build_type"
     package_type = "library"
     options = {
         "shared": [True, False],
@@ -43,23 +43,20 @@ class OpenColorIOConan(ConanFile):
     def configure(self):
         if self.options.shared:
             self.options.rm_safe("fPIC")
-        if not self.settings.cppstd:
-            self.settings.cppstd = "17"
-        if not self.settings.compiler.cppstd:
-            self.settings.compiler.cppstd = "17"
 
     def layout(self):
         cmake_layout(self, src_folder="src")
 
     def requirements(self):
         self.requires("expat/[>=2.6.2 <3]")
-        self.requires("glew/[>=2.1.0]")
-        self.requires("freeglut/[>=3.2.2]")
+        if self.settings.os != "Macos":
+            self.requires("glew/[>=2.1.0]")
+            self.requires("freeglut/[>=3.2.2]")
         if Version(self.version) < "2.2.0":
             self.requires("openexr/2.5.7")
         else:
-            self.requires("openexr/3.3.2")
-            self.requires("imath/3.1.9")
+            self.requires("openexr/3.4.4")
+            self.requires("imath/3.2.1")
 
         if Version(self.version) < "2.0.0":
             self.requires("tinyxml/2.6.2")
@@ -69,7 +66,7 @@ class OpenColorIOConan(ConanFile):
             self.requires("yaml-cpp/0.8.0")
 
         if Version(self.version) >= "2.3.0":
-            self.requires("minizip-ng/4.0.3")
+            self.requires("minizip-ng/4.0.7")
         elif Version(self.version) >= "2.2.0":
             self.requires("minizip-ng/3.0.9")
 
@@ -145,20 +142,22 @@ class OpenColorIOConan(ConanFile):
         tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0077"] = "NEW"
         tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0091"] = "NEW"
 
-        # glew/glut
-        glew_dep = self.dependencies["glew"]
-        freeglut_dep = self.dependencies["freeglut"]
 
-        if self.settings.os == "Windows":
-            # Convert Windows paths to use forward slashes for CMake
-            glew_dep = glew_dep.package_folder.replace("\\", "/")
-            freeglut_dep = freeglut_dep.package_folder.replace("\\", "/")
+        if self.settings.os != "Macos":
+            # glew/glut
+            glew_dep = self.dependencies["glew"]
+            freeglut_dep = self.dependencies["freeglut"]
 
-            tc.variables["GLEW_ROOT"] = glew_dep
-            tc.variables["GLUT_ROOT"] = freeglut_dep
+            if self.settings.os == "Windows":
+                # Convert Windows paths to use forward slashes for CMake
+                glew_dep = glew_dep.package_folder.replace("\\", "/")
+                freeglut_dep = freeglut_dep.package_folder.replace("\\", "/")
 
-        # Set specific GLEW variables that OpenColorIO expects
-        tc.variables["GLEW_INCLUDE_DIRS"] = f"{glew_dep}/include"
+                tc.variables["GLEW_ROOT"] = glew_dep
+                tc.variables["GLUT_ROOT"] = freeglut_dep
+
+                # Set specific GLEW variables that OpenColorIO expects
+                tc.variables["GLEW_INCLUDE_DIRS"] = f"{glew_dep}/include"
 
         tc.generate()
 
@@ -168,7 +167,7 @@ class OpenColorIOConan(ConanFile):
     def _patch_sources(self):
         apply_conandata_patches(self)
 
-        for module in ("expat", "lcms2", "pystring", "yaml-cpp", "Imath", "minizip-ng", "freeglut"):
+        for module in ("expat", "lcms2", "pystring", "yaml-cpp", "Imath", "minizip-ng", "freeglut", "GLEW"):
             rm(self, "Find"+module+".cmake", os.path.join(self.source_folder, "share", "cmake", "modules"))
 
     def build(self):

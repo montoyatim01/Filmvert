@@ -7,7 +7,10 @@
 void setTempColor(float tempVal);
 void setTintColor(float tintVal);
 
-bool ColorEdit4WithFineTune(const char* label, float col[4], ImGuiColorEditFlags flags = 0);
+bool ColorEdit4WithFineTune(const char* label, float col[4], bool cmyk, bool slow = false, ImGuiColorEditFlags flags = 0);
+bool ColorEdit3WithFineTune(const char* label, float col[3], ImGuiColorEditFlags flags = 0);
+bool ColorEdit1WithFineTune(const char* label, float col[4], ImGuiColorEditFlags flags = 0);
+bool TreeNodeWithLine(const char* label, bool* checked = nullptr, bool altHeld = false, float rightPad = 0.0f);
 void transformCoordinates(int& x, int& y, int rotation, int width, int height);
 void inverseTransformCoordinates(int& x, int& y, int rotation, int width, int height);
 

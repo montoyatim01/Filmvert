@@ -1,5 +1,6 @@
 #include "utils.h"
 #include <cmath>
+#include <chrono>
 
 
 
@@ -63,6 +64,27 @@ void ap0_to_ap1(float* in, float* out) {
     return;
 }
 
+float oklab_Chroma(float r, float g, float b) {
+    // Convert pixel from AP1 to sRGB primaries
+    float s_r = 1.7070626733 * r + -0.6199595404 * g + -0.0872598502 * b;
+    float s_g = -0.1309768295 * r + 1.1390322752 * g + -0.0079562968 * b;
+    float s_b = -0.0245106012 * r + -0.1248109317 * g + 1.1493959705 * b;
+
+    // Convert to oklab
+    // Sample code from: https://bottosson.github.io/posts/oklab/
+    float l = 0.4122214708f * s_r + 0.5363325363f * s_g + 0.0514459929f * s_b;
+	float m = 0.2119034982f * s_r + 0.6806995451f * s_g + 0.1073969566f * s_b;
+	float s = 0.0883024619f * s_r + 0.2817188376f * s_g + 0.6299787005f * s_b;
+
+    float l_ = cbrtf(l);
+    float m_ = cbrtf(m);
+    float s_ = cbrtf(s);
+
+    float la = 1.9779984951f*l_ - 2.4285922050f*m_ + 0.4505937099f*s_;
+    float lb = 0.0259040371f*l_ + 0.7827717662f*m_ - 0.8086757660f*s_;
+    return std::sqrt(std::pow(la, 2.0f) + std::pow(lb, 2.0f));
+}
+
 
 // Helper functions for endian conversion
 uint16_t swapBytes16(uint16_t value) {
@@ -99,4 +121,86 @@ void computeKernels(float strength, float* kernels)
       kernels[i] /= kernelSum;
   }
 
+}
+
+void checkRawFile(rawSetting& rawSet, long fileSize) {
+    switch (fileSize) {
+        case 36000000:
+            // 3000x2000 Base 16
+            rawSet.width = 3000;
+            rawSet.height = 2000;
+            rawSet.channels = 3;
+            rawSet.bitDepth = 16;
+            rawSet.littleE = true;
+            break;
+        case 36000016:
+            // 3000x2000 Base 16 w/header
+            rawSet.width = 3000;
+            rawSet.height = 2000;
+            rawSet.channels = 3;
+            rawSet.bitDepth = 16;
+            rawSet.littleE = true;
+            rawSet.pakonHeader = true;
+            break;
+        case 20250000:
+            // 2250x1500 Base 8
+            rawSet.width = 2250;
+            rawSet.height = 1500;
+            rawSet.channels = 3;
+            rawSet.bitDepth = 16;
+            rawSet.littleE = true;
+            break;
+        case 20250016:
+            // 2250x1500 Base 8 w/header
+            rawSet.width = 2250;
+            rawSet.height = 1500;
+            rawSet.channels = 3;
+            rawSet.bitDepth = 16;
+            rawSet.littleE = true;
+            rawSet.pakonHeader = true;
+            break;
+        case 18000000:
+            // 1500x2000 Half-frame Base 16
+            rawSet.width = 1500;
+            rawSet.height = 2000;
+            rawSet.channels = 3;
+            rawSet.bitDepth = 16;
+            rawSet.littleE = true;
+            break;
+        case 18000016:
+            // 1500x2000 Half-frame Base 16 w/header
+            rawSet.width = 1500;
+            rawSet.height = 2000;
+            rawSet.channels = 3;
+            rawSet.bitDepth = 16;
+            rawSet.littleE = true;
+            rawSet.pakonHeader = true;
+            break;
+        case 9000000:
+            // 1500x1000 Base 4
+            rawSet.width = 1500;
+            rawSet.height = 1000;
+            rawSet.channels = 3;
+            rawSet.bitDepth = 16;
+            rawSet.littleE = true;
+            break;
+        case 9000016:
+            // 1500x1000 Base 4 w/header
+            rawSet.width = 1500;
+            rawSet.height = 1000;
+            rawSet.channels = 3;
+            rawSet.bitDepth = 16;
+            rawSet.littleE = true;
+            rawSet.pakonHeader = true;
+            break;
+        default:
+            // We don't know!
+            break;
+    }
+}
+
+
+uint64_t currentEpoch() {
+    auto now = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
 }

@@ -20,6 +20,10 @@ void mainWindow::copyIntoParams() {
         copyParams.imageCropMinY = activeImage()->imgParam.imageCropMinY;
         copyParams.imageCropMaxY = activeImage()->imgParam.imageCropMaxY;
         copyParams.arbitraryRotation = activeImage()->imgParam.arbitraryRotation;
+        copyParams.cropEnable = activeImage()->imgParam.cropEnable;
+        copyParams.lockAspect = activeImage()->imgParam.lockAspect;
+        copyParams.imageCropAspect = activeImage()->imgParam.imageCropAspect;
+        copyParams.rotation = activeImage()->imgParam.rotation;
         for (int i = 0; i < 4; i++) {
             copyParams.whitePoint[i] = activeImage()->imgParam.whitePoint[i];
             copyParams.blackPoint[i] = activeImage()->imgParam.blackPoint[i];
@@ -33,6 +37,12 @@ void mainWindow::copyIntoParams() {
             copyParams.cropBoxX[i] = activeImage()->imgParam.cropBoxX[i];
             copyParams.cropBoxY[i] = activeImage()->imgParam.cropBoxY[i];
         }
+        std::memcpy(copyParams.g_matrix, activeImage()->imgParam.g_matrix, sizeof(copyParams.g_matrix));
+        for (int i = 0; i < 4; i ++) {
+            copyParams.curves[i].px = activeImage()->imgParam.curves[i].px;
+            copyParams.curves[i].py = activeImage()->imgParam.curves[i].py;
+        }
+
 
         //---Metadata
         copyMeta.cameraMake = activeImage()->imgMeta.cameraMake;
@@ -65,6 +75,8 @@ void mainWindow::pasteIntoParams() {
     for (int i = 0; i < activeRollSize(); i++) {
         if (getImage(i)->selected) {
             getImage(i)->metaPaste(pasteOptions, &copyParams, &copyMeta);
+            if (appPrefs.prefs.cmykSliders)
+                getImage(i)->imgParam.rgb_to_cmyk();
             imgRender(getImage(i), r_sdt);
         }
     }

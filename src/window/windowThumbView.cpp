@@ -4,12 +4,19 @@
 
 //--- Thumbnail View Routine ---//
 void mainWindow::thumbView() {
-    ImGui::SetNextWindowPos(ImVec2(0,imageWinSize.y + 25));
-    ImGui::SetNextWindowSize(ImVec2(winWidth,(winHeight - imageWinSize.y) - 25));
+    const float tBGcol[4]{appPrefs.prefs.thumbBGColor[0], appPrefs.prefs.thumbBGColor[1], appPrefs.prefs.thumbBGColor[2], appPrefs.prefs.thumbBGColor[3]};
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(tBGcol[0], tBGcol[1], tBGcol[2], tBGcol[3]));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(tBGcol[0] > 0.75f ? 0.0f : 1.0f,
+                                        tBGcol[1] > 0.75f ? 0.0f : 1.0f,
+                                        tBGcol[2] > 0.75f ? 0.0f : 1.0f,
+                                        1.0f));
+    ImGui::SetNextWindowPos(ImVec2(0,imageWinSize.y + menuHeight));
+    ImGui::SetNextWindowSize(ImVec2(winWidth,(winHeight - imageWinSize.y) - menuHeight));
     ImGui::Begin("Thumbnails", 0, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
     {
         if (!validRoll()) {
             ImGui::End();
+            ImGui::PopStyleColor(2);
             return;
         }
 
@@ -85,7 +92,7 @@ void mainWindow::thumbView() {
             int tWidth = getImage(i)->dispW;
             int tHeight = getImage(i)->dispH;
 
-            float proxyScale = (getImage(i)->imageLoaded && !toggleProxy && !getImage(i)->reloading) ? 1.0f : appPrefs.prefs.proxyRes;
+            float proxyScale = (getImage(i)->imageLoaded && !toggleProxy && !getImage(i)->reloading) ? appPrefs.prefs.proxyRes : appPrefs.prefs.proxyRes;
             int displayWidth = (int)((float)tWidth * proxyScale);
             int displayHeight = (int)((float)tHeight * proxyScale);
 
@@ -112,6 +119,7 @@ void mainWindow::thumbView() {
                         selection.SetItemSelected(i, true);
                         getImage(i)->selected = true;
                         activeRoll()->selIm = i; // Update primary selection
+                        flagVisibleImage();
                     }
                 } else {
                     // Single select mode: clear others and select this one
@@ -123,10 +131,11 @@ void mainWindow::thumbView() {
                     selection.SetItemSelected(i, true);
                     getImage(i)->selected = true;
                     activeRoll()->selIm = i;
+                    flagVisibleImage();
                 }
             }
 
-            ImGui::SetItemAllowOverlap();
+            ImGui::SetNextItemAllowOverlap();
             ImGui::SetCursorPos(ImVec2(pos.x, pos.y));
             ImVec2 IMscreenPos = ImGui::GetCursorScreenPos();
 
@@ -175,7 +184,7 @@ void mainWindow::thumbView() {
                 // Draw the rotated quad
                 if (getImage(i)->imageLoaded && !toggleProxy && !getImage(i)->reloading && !getImage(i)->fullIm)
                     draw_list->AddImageQuad(
-                        static_cast<ImTextureID>(getImage(i)->glTexture),
+                        static_cast<ImTextureID>(getImage(i)->glTextureSm),
                         canvas_pos,
                         ImVec2(canvas_pos.x + displaySize.x, canvas_pos.y),
                         ImVec2(canvas_pos.x + displaySize.x, canvas_pos.y + displaySize.y),
@@ -231,7 +240,7 @@ void mainWindow::thumbView() {
             ImGui::TextUnformatted(filename);
 
             // Purple circle for metadata write needed
-            if (getImage(i) && getImage(i)->needMetaWrite) {
+            if (getImage(i) && getImage(i)->imageUnsaved()) {
                 ImDrawList* drawList = ImGui::GetWindowDrawList();
                 ImVec2 screenPos = ImGui::GetCursorScreenPos();
                 ImU32 handleColor = IM_COL32(172, 2, 250, 255);
@@ -257,4 +266,5 @@ void mainWindow::thumbView() {
         }
     }
     ImGui::End();
+    ImGui::PopStyleColor(2);
 }

@@ -40,6 +40,7 @@
 #include "structs.h"
 #include "threadPool.h"
 #include "windowUtils.h"
+#include "updateCheck.h"
 
 
 // Declared functions from macOSFile.mm
@@ -82,13 +83,23 @@ class mainWindow
         float thumbHeight = 290;
         int winWidth = 0;
         int winHeight = 0;
-        ImVec2 cursorPos;
+        int menuHeight = 0;  // set each frame by menuBar() via ImGui::GetFrameHeight()
+        ImVec2 cursorPos;   // kept for backward compat (calculateVisible)
         float dispScale = 1.0f;
         ImVec2 dispSize;
-        ImVec2 scroll;
+        ImVec2 scroll;      // kept for backward compat
+        ImVec2 viewOffset;  // screen-space position of image top-left inside the window
+        bool viewReady = false; // false until first centering is applied
         bool draggingImageCrop = false;
         ImFont* ft_text;
         ImFont* ft_header;
+        #if defined(WIN32)
+        std::string prefPath;
+        #elif defined __APPLE__
+        std::string homeStr;
+        #else
+        std::string homeStr;
+        #endif
 
         unsigned long long logoTex = 0;
 
@@ -99,6 +110,8 @@ class mainWindow
         bool histRunning = false;
         bool wantClose = false;
         bool uiChanges = false;
+        bool activeRollLoading = false;
+        bool updateCrop = false;
         image* prevIm;
         preferenceSet tmpPrefs;
 
@@ -121,9 +134,12 @@ class mainWindow
         bool minMaxDisp = false;
         bool sampleVisible = false;
         bool gradeBypass = false;
+        int channelView = 0;
+        bool showClip = false;
         bool fpsFlag = false;
         bool toggleProxy = false;
         bool cropVisible = false;
+        bool altHeld = false;
 
         // Copy/Paste
         imageParams copyParams;
@@ -133,6 +149,10 @@ class mainWindow
         metaBuff metaEdit;
 
         // Popup flags
+        bool dispImportPop = false;
+        bool dispImpRollPop = false;
+        bool newRollPopup = false;
+        bool exportPopup = false;
         bool unsavedPopTrigger = false;
         bool globalMetaPopTrig = false;
         bool localMetaPopTrig = false;
@@ -145,6 +165,8 @@ class mainWindow
         bool aboutPopTrig = false;
         bool contactPopTrig = false;
         bool relNotesPopTrig = false;
+        bool dispPopDownFlag = false;
+        std::atomic<bool> newReleasePopTrig = false;
 
         bool ImMatchRoll = false;
         bool badOcioText = false;
@@ -153,6 +175,11 @@ class mainWindow
         char ocioPath[1024];
         int ocioSel = 0;
         bool demoWin = false;
+        std::vector<const char*> colorPickers;
+        std::vector<const char*> scalingModes;
+        std::vector<const char*> viewPixelDepth;
+        std::string newVersion;
+        std::string newVersionBody;
 
 
 
@@ -176,12 +203,9 @@ class mainWindow
         // Import
         std::atomic<size_t> completedTasks = 0;
         size_t totalTasks = 0;
-        bool dispImportPop = false;
-        bool dispImpRollPop = false;
         bool impRawCheck = false;
         std::vector<std::string> importFiles;
         int impRoll = 0;
-        bool newRollPopup = false;
         char rollNameBuf[64];
         char rollPath[1024];
         rawSetting rawSet;
@@ -195,7 +219,6 @@ class mainWindow
         // Export
         std::thread exportThread;
         exportParam expSetting;
-        bool exportPopup = false;
         bool expRolls = false;
         std::chrono::time_point<std::chrono::steady_clock> expStart;
         std::vector<const char*> fileTypes;
@@ -218,6 +241,7 @@ class mainWindow
         void windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteracting, bool &currentlyInteracting, float scale);
         void paramView();
         void thumbView();
+        void curvesEditor(bool& paramChange);
 
         // windowUtls.cpp
         bool validRoll();
@@ -233,9 +257,14 @@ class mainWindow
         void checkForRaw();
         void testFirstRawFile();
         bool unsavedChanges();
+        std::string byteFormat(uint64_t v);
         void selectForward();
         void selectBackward();
         void flagVisibleImage();
+        bool popupCheck() {return dispImportPop || dispImpRollPop || newRollPopup || exportPopup ||
+            unsavedPopTrigger || globalMetaPopTrig || localMetaPopTrig ||
+            preferencesPopTrig || ackPopTrig || anaPopTrig || shortPopTrig || imMatchPopTrig ||
+            aboutPopTrig || contactPopTrig || relNotesPopTrig;}
 
         // windowMeta.cpp
         void checkMeta();
@@ -279,23 +308,24 @@ class mainWindow
 
         void analyzeImage();
 
-        // windowHistogram.cpp
-        //void updateHistogram();
-        //void createSDLTexture(image* actImage);
-        //void updateSDLTexture(image* actImage);
-        //void updateHistPixels(image* img, float* imgPixels, float* histPixels, int width, int height, float intensityMultiplier);
 
-        // windowPopups.cpp
+        // windowIOPopups.cpp
         void importRawSettings();
         void importIDTSetting();
         void importImagePopup();
         void importRollPopup();
         void batchRenderPopup();
+
+        // windowMetaPopups.cpp
         void pastePopup();
-        void unsavedRollPopup();
         void globalMetaPopup();
         void localMetaPopup();
+
+        // windowPreferences.cpp
         void preferencesPopup();
+
+        // windowPopups.cpp
+        void unsavedRollPopup();
         void ackPopup();
         void analyzePopup();
         void shortcutsPopup();
@@ -303,6 +333,7 @@ class mainWindow
         void aboutPopup();
         void contactSheetPopup();
         void releaseNotesPopup();
+        void newReleasePopup();
 
         void copyIntoParams();
         void pasteIntoParams();

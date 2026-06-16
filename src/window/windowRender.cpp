@@ -2,6 +2,8 @@
 //#include "metalGPU.h"
 #include "window.h"
 
+#include <cstring>
+
 
 //--- Image Render ---//
 /*
@@ -116,8 +118,8 @@ void mainWindow::stateRender() {
 
 //--- Analyze Image ---//
 /*
-    Call up the GPU render for the blur pass
-    and run the min/max on the resulting image
+    Render  the blur pass and run
+    the min/max on the resulting image
 */
 void mainWindow::analyzeImage() {
 
@@ -134,7 +136,9 @@ void mainWindow::analyzeImage() {
         if (!activeImage()->blurImgData)
             activeImage()->allocBlurBuf();
         activeImage()->blurImage();
-        activeImage()->processMinMax();
+        activeImage()->processMinMax(dispOCIO);
+        if (appPrefs.prefs.cmykSliders)
+            activeImage()->imgParam.rgb_to_cmyk();
         anaPopTrig = false;
         activeImage()->needMetaWrite = true;
         metaRefresh = true;

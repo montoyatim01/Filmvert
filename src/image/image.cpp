@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "renderParams.h"
 #include "utils.h"
+#include <cstring>
 
 
 
@@ -126,6 +127,47 @@ void image::setCrop(float buffer) {
     imgParam.cropBoxY[3] = 1.0 - buffer;
 }
 
+//--- Load File into buffer ---//
+/*
+    Load the raw image file data into
+    the internal buffer for faster reloading
+*/
+void image::loadFileintoBuffer() {
+    std::ifstream file(fullPath, std::ios::binary | std::ios::ate);
+
+        if (!file.is_open()) { // Cannot open file
+            LOG_ERROR("Failed to open file: {}", fullPath);
+            fileLoaded = false;
+            return;
+        }
+
+        std::streamsize size = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        fileBuffer.resize(size);
+
+        if (!file.read(fileBuffer.data(), size)) { // Cannot read file
+            LOG_ERROR("Failed to read file: {}", fullPath);
+            fileLoaded = false;
+            return;
+        }
+
+        // File read into buffer
+        fileLoaded = true;
+
+}
+
+//--- Update Save State ---//
+/*
+    Copy the last saved params/metadata into the
+    last Saved versions for checking whether
+    a save is needed
+*/
+void image::updateSaveState() {
+    prevSaveParam = imgParam;
+    prevSaveMeta = imgMeta;
+}
+
 //---Image to Param---//
 /*
     Fill out the render param struct with the values
@@ -133,7 +175,6 @@ void image::setCrop(float buffer) {
     The "alpha" values in the UI get used as a global multiplier
     (add/sub for bp, lift, offset)
 */
-
 renderParams img_to_param(image* _img) {
     renderParams params;
 
@@ -147,6 +188,9 @@ renderParams img_to_param(image* _img) {
 
     params.bypass = _img->renderBypass ? 1 : 0;
     params.gradeBypass = _img->gradeBypass ? 1 : 0;
+    params.secEnable = _img->secEnable;
+    params.showClip = _img->showClip ? 1 : 0;
+    params.channelView = _img->channelView;
 
     params.arbitraryRotation = _img->imgParam.arbitraryRotation;
     params.cropEnable = _img->imgParam.cropEnable;
@@ -155,6 +199,8 @@ renderParams img_to_param(image* _img) {
     params.imageCropMinY = _img->imgParam.imageCropMinY;
     params.imageCropMaxX = _img->imgParam.imageCropMaxX;
     params.imageCropMaxY = _img->imgParam.imageCropMaxY;
+    params.sharpen = _img->imgParam.g_sharpen;
+    params.sharpenRadius = _img->imgParam.g_sharpenRadius;
 
     for (int i = 0; i < 4; i++) {
         params.baseColor[i] = i == 3 ? 0.0f : _img->imgParam.baseColor[i];
@@ -167,7 +213,21 @@ renderParams img_to_param(image* _img) {
         params.G_mult[i] = i == 3 ? 1.0f : _img->imgParam.g_mult[i] * _img->imgParam.g_mult[3];
         params.G_offset[i] = i == 3 ? 0.0f : _img->imgParam.g_offset[i] + _img->imgParam.g_offset[3];
         params.G_gamma[i] = i == 3 ? 1.0f : _img->imgParam.g_gamma[i] * _img->imgParam.g_gamma[3];
+    }
+    std::memcpy(params.G_matrixR, _img->imgParam.g_matrix[0], sizeof(_img->imgParam.g_matrix[0]));
+    std::memcpy(params.G_matrixG, _img->imgParam.g_matrix[1], sizeof(_img->imgParam.g_matrix[1]));
+    std::memcpy(params.G_matrixB, _img->imgParam.g_matrix[2], sizeof(_img->imgParam.g_matrix[2]));
 
+    float* curveDst[4] = { params.curveW, params.curveR, params.curveG, params.curveB };
+    int*   curveN[4]   = { &params.curveW_n, &params.curveR_n, &params.curveG_n, &params.curveB_n };
+    for (int ch = 0; ch < 4; ch++) {
+        const imageCurve& src = _img->imgParam.curves[ch];
+        int np = std::min(src.n(), CURVE_MAX_PTS);
+        *curveN[ch] = np;
+        for (int i = 0; i < np; i++) {
+            curveDst[ch][i * 2]     = src.px[i];
+            curveDst[ch][i * 2 + 1] = src.py[i];
+        }
     }
 
     return params;

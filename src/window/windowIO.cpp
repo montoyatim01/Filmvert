@@ -1,8 +1,11 @@
 //#include "metalGPU.h"
+#include "cmrc/cmrc.hpp"
 #include "ocioProcessor.h"
 #include "preferences.h"
+#include "structs.h"
 #include "threadPool.h"
 #include "window.h"
+#include <OpenImageIO/imagebufalgo.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/filesystem.h>
 #include <chrono>
@@ -24,24 +27,44 @@ void mainWindow::setIni() {
     else
     {
         LOG_CRITICAL("Cannot query the AppData folder!");
+        return;
     }
     appData += "\\Filmvert\\";
-    std::string prefPath = appData;
+    prefPath = appData;
+    try {
+        std::filesystem::create_directories(prefPath);
+    } catch (const std::exception& e) {
+        LOG_WARN("Unable to create window save file! Window state may not persist between sessions. {}", e.what());
+        return;
+    }
+
     prefPath += std::string("/imgui.ini");
     io.IniFilename = prefPath.c_str();
 
     #elif defined __APPLE__
     char* homeDir = getenv("HOME");
-    std::string homeStr = homeDir;
+    homeStr = homeDir;
     homeStr += "/Library/Preferences/Filmvert/";
+    try {
+        std::filesystem::create_directories(homeStr);
+    } catch (const std::exception& e) {
+        LOG_WARN("Unable to create window save file! Window state may not persist between sessions. {}", e.what());
+        return;
+    }
     homeStr += "imgui.ini";
     io.IniFilename = homeStr.c_str();
 
 
     #else
     char* homeDir = getenv("HOME");
-    std::string homeStr = homeDir;
+    homeStr = homeDir;
     homeStr += "/.local/Filmvert/";
+    try {
+        std::filesystem::create_directories(homeStr);
+    } catch (const std::exception& e) {
+        LOG_WARN("Unable to create window save file! Window state may not persist between sessions. {}", e.what());
+        return;
+    }
     homeStr += "imgui.ini";
     io.IniFilename = homeStr.c_str();
     #endif
@@ -75,7 +98,7 @@ bool mainWindow::loadLogoImageData(std::optional<cmrc::file> logoIm, int& width,
     pixels.resize(width * height * channels);
 
 	// Read the image data
-	if (!input->read_image(OIIO::TypeDesc::UINT8, pixels.data()))
+	if (!input->read_image(0, 0, 0, channels, OIIO::TypeDesc::UINT8, pixels.data()))
 	{
 		LOG_ERROR("Failed to read image data: " + input->geterror());
 		input->close();
@@ -162,9 +185,112 @@ void mainWindow::openImages() {
     auto selection = ShowFileOpenDialog();
 
     if (selection.size() > 0) {
-        dispImportPop = true;
-        importFiles = selection;
-        checkForRaw();
+
+        // If we've selected a single file
+        // that also happens to be a filmvert roll
+        if (selection.size() == 1) {
+            std::filesystem::path filePath = std::filesystem::path(selection[0]);
+            if (filePath.extension().string() == ".fvi") {
+                // We've selected a single roll file
+                // Create a roll and import the images
+                std::string rollPath = filePath.parent_path().string();
+                std::string rollName = filePath.stem().string();
+                int thisRoll = activeRolls.size();
+                activeRolls.emplace_back(filmRoll(rollName));
+                activeRolls[thisRoll].imagesLoading = true;
+                std::optional<std::vector<std::string>> fileList = activeRolls[thisRoll].getRollFiles(filePath.string());
+                if (!fileList.has_value() || fileList.value().empty()) {
+                    LOG_WARN("Roll file returned no files!");
+                    return;
+                }
+                dispImportPop = true;
+                std::thread impThread = std::thread{[this, fileList, thisRoll, filePath, rollPath]() {
+                    std::vector<std::string> images = fileList.value();
+                    completedTasks = 0;
+                    totalTasks = images.size();
+                    importFiles = images;
+
+                    // Launch the thread pool
+                    std::vector<std::future<IndexedResult>> futures;
+                    for (size_t i = 0; i < images.size(); ++i) {
+                            const std::string& file = images[i];
+                            futures.push_back(tPool->submit([file, i, this]() -> IndexedResult {
+                                auto result = readImage(file, rawSet, importOCIO, false);
+                                ++completedTasks; // Increment counter when done
+                                return IndexedResult{i, std::move(result)};
+                            }));
+                    }
+
+                    std::vector<IndexedResult> results;
+                    results.reserve(futures.size());
+                    for (auto& f : futures)
+                        results.push_back(f.get());
+
+                    std::sort(results.begin(), results.end(),
+                            [](const IndexedResult& a, const IndexedResult& b) {
+                            return a.index < b.index;
+                            });
+
+                    for (auto& res : results) {
+                        if (std::holds_alternative<image>(res.result)) {
+                            activeRolls[thisRoll].images.emplace_back(std::get<image>(res.result));
+                        } else {
+                            LOG_ERROR("Error: {}", std::get<std::string>(res.result));
+                        }
+                    }
+                    // Import the roll metadata
+                    activeRolls[thisRoll].importRollMetaJSON(filePath.string());
+                    // We want to flag to apply all
+                    copyPaste impOpts;
+                    impOpts.enableAll();
+                    for (auto &imp : activeRolls[thisRoll].metaImp)
+                        imp.selected = true;
+                    activeRolls[thisRoll].applyRollMetaJSON(true, impOpts);
+                    activeRolls[thisRoll].sortRoll();
+                    for (int i = 0; i < activeRolls[thisRoll].rollSize(); i++) {
+                        image* thisIm = getImage(thisRoll, i);
+                        if (thisIm) {
+                            imgRender(thisIm, r_bg);
+                            thisIm->imgMeta.rollName = activeRolls[thisRoll].rollName;
+                            thisIm->rollPath = rollPath;
+                            thisIm->imgState.setPtrs(&thisIm->imgMeta, &thisIm->imgParam, &thisIm->needRndr);
+                            thisIm->needMetaWrite = false;
+                            thisIm->updateSaveState();
+                        }
+                    }
+                    activeRolls[thisRoll].rollLoaded = true;
+                    activeRolls[thisRoll].rollPath = rollPath;
+                    if (activeRolls[thisRoll].images.size() > 0)
+                        activeRolls[thisRoll].images[0].selected = true;
+                    activeRolls[thisRoll].selIm = activeRolls[thisRoll].rollSize() > 0 ? 0 : -1;
+                    activeRolls[thisRoll].imagesLoading = false;
+                    dispImportPop = false;
+                    activeRolls[selRoll].selected = false;
+                    if (appPrefs.prefs.perfMode)
+                        clearRoll(&activeRolls[selRoll]);
+                    selRoll = thisRoll;
+                    flagVisibleImage();
+                    totalTasks = 0;
+                    completedTasks = 0;
+                    impRoll = 0;
+                    importFiles.clear();
+                    rawSet.pakonHeader = false;
+                    impRawCheck = false;
+                }};
+                impThread.detach();
+                return;
+            } // Extension == .fvi
+            else {
+                dispImportPop = true;
+                importFiles = selection;
+                checkForRaw();
+            }
+        } // Selection size == 1
+        else {
+            dispImportPop = true;
+            importFiles = selection;
+            checkForRaw();
+        }
     }
 
 }
@@ -369,7 +495,7 @@ void mainWindow::exportRolls() {
                             while (!getImage(r, i)->renderReady) {
                                 auto end = std::chrono::steady_clock::now();
                                 auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-                                timeout = getImage(i)->cpuRender ? 300000 : timeout;
+                                timeout = getImage(r, i)->cpuRender ? 300000 : timeout;
                                 if (dur.count() > timeout) {
                                     if (retry) {
                                         // Bailing out after waiting 90 seconds for GL to finish rendering..
@@ -377,7 +503,7 @@ void mainWindow::exportRolls() {
                                         return;
                                     }
                                     // Try to re-queue the render to the front
-                                    if (!getImage(i)->cpuRender)
+                                    if (!getImage(r, i)->cpuRender)
                                         gpu->addToRender(getImage(r, i), r_sdt, exportOCIO);
                                     start = std::chrono::steady_clock::now();
                                     retry = true;

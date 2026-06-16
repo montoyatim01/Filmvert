@@ -1,7 +1,10 @@
+#include "imageMeta.h"
 #include "roll.h"
 #include "structs.h"
 #include "exifUtils.h"
+#include "metaUtils.h"
 #include <filesystem>
+#include <nlohmann/detail/value_t.hpp>
 
 //--- Get Roll Metadata String ---//
 /*
@@ -13,13 +16,16 @@ std::string filmRoll::getRollMetaString(bool pretty) {
     try {
         nlohmann::json j;
         nlohmann::json jRoll = nlohmann::json::object();
+        nlohmann::json jRollMeta;
+        jRollMeta["fv_version"] = std::to_string(VERMAJOR) + "." + std::to_string(VERMINOR) + "." + std::to_string(VERPATCH);
+        jRoll["rollMeta"] = jRollMeta;
 
         for (int i = 0; i < images.size(); i++) {
             image* img = getImage(i);
             if (img) {
                 std::optional<nlohmann::json> met = img->getJSONMeta();
                 if (met.has_value())
-                    jRoll[img->srcFilename.c_str()] = met.value();
+                    jRoll[img->imgMeta.hash.c_str()] = met.value();
             }
         }
         j[rollName.c_str()] = jRoll;
@@ -48,35 +54,47 @@ bool filmRoll::exportRollMetaJSON() {
             nlohmann::json jIn;
             std::ifstream f(outPath);
             if (f) { // File read successfully
-                jIn = nlohmann::json::parse(f);
-                if (!jIn.empty()) { // File parsed successfully
-                    auto first_item = jIn.begin();
-                    std::string rollNameImp = first_item.key();
-                    if (rollName == rollNameImp) { // Matching file roll to current roll
-                        nlohmann::json jRoll = first_item.value();
+                if (f.peek() == std::ifstream::traits_type::eof()) {
+                    // File is empty, skip parsing
+                    merge = false;
+                } else {
+                    jIn = nlohmann::json::parse(f);
+                    if (!jIn.empty()) { // File parsed successfully
+                        auto first_item = jIn.begin();
+                        std::string rollNameImp = first_item.key();
+                        if (rollName == rollNameImp) { // Matching file roll to current roll
+                            nlohmann::json jRoll = first_item.value();
 
-                        for (int i = 0; i < images.size(); i++) {
-                            image* img = getImage(i);
-                            if (img) {
-                                std::optional<nlohmann::json> met = img->getJSONMeta();
-                                if (met.has_value())
-                                    jRoll[img->srcFilename.c_str()] = met.value();
+                            for (int i = 0; i < images.size(); i++) {
+                                image* img = getImage(i);
+                                if (img) {
+                                    std::optional<nlohmann::json> met = img->getJSONMeta();
+                                    if (met.has_value())
+                                        jRoll[img->imgMeta.hash.c_str()] = met.value();
+                                }
                             }
+                            nlohmann::json j;
+                            nlohmann::json jRollMeta;
+                            jRollMeta["fv_version"] = std::to_string(VERMAJOR) + "." + std::to_string(VERMINOR) + "." + std::to_string(VERPATCH);
+                            jRoll["rollMeta"] = jRollMeta;
+                            j[rollName.c_str()] = jRoll;
+                            jDump = j.dump(4);
+                        } else {
+                            merge = false;
                         }
-                        nlohmann::json j;
-                        j[rollName.c_str()] = jRoll;
-                        jDump = j.dump(4);
                     } else {
                         merge = false;
                     }
-                } else {
-                    merge = false;
                 }
             } else {
                 merge = false;
             }
         } else {
             merge = false;
+        }
+
+        if (!merge) {
+            jDump = getRollMetaString(true);
         }
 
         std::ofstream jsonFile(outPath, std::ios::out | std::ios::trunc);
@@ -108,7 +126,7 @@ bool filmRoll::exportRollCSV() {
     csvFile << "FrameNumber,FileName,CameraMake,CameraModel,Lens,FilmStock,";
     csvFile << "FocalLength,fNumber,ExposureTime,RollName,Date/Time,Location,";
     csvFile << "GPS,Notes,DevelopmentProcess,ChemicalManufacturer,";
-    csvFile << "DevelopmentNotes,Scanner,ScanNotes,Rating\n";
+    csvFile << "DevelopmentNotes,Scanner,ScanNotes,Rating,FilmvertVersion,FileHash\n";
 
     for (int i = 0; i < images.size(); i++) {
         csvFile << images[i].imgMeta.frameNumber << ",";
@@ -130,7 +148,9 @@ bool filmRoll::exportRollCSV() {
         csvFile << images[i].imgMeta.devNotes << ",";
         csvFile << images[i].imgMeta.scanner << ",";
         csvFile << images[i].imgMeta.scanNotes << ",";
-        csvFile << images[i].imgMeta.rating << "\n";
+        csvFile << images[i].imgMeta.rating << ",";
+        csvFile << images[i].imgMeta.fvVersion << ",";
+        csvFile << images[i].imgMeta.hash << "\n";
     }
 
     csvFile.close();
@@ -168,7 +188,17 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
             Exiv2::ExifData exifData = image->exifData();
             if (!exifData.empty()) {
                 if (auto fvMetaOpt = getExifValue<std::string>(exifData, "Exif.Image.ImageDescription"); fvMetaOpt.has_value()) {
-                    std::string customMeta = saniJsonString(fvMetaOpt.value());
+                    std::string rawMetaString = fvMetaOpt.value();
+                    std::string jsonString;
+                    char first = rawMetaString.front();
+                    if (first == '{' || first == '[' || first == '"') {
+                        // we have JSON
+                        jsonString = rawMetaString;
+                    } else {
+                        // Probably base64 compressed from a jpeg
+                        jsonString = decodeAndDecompress(rawMetaString);
+                    }
+                    std::string customMeta = saniJsonString(jsonString);
                     if (!customMeta.empty()) {
                         // Run the meta loding function
                         jIn = nlohmann::json::parse(customMeta);
@@ -188,25 +218,120 @@ bool filmRoll::importRollMetaJSON(const std::string& jsonFile) {
         auto first_item = jIn.begin();
         rollName = first_item.key();
         nlohmann::json jRoll = first_item.value();
+        std::string fvVersion;
+        if (jRoll.contains("rollMeta")) {
+            if (jRoll["rollMeta"].contains("fv_version"))
+                fvVersion = jRoll["rollMeta"]["fv_version"].get<std::string>();
+        }
         for (int i = 0; i < images.size(); i++) {
-            if (jRoll.contains(images[i].srcFilename)) {
-                nlohmann::json obj = jRoll[images[i].srcFilename].get<nlohmann::json>();
-                metaImp.emplace_back(MetaImpSet(&images[i], true, images[i].srcFilename, obj.dump(-1)));
-                //images[i].loadMetaFromStr(obj.dump(-1), true);
+            // Pre-compute the loaded image's filename stem for old-format matching
+            std::string imgStem = std::filesystem::path(images[i].imgMeta.fileName).stem().string();
+
+            // Iterate through the JSON object.
+            // New format: key is the full hash   (e.g. "75efe954...")
+            // Old format: key is the filename stem (e.g. "GQ6A3504")
+            for (auto& [key, entry] : jRoll.items()) {
+                // Guard against missing or malformed entries (e.g. "rollMeta" sentinel)
+                if (!entry.contains("metadata")) continue;
+
+                const auto& meta = entry["metadata"];
+                bool matched = false;
+
+                // 1. New format — key equals the image hash
+                if (!matched)
+                    matched = (images[i].imgMeta.hash == key);
+
+                // 2. New format — explicit hash field inside metadata
+                if (!matched && meta.contains("hash"))
+                    matched = (images[i].imgMeta.hash == meta["hash"].get<std::string>());
+
+                // 3. New format — fileName field present and non-empty
+                if (!matched && meta.contains("fileName")) {
+                    std::string jfn = meta["fileName"].get<std::string>();
+                    if (!jfn.empty())
+                        matched = (images[i].imgMeta.fileName == jfn);
+                }
+
+                // 4. Old format — key is the filename stem (fileName field was empty)
+                if (!matched && !imgStem.empty())
+                    matched = (imgStem == key);
+
+                if (matched) {
+                    metaImp.emplace_back(MetaImpSet(&images[i], true, images[i].srcFilename, entry.dump(-1)));
+                    break; // Found a match, no need to keep searching
+                }
             }
         }
         //if (appPrefs.prefs.autoSort)
         //    sortRoll();
         return true;
 
-    } catch (const std::exception& e) {
-        LOG_WARN("Unable to import roll from JSON file: {}", e.what());
-        return false;
     } catch (const Exiv2::Error& e) {
         LOG_ERROR("Exiv2 image exception: {}", e.what());
         return false;
+    } catch (const std::exception& e) {
+        LOG_WARN("Unable to import roll from JSON file: {}", e.what());
+        return false;
     }
 
+}
+//--- Get Roll Files ---//
+/*
+    Return a list of file paths from a roll file
+*/
+std::optional<std::vector<std::string>> filmRoll::getRollFiles(const std::string& rollFile) {
+    std::vector<std::string> fileList;
+    try {
+        nlohmann::json jIn;
+        std::filesystem::path imPath(rollFile);
+
+        if (imPath.extension().string() == ".fvi" ||
+            imPath.extension().string() == ".FVI") {
+            // Selected json file for import
+            std::ifstream f(rollFile);
+            if (!f)
+                return std::nullopt;
+            jIn = nlohmann::json::parse(f);
+        } else {
+            LOG_WARN("Not a roll file!");
+            return std::nullopt;
+        }
+        auto first_item = jIn.begin();
+        rollName = first_item.key();
+        nlohmann::json jRoll = first_item.value();
+        std::string fvVersion;
+        if (jRoll.contains("rollMeta")) {
+            if (jRoll["rollMeta"].contains("fv_version"))
+                fvVersion = jRoll["rollMeta"]["fv_version"].get<std::string>();
+        }
+
+        for (const auto& [key, item] : jRoll.items()) {
+
+            if (!item.contains("metadata"))
+                continue;
+
+            imageMetadata imMeta = item["metadata"].get<imageMetadata>();
+            if (imMeta.filePath.empty()) {
+                // Older version of Filmvert, we need to search for the image
+                // based on the roll location. Otherwise we don't know where
+                // to find the file
+                std::filesystem::path rollDir = imPath.parent_path();
+                std::string foundFile = searchImage(rollDir, key);
+                if (foundFile.empty())
+                    LOG_WARN("Unable to find file: {}", key);
+                else
+                    fileList.push_back(foundFile);
+            } else {
+                fileList.push_back((std::filesystem::path(imMeta.filePath) / imMeta.fileName).string());
+            }
+
+        }
+        return fileList;
+
+    } catch (const std::exception& e) {
+        LOG_WARN("Unable to import roll from JSON file: {}", e.what());
+        return std::nullopt;
+    }
 }
 
 void filmRoll::applyRollMetaJSON(bool params, copyPaste impOpt) {
@@ -466,4 +591,16 @@ void filmRoll::rollMetaPostEdit(metaBuff *meta) {
 
     std::memset(meta, 0, sizeof(metaBuff));
 
+}
+
+std::string filmRoll::searchImage(const std::filesystem::path& searchPath, const std::string& fileStemName) {
+    for (const auto& entry : std::filesystem::directory_iterator(searchPath)) {
+            if (!entry.is_regular_file())
+                continue;
+            if (entry.path().extension() == ".xmp" || entry.path().extension() == ".XMP")
+                continue;
+            if (entry.path().stem() == fileStemName)
+                return entry.path().string();
+        }
+        return {};
 }

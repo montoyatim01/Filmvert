@@ -11,6 +11,18 @@
 // Global Application Preferences
 userPreferences appPrefs;
 
+//--- Init Preferences ---//
+/*
+    Initialize default preferences
+*/
+void userPreferences::initPrefs() {
+    tmpAutoSave = prefs.autoSave;
+    if (prefs.maxSimExports < 1 || prefs.maxSimExports > 128) {
+        prefs.maxSimExports = std::thread::hardware_concurrency();
+        prefs.maxSimExports = prefs.maxSimExports < 1 ? 4 : prefs.maxSimExports;
+    }
+}
+
 //--- Load From File ---//
 /*
     Attempt to load the preferences in
@@ -20,21 +32,16 @@ void userPreferences::loadFromFile() {
     try {
         std::ifstream f(getPrefFile().c_str());
         if (!f) {
-            LOG_INFO("No preferences file found, or file handle invalid.");
+            initPrefs();
+            saveToFile();
             return;
         }
-
         nlohmann::json prefObj;
         prefObj = nlohmann::json::parse(f);
         if (prefObj.contains("Preferences")) {
             prefs = prefObj["Preferences"].get<preferenceSet>();
-            tmpAutoSave = prefs.autoSave;
-            if (prefs.maxSimExports < 1) {
-                prefs.maxSimExports = std::thread::hardware_concurrency();
-                prefs.maxSimExports = prefs.maxSimExports < 1 ? 4 : prefs.maxSimExports;
-            }
-
         }
+        initPrefs();
     }  catch (const std::exception& e) {
         LOG_WARN("Unable to import preferences file: {}", e.what());
         return;

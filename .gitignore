@@ -11,3 +11,4 @@ macOSBuild
 assets/licenses.txt
 LinuxBuild
 Releases
+*.DS_Store

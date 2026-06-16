@@ -16,10 +16,11 @@ namespace OCIO = OCIO_NAMESPACE;
 struct ocioConfig {
     std::string configName;
     OCIO::ConstConfigRcPtr config;
-    std::vector<char*> colorspaces;
-    std::vector<char*> displays;
-    std::vector<std::vector<char*>> views;
-    std::vector<char*> looks;
+    std::vector<std::string> colorspaces;
+    std::vector<std::string> displays;
+    std::vector<std::vector<std::string>> views;
+    std::vector<std::string> looks;
+
 };
 
 class ocioProcessor {
@@ -33,7 +34,7 @@ class ocioProcessor {
 
     void setActiveConfig(int id);
     ocioConfig* activeConfig(){return &m_configs[selectedConfig];}
-    std::vector<char*> getConfigList();
+    std::vector<std::string> getConfigList();
     std::vector<std::string> getConfigNames();
 
     void processImage(float* img, unsigned int width, unsigned int height, ocioSetting &ocioSet);

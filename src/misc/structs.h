@@ -1,12 +1,53 @@
 #ifndef _structs_h_
 #define _structs_h_
 
+#include <cstdint>
 #include <string>
 #include <array>
 
+#ifdef _WIN32
+#define M_PI 3.141592653
+#endif
+
+// ---------------------------------------------------------------------------
+// Application version — edit these three lines and VERSTAGE only.
+// All four are validated at compile time immediately below.
+// ---------------------------------------------------------------------------
 #define VERMAJOR 1
-#define VERMINOR 1
-#define VERPATCH 2
+#define VERMINOR 2
+#define VERPATCH 0
+
+// Release stage for the current build.
+// Must be exactly one of: ReleaseStage::Alpha, ReleaseStage::Beta,
+//                         ReleaseStage::Release
+enum class ReleaseStage : uint8_t {
+    Alpha   = 0,
+    Beta    = 1,
+    Release = 2
+};
+
+#define VERSTAGE ReleaseStage::Release
+
+// ---------------------------------------------------------------------------
+// Compile-time validation
+//   VERMAJOR / VERMINOR / VERPATCH — must be integers in [0, 65535]
+//     If any is set to a string literal the >= comparison is an illegal
+//     pointer-to-integer conversion and the compiler errors immediately.
+//     If any is a float the range check fires the static_assert message.
+//   VERSTAGE — enum comparison is type-safe; only the three ReleaseStage
+//     values compile; anything else is a type error.
+// ---------------------------------------------------------------------------
+static_assert(VERMAJOR >= 0 && VERMAJOR <= 65535,
+    "VERMAJOR must be an integer in [0, 65535]");
+static_assert(VERMINOR >= 0 && VERMINOR <= 65535,
+    "VERMINOR must be an integer in [0, 65535]");
+static_assert(VERPATCH >= 0 && VERPATCH <= 65535,
+    "VERPATCH must be an integer in [0, 65535]");
+static_assert(
+    VERSTAGE == ReleaseStage::Alpha   ||
+    VERSTAGE == ReleaseStage::Beta    ||
+    VERSTAGE == ReleaseStage::Release,
+    "VERSTAGE must be ReleaseStage::Alpha, ReleaseStage::Beta, or ReleaseStage::Release");
 
 struct copyPaste {
 
@@ -29,6 +70,8 @@ struct copyPaste {
     bool offset = false;
     bool gamma = false;
     bool saturation = false;
+    bool matrix = false;
+    bool curves = false;
 
     //---Metadata
     bool make = false;
@@ -47,6 +90,8 @@ struct copyPaste {
     bool devnote = false;
     bool scanner = false;
     bool scannotes = false;
+    bool frameNum = false;
+    bool hash = false;
 
     bool rotation = false;
     bool imageCrop = false;
@@ -63,10 +108,10 @@ struct copyPaste {
 
     void gradeGlobal(){
         if (temp && tint && bp && wp && lift &&
-            gain && mult && offset && gamma && saturation)
-            temp = tint = bp = wp = lift = gain = mult = offset = gamma = saturation = !gamma;
+            gain && mult && offset && gamma && saturation && matrix)
+            temp = tint = bp = wp = lift = gain = mult = offset = gamma = matrix = curves = saturation = !gamma;
         else
-            temp = tint = bp = wp = lift = gain = mult = offset = gamma = saturation = true;
+            temp = tint = bp = wp = lift = gain = mult = offset = gamma = matrix = curves = saturation = true;
     }
 
     void metaGlobal() {
@@ -82,6 +127,14 @@ struct copyPaste {
             fstop = exposure = date = location =
             gps = notes = dev = chem = devnote =
             scanner = scannotes = rotation = imageCrop = true;
+    }
+
+    void enableAll() {
+        baseColor = cropPoints = analysisBlur = analysis = temp = tint =
+            bp = wp = lift = gain = offset = gamma = saturation = matrix =
+            curves = make = model = lens = stock = focal = fstop = exposure =
+            date = location = gps = notes = dev = chem = devnote = scanner =
+            scannotes = frameNum = hash = rotation = imageCrop = ocio = true;
     }
 };
 
@@ -100,6 +153,13 @@ struct exportParam {
   float borderColor[3] = {0.0f, 0.0f, 0.0f};
   int csBakeRot = 1;
   bool greyscale = false;
+
+  bool resize = false;
+  bool fixedSize = false;
+  bool longSide = true;
+
+  uint32_t fixedSizePx = 3000;
+  float scaleSize = 100.0f;
 };
 
 struct minMaxPoint {
@@ -131,6 +191,7 @@ struct ocioSetting {
     int view = 0;
     bool inverse = false;
     bool useDisplay = true;
+    bool gamutComp = false;
     bool impOverwrite = false;
 
     int texCount = 0;
@@ -145,6 +206,7 @@ struct ocioSetting {
                  view == other.view &&
                 inverse == other.inverse &&
                 useDisplay == other.useDisplay &&
+                gamutComp == other.gamutComp &&
                 texCount == other.texCount &&
                 texture[0] == other.texture[0] &&
                 texWidth[0] == other.texWidth[0] &&
@@ -176,6 +238,13 @@ enum closeMode {
     c_app = 0,
     c_roll = 1,
     c_selIm = 2
+};
+
+enum gradeSection {
+    grade_wb = 1 << 0,
+    grade_tone = 1 << 1,
+    grade_curves = 1 << 2,
+    grade_matrix = 1 << 3
 };
 
 #endif

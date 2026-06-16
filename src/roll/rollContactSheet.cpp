@@ -1,6 +1,7 @@
 #include "preferences.h"
 #include "roll.h"
 #include "gpu.h"
+#include "metaUtils.h"
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/imagebufalgo.h>
@@ -63,6 +64,7 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
         OIIO::ImageBuf rawOIIOBuf(rawImgSpec, rawImgBuffer);
 
         OIIO::ImageBuf* oiioImage;
+        OIIO::ImageBuf orientedOIIOBuf;
 
         // Apply the image's orientation
         if (expParam.csBakeRot == 0) {
@@ -74,7 +76,7 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
                 images[im].imgParam.rotation == 3 ||
                 images[im].imgParam.rotation == 4) {
                     rawOIIOBuf.specmod()["Orientation"] = images[im].imgParam.rotation;
-                    OIIO::ImageBuf orientedOIIOBuf;
+
                     if (!OIIO::ImageBufAlgo::reorient(orientedOIIOBuf, rawOIIOBuf)) {
                         LOG_ERROR("[CS] Failed to reorient image: {}", OIIO::geterror());
                         oiioImage = &rawOIIOBuf;
@@ -87,7 +89,6 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
         } else {
             // Bake everything
             rawOIIOBuf.specmod()["Orientation"] = images[im].imgParam.rotation;
-            OIIO::ImageBuf orientedOIIOBuf;
             if (!OIIO::ImageBufAlgo::reorient(orientedOIIOBuf, rawOIIOBuf)) {
                 LOG_ERROR("[CS] Failed to reorient image: {}", OIIO::geterror());
                 oiioImage = &rawOIIOBuf;
@@ -174,8 +175,23 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
     // Final image
     OIIO::ImageSpec finalSpec(imgBlkWidth, imgBlkHeight + titleHeight, 4, OIIO::TypeDesc::FLOAT);
     std::string rollMeta = getRollMetaString();
-    //std::raise(SIGINT);
-    finalSpec.attribute("ImageDescription", rollMeta);
+    if (expParam.format == 2) {
+        // We're writing a jpeg and should compress the
+        // metadata to fit within the alotted 64k
+        std::string compressedMeta = compressAndEncode(rollMeta);
+
+        if (compressedMeta.size() < 64 * 1023) {
+            // Only write the metadata if it's small enough, with headroom
+            finalSpec.attribute("ImageDescription", compressedMeta);
+        } else {
+            // This is too big for the file
+            LOG_WARN("Cannot embed roll metadata in contact sheet, too large!");
+        }
+    } else {
+        finalSpec.attribute("ImageDescription", rollMeta);
+    }
+
+
     OIIO::ImageBuf finalBuf(finalSpec);
 
     if (!OIIO::ImageBufAlgo::fill(finalBuf, {0.0f, 0.0f, 0.0f, 1.0f})) {
@@ -219,34 +235,27 @@ void filmRoll::generateContactSheet(int imageWidth, exportParam expParam) {
     } // Row loop
 
     OIIO::TypeDesc outFormat;
-    switch (expParam.bitDepth) {
-        case 0:
-            outFormat = OIIO::TypeDesc::UINT8;
-            break;
-        case 1:
-            outFormat = OIIO::TypeDesc::UINT16;
-            break;
-        case 2:
-            outFormat = OIIO::TypeDesc::FLOAT;
-            break;
-   }
-
     std::string fileExt = "";
     switch (expParam.format) {
         case 0:
             fileExt = ".dpx";
+            outFormat = OIIO::TypeDesc::UINT16;
             break;
         case 1:
             fileExt = ".exr";
+            outFormat = OIIO::TypeDesc::UINT16;
             break;
         case 2:
             fileExt = ".jpg";
+            outFormat = OIIO::TypeDesc::UINT8;
             break;
         case 3:
             fileExt = ".png";
+            outFormat = OIIO::TypeDesc::UINT16;
             break;
         case 4:
             fileExt = ".tiff";
+            outFormat = OIIO::TypeDesc::UINT16;
             break;
     }
     std::string filePath = rollPath + "/" + rollName + fileExt;

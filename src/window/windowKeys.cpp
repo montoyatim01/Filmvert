@@ -8,14 +8,18 @@
     pressed any of the assigned hotkeys.
 */
 void mainWindow::checkHotkeys() {
-    if (unsavedPopTrigger || globalMetaPopTrig ||
-        localMetaPopTrig || preferencesPopTrig ||
-        ackPopTrig || anaPopTrig || shortPopTrig ||
-        imMatchPopTrig || contactPopTrig || relNotesPopTrig) {
-            // Don't handle any of the key combos
-            // if we have windows open already!
-            return;
-        }
+
+
+    if (ImGui::IsKeyDown(ImGuiKey_LeftAlt) || ImGui::IsKeyDown(ImGuiKey_RightAlt)) {
+        altHeld = true;
+    }
+    if (ImGui::IsKeyReleased(ImGuiKey_LeftAlt) || ImGui::IsKeyReleased(ImGuiKey_RightAlt)) {
+        altHeld = false;
+    }
+
+    // Status of any mod keys held
+    const ImGuiIO& io = ImGui::GetIO();
+    const bool noMods = !io.KeyCtrl && !io.KeyShift && !io.KeyAlt && !io.KeySuper;
 
     // Close app
     if (ImGui::IsKeyChordPressed(ImGuiKey_Q | ImGuiMod_Ctrl)) {
@@ -270,8 +274,51 @@ void mainWindow::checkHotkeys() {
         }
     }
 
-    if (ImGui::IsKeyChordPressed(ImGuiKey_D | ImGuiMod_Ctrl)) {
-        // Metadata popup flag
+    if (ImGui::IsKeyChordPressed(ImGuiKey_D | ImGuiMod_Ctrl | ImGuiMod_Shift)) {
+        // Demo popup flag
         demoWin = !demoWin;
+    }
+
+    // Red channel view
+    if (ImGui::IsKeyPressed(ImGuiKey_R) && noMods) {
+        if (validIm()) {
+            channelView = channelView != 1 ? 1 : 0;
+            activeImage()->channelView = channelView;
+            renderCall = true;
+        }
+    }
+
+    // Green channel view
+    if (ImGui::IsKeyPressed(ImGuiKey_G) && noMods) {
+        if (validIm()) {
+            channelView = channelView != 2 ? 2 : 0;
+            activeImage()->channelView = channelView;
+            renderCall = true;
+        }
+    }
+
+    // Blue channel view
+    if (ImGui::IsKeyPressed(ImGuiKey_B) && noMods) {
+        if (validIm()) {
+            channelView = channelView != 3 ? 3 : 0;
+            activeImage()->channelView = channelView;
+            renderCall = true;
+        }
+    }
+
+    // Show Clipping
+    if (ImGui::IsKeyPressed(ImGuiKey_K) && noMods) {
+        if (validIm()) {
+            showClip = !showClip;
+            renderCall = true;
+        }
+    }
+
+    // Disable Grades
+    if (ImGui::IsKeyPressed(ImGuiKey_D) && noMods) {
+        if (validIm()) {
+            gradeBypass = !gradeBypass;
+            renderCall = true;
+        }
     }
 }

@@ -32,7 +32,8 @@ void calculateHistogramFromRGBA(const float *rgba_buffer, int width,
     histogram = HistogramData();
 
     const int pixel_count = width * height;
-    const int num_threads = std::thread::hardware_concurrency();
+    int num_threads = std::thread::hardware_concurrency();
+    num_threads = num_threads < 1 || num_threads > THREAD_LIMIT ? 2 : num_threads;
     const int pixels_per_thread = pixel_count / num_threads;
 
     // Create thread-local histograms to avoid contention

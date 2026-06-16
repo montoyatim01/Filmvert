@@ -10,6 +10,7 @@
 
 struct imageMetadata {
     std::string fileName;
+    std::string filePath;
     std::string rollName;
     int frameNumber = 9999;
     int rating = 0;
@@ -31,17 +32,21 @@ struct imageMetadata {
     std::string scanner;
     std::string scanNotes;
 
+    std::string fvVersion;
+    std::string hash;
+
     // Border information (saved but unused)
     float borderPercentage = 0.0f;
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(imageMetadata, fileName, rollName,
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(imageMetadata, fileName, filePath, rollName,
         frameNumber, rating, cameraMake, cameraModel, lens, filmStock,
         focalLength, fNumber, exposureTime, dateTime, location,
         gps, notes, devProcess, chemMfg, devNotes, scanner, scanNotes,
-        borderPercentage);
+        fvVersion, hash, borderPercentage);
 
     bool operator==(const imageMetadata& other) const {
         return fileName == other.fileName &&
+                hash == other.hash &&
                 rollName == other.rollName &&
                 frameNumber == other.frameNumber &&
                 cameraMake == other.cameraMake &&

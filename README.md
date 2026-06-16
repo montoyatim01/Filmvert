@@ -53,6 +53,8 @@ For full documentation on all features and workflows, take a look at the [projec
 ## 🚚 Building from source
 **Requirements**
 
+- C++ Build toolchain
+
 - Conan 1.66.0
 
 - Cmake 3.18 or greater
@@ -65,7 +67,7 @@ Simply execute the build script based on your platform, using either 'Debug' or 
 ```./build.sh Release```
 
 If you get a warning about missing conan profiles, run the command:
-```conan profile new default --detect```
+```conan profile detect```
 to generate default profiles
 
 ## ⭐️ Contributing
