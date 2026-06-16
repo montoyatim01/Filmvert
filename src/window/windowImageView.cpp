@@ -10,12 +10,13 @@
 */
 void mainWindow::imageView() {
     bool calcBaseColor = false;
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(appPrefs.prefs.imageBGColor[0], appPrefs.prefs.imageBGColor[1], appPrefs.prefs.imageBGColor[2], appPrefs.prefs.imageBGColor[3]));
     ImGui::SetNextWindowSizeConstraints(ImVec2(500,500), ImVec2(winWidth - 128, winHeight - 128));
-    ImGui::SetNextWindowPos(ImVec2(0,25), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(winWidth * 0.65,winHeight - (25 + thumbHeight)), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(0, menuHeight), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(winWidth * 0.65,winHeight - (menuHeight + thumbHeight)), ImGuiCond_FirstUseEver);
     ImGuiWindowFlags winFlags = 0;
     winFlags |= ImGuiWindowFlags_NoTitleBar;
-    winFlags |= ImGuiWindowFlags_HorizontalScrollbar;
+    winFlags |= ImGuiWindowFlags_NoScrollbar;
     winFlags |= ImGuiWindowFlags_NoScrollWithMouse;
     winFlags |= ImGuiWindowFlags_NoMove;
     winFlags |= ImGuiWindowFlags_NoCollapse;
@@ -63,24 +64,102 @@ void mainWindow::imageView() {
         }
         dispSize = ImVec2(effectiveScale * displayWidth, effectiveScale * displayHeight);
 
-        cursorPos.x = (ImGui::GetWindowSize().x - dispSize.x) * 0.5f;
-        cursorPos.y = (ImGui::GetWindowSize().y - dispSize.y) * 0.5f;
-        if (cursorPos.x < 0)
-            cursorPos.x = 0;
-        if (cursorPos.y < 0)
-            cursorPos.y = 0;
+        // Cartesian-style viewer: the image center is the origin.
+        // panOffset tracks how far the image center is displaced from the window
+        // center (screen pixels). dispScale (zoom) is never touched on image change,
+        // so switching images preserves both zoom level and pan position.
+        static image*  lastCenteredImage = nullptr;
+        static int     lastRotation      = -1;
+        static ImVec2  panOffset         = {0.0f, 0.0f};
+        static bool    lastReloading     = false;
 
-        ImGui::SetCursorPos(cursorPos);
+        bool imageChanged    = (activeImage() != lastCenteredImage);
+        bool rotationChanged = (!imageChanged && activeImage()->imgParam.rotation != lastRotation);
+        // Detect the frame where a reload just completed for the current image.
+        // GPU render sets reloading=false and dispW/dispH after imageView() runs,
+        // so this fires on the first frame we see the post-render full dimensions.
+        bool reloadCompleted = (!imageChanged && lastReloading && !activeImage()->reloading);
 
-        // Store the current position for later reference
+        // dispSize is only valid once the proxy (or full image) has been rendered.
+        // While an image is still loading its dimensions may be zero, which would
+        // set viewOffset to imageWinSize/2 (top-left at window center) and corrupt
+        // panOffset for every subsequent image in the roll.
+        const bool dispSizeValid = (dispSize.x > 1.0f && dispSize.y > 1.0f);
+
+        if (!viewReady) {
+            // Very first image: start centered, no pan offset.
+            // Defer until we have real dimensions so the initial centering is correct.
+            if (dispSizeValid) {
+                panOffset = {0.0f, 0.0f};
+                viewOffset.x = (imageWinSize.x - dispSize.x) * 0.5f;
+                viewOffset.y = (imageWinSize.y - dispSize.y) * 0.5f;
+                viewReady = true;
+                lastCenteredImage = activeImage();
+                lastRotation      = activeImage()->imgParam.rotation;
+            }
+        } else if (imageChanged) {
+            // Different image selected: keep zoom (dispScale unchanged) and apply
+            // the same center-relative pan so the viewer feels continuous.
+            // Defer if dispSize isn't valid yet (proxy still loading after a buffer
+            // reload). By not updating lastCenteredImage, imageChanged stays true
+            // and we retry each frame until real dimensions are available — preventing
+            // a stale viewOffset and corrupted panOffset from propagating to every
+            // image in the roll.
+            if (dispSizeValid) {
+                viewOffset.x = (imageWinSize.x - dispSize.x) * 0.5f + panOffset.x;
+                viewOffset.y = (imageWinSize.y - dispSize.y) * 0.5f + panOffset.y;
+                lastCenteredImage = activeImage();
+                lastRotation      = activeImage()->imgParam.rotation;
+            }
+        } else if (rotationChanged) {
+            // Same image, rotation changed: dispSize has swapped axes so the old
+            // viewOffset no longer centers the image.  Re-center now and clear the
+            // pan offset so the next image-switch starts from a clean baseline.
+            panOffset = {0.0f, 0.0f};
+            viewOffset.x = (imageWinSize.x - dispSize.x) * 0.5f;
+            viewOffset.y = (imageWinSize.y - dispSize.y) * 0.5f;
+            lastRotation = activeImage()->imgParam.rotation;
+        } else if (reloadCompleted && dispSizeValid) {
+            // Reload just finished: GPU has written final dispW/dispH and cleared
+            // reloading. Re-anchor viewOffset from the preserved panOffset so any
+            // proxy/full discrepancy accumulated during the reload is corrected.
+            viewOffset.x = (imageWinSize.x - dispSize.x) * 0.5f + panOffset.x;
+            viewOffset.y = (imageWinSize.y - dispSize.y) * 0.5f + panOffset.y;
+        }
+
+        // Track reloading state for reload-completion detection next frame.
+        lastReloading = activeImage()->reloading;
+
+        // Recompute panOffset every frame so it's always current when an image
+        // switch is detected next frame.  Skip the update when dispSize isn't
+        // valid yet (proxy still loading): computing panOffset against a zero
+        // dispSize would corrupt it with a large spurious offset that then
+        // gets applied on the first frame real dimensions arrive.
+        // Also skip while reloading — proxy dimensions may differ slightly from
+        // the final GPU output due to integer truncation, so we freeze panOffset
+        // during the reload and let the reloadCompleted branch re-anchor it cleanly.
+        if (dispSizeValid && !activeImage()->reloading) {
+            panOffset.x = viewOffset.x - (imageWinSize.x - dispSize.x) * 0.5f;
+            panOffset.y = viewOffset.y - (imageWinSize.y - dispSize.y) * 0.5f;
+        }
+
+        // viewOffset is the screen-space position of the image top-left inside the window.
+        // We keep cursorPos/scroll in sync so calculateVisible() still works.
+        cursorPos = viewOffset;
+        scroll = {0, 0};
+
+        // Place a full-window Dummy so IsItemHovered() covers the entire viewer
+        ImGui::SetCursorPos(ImVec2(0, 0));
+
+        // Image draws at viewOffset; imagePos is the screen-space top-left
         ImVec2 imagePos = ImVec2(
-            ImGui::GetWindowPos().x + cursorPos.x - ImGui::GetScrollX(),
-            ImGui::GetWindowPos().y + cursorPos.y - ImGui::GetScrollY()
+            ImGui::GetWindowPos().x + viewOffset.x,
+            ImGui::GetWindowPos().y + viewOffset.y
         );
 
         { // Draw the image based on its rotation
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+            ImVec2 canvas_pos = imagePos;
 
             // Define UV coordinates for each corner based on rotation
             ImVec2 uv0, uv1, uv2, uv3; // top-left, top-right, bottom-right, bottom-left
@@ -120,9 +199,9 @@ void mainWindow::imageView() {
             }
 
             // Draw the rotated quad
-            if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading && !activeImage()->fullIm)
+            if (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading && !activeImage()->fullIm && !isExporting && gpu->dispBufIm() == activeImage())
                 draw_list->AddImageQuad(
-                    static_cast<ImTextureID>(activeImage()->glTexture),
+                    static_cast<ImTextureID>(gpu->dispTex()),
                     canvas_pos, // top-left
                     ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y), // top-right
                     ImVec2(canvas_pos.x + dispSize.x, canvas_pos.y + dispSize.y), // bottom-right
@@ -139,16 +218,13 @@ void mainWindow::imageView() {
                     uv0, uv1, uv2, uv3
                 );
 
-            // Reserve space in ImGui layout
-            ImGui::Dummy(dispSize);
+            // Full-window Dummy for hover/key-ownership (image is drawn by draw list at viewOffset)
+            ImGui::Dummy(imageWinSize);
         }
 
 
         ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
         ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelX);
-
-        scroll.x = ImGui::GetScrollX();
-        scroll.y = ImGui::GetScrollY();
 
         ImGuiWindow *win = ImGui::GetCurrentWindow();
         bool currentlyInteracting = false;
@@ -295,11 +371,10 @@ void mainWindow::imageView() {
                 newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
                 newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
 
-                // Constrain to rotated images boundaries
-                int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
-                                    activeImage()->height : activeImage()->width;
-                int rotatedHeight = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
-                                    activeImage()->width : activeImage()->height;
+                // Cases 5-8 all swap the display width/height relative to the original
+                bool swapDims = (activeImage()->imgParam.rotation >= 5 && activeImage()->imgParam.rotation <= 8);
+                int rotatedWidth  = swapDims ? activeImage()->height : activeImage()->width;
+                int rotatedHeight = swapDims ? activeImage()->width  : activeImage()->height;
 
                 newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
                 newPosRotated.y = ImClamp(newPosRotated.y, 0.0f, (float)rotatedHeight);
@@ -332,11 +407,9 @@ void mainWindow::imageView() {
                 ImVec2 newPosRotated;
                 newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
                 newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
-                // Constrain to rotated images boundaries
-                int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
-                                    activeImage()->height : activeImage()->width;
-                int rotatedHeight = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
-                                    activeImage()->width : activeImage()->height;
+                bool swapDims = (activeImage()->imgParam.rotation >= 5 && activeImage()->imgParam.rotation <= 8);
+                int rotatedWidth  = swapDims ? activeImage()->height : activeImage()->width;
+                int rotatedHeight = swapDims ? activeImage()->width  : activeImage()->height;
 
                 newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
                 newPosRotated.y = ImClamp(newPosRotated.y, 0.0f, (float)rotatedHeight);
@@ -351,7 +424,9 @@ void mainWindow::imageView() {
 
                 activeImage()->minSel = true;
                 // Does this need to be on it's own thread?
-                activeImage()->setMinMax();
+                activeImage()->setMinMax(dispOCIO);
+                if (appPrefs.prefs.cmykSliders)
+                    activeImage()->imgParam.rgb_to_cmyk();
                 // We want to be sure our changes are immediately rendered
                 renderCall = true;
             } else {
@@ -368,11 +443,9 @@ void mainWindow::imageView() {
                 ImVec2 newPosRotated;
                 newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
                 newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
-                // Constrain to rotated images boundaries
-                int rotatedWidth = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
-                                    activeImage()->height : activeImage()->width;
-                int rotatedHeight = (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8) ?
-                                    activeImage()->width : activeImage()->height;
+                bool swapDims = (activeImage()->imgParam.rotation >= 5 && activeImage()->imgParam.rotation <= 8);
+                int rotatedWidth  = swapDims ? activeImage()->height : activeImage()->width;
+                int rotatedHeight = swapDims ? activeImage()->width  : activeImage()->height;
 
                 newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
                 newPosRotated.y = ImClamp(newPosRotated.y, 0.0f, (float)rotatedHeight);
@@ -387,7 +460,9 @@ void mainWindow::imageView() {
 
                 activeImage()->minSel = false;
                 // Does this need to be on it's own thread?
-                activeImage()->setMinMax();
+                activeImage()->setMinMax(dispOCIO);
+                if (appPrefs.prefs.cmykSliders)
+                    activeImage()->imgParam.rgb_to_cmyk();
                 // We want to be sure our changes are immediately rendered
                 renderCall = true;
             } else {
@@ -514,24 +589,14 @@ void mainWindow::imageView() {
 
         // Controls for panning and zooming the image
         if (ImGui::IsItemHovered()) {
+            // Mouse position in image space.
+            // viewOffset is where the image top-left sits in window space.
+            // mousePosInImage = (winMouse - viewOffset) / dispScale = imageCoord * baseScale
             ImVec2 mousePosInImage;
-            mousePosInImage.x =
-                (ImGui::GetIO().MousePos.x - ImGui::GetWindowPos().x -
-                 cursorPos.x + ImGui::GetScrollX()) /
-                dispScale;
-            mousePosInImage.y =
-                (ImGui::GetIO().MousePos.y - ImGui::GetWindowPos().y -
-                 cursorPos.y + ImGui::GetScrollY()) /
-                dispScale;
+            mousePosInImage.x = (ImGui::GetIO().MousePos.x - ImGui::GetWindowPos().x - viewOffset.x) / dispScale;
+            mousePosInImage.y = (ImGui::GetIO().MousePos.y - ImGui::GetWindowPos().y - viewOffset.y) / dispScale;
 
-            // Inside the mouse wheel condition:
             if (ImGui::GetIO().MouseWheel != 0 && (ImGui::GetIO().KeyShift || ImGui::GetIO().KeyAlt || !appPrefs.prefs.trackpadMode)) {
-                // Store the mouse position relative to the image before zooming
-                float mouseXRatio = mousePosInImage.x / activeImage()->width;
-                float mouseYRatio = mousePosInImage.y / activeImage()->height;
-
-                // Adjust scale factor
-                float prevScale = dispScale;
                 dispScale = dispScale * pow(1.05f, ImGui::GetIO().MouseWheel);
 
                 // Clamp the relative scale
@@ -540,61 +605,215 @@ void mainWindow::imageView() {
 
                 // Recalculate actual scale
                 actualScale = baseScale * dispScale;
+                float newEffectiveScale = (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading)
+                                          ? actualScale
+                                          : actualScale / appPrefs.prefs.proxyRes;
+                dispSize = ImVec2(newEffectiveScale * displayWidth, newEffectiveScale * displayHeight);
 
-                // Calculate new display size
-                dispSize = ImVec2(dispScale * activeImage()->width,
-                                  dispScale * activeImage()->height);
+                float winMouseX = ImGui::GetIO().MousePos.x - ImGui::GetWindowPos().x;
+                float winMouseY = ImGui::GetIO().MousePos.y - ImGui::GetWindowPos().y;
 
-                // Recalculate cursor position correctly
-                cursorPos.x = (ImGui::GetWindowSize().x - dispSize.x) * 0.5f;
-                cursorPos.y = (ImGui::GetWindowSize().y - dispSize.y) * 0.5f;
+                // Keep the image point under the cursor fixed:
+                //   viewOffset_new = winMouse - mousePosInImage * dispScale_new
+                //                  = winMouse - imageCoord * effectiveScale_new  ✓
+                // No clamping — the image is allowed to extend beyond window edges.
+                viewOffset.x = winMouseX - mousePosInImage.x * dispScale;
+                viewOffset.y = winMouseY - mousePosInImage.y * dispScale;
 
-                if (cursorPos.x < 0) cursorPos.x = 0;
-                if (cursorPos.y < 0) cursorPos.y = 0;
-
-                // Calculate new scroll position to keep mouse point fixed during zoom
-                float newMouseImageX = mouseXRatio * activeImage()->width;
-                float newMouseImageY = mouseYRatio * activeImage()->height;
-
-                scroll.x = (newMouseImageX * dispScale) - (ImGui::GetIO().MousePos.x - ImGui::GetWindowPos().x) + cursorPos.x;
-                scroll.y = (newMouseImageY * dispScale) - (ImGui::GetIO().MousePos.y - ImGui::GetWindowPos().y) + cursorPos.y;
-
-                ImGui::SetScrollX(scroll.x);
-                ImGui::SetScrollY(scroll.y);
                 currentlyInteracting = true;
             }
 
             if ((ImGui::GetIO().MouseWheel != 0 || ImGui::GetIO().MouseWheelH != 0) && !ImGui::GetIO().KeyShift && !ImGui::GetIO().KeyAlt && appPrefs.prefs.trackpadMode) {
-                scroll.x = ImGui::GetScrollX() - (ImGui::GetIO().MouseWheelH * 12);
-                scroll.y = ImGui::GetScrollY() - (ImGui::GetIO().MouseWheel * 12);
-                ImGui::SetScrollX(scroll.x);
-                ImGui::SetScrollY(scroll.y);
+                viewOffset.x += ImGui::GetIO().MouseWheelH * 12;
+                viewOffset.y += ImGui::GetIO().MouseWheel * 12;
                 currentlyInteracting = true;
             }
 
             if ((ImGui::IsKeyPressed(ImGuiKey_H) && !ImGui::IsKeyPressed(ImGuiMod_Ctrl)) || firstImage) {
-                int iWidth = activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ? activeImage()->dispH : activeImage()->dispW;
-                int iHeight = activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ? activeImage()->dispW : activeImage()->dispH;
-                // Pressed the z key, reset zoom
-                float scaleX = ImGui::GetWindowSize().x / (iWidth + ((float)iWidth * 0.01f));
-                float scaleY = ImGui::GetWindowSize().y / (iHeight + ((float)iHeight * 0.01f));
-
                 dispScale = 0.98f;
                 actualScale = baseScale * dispScale;
+                // Recompute dispSize for the reset scale so centering is accurate
+                float resetEffScale = (activeImage()->imageLoaded && !toggleProxy && !activeImage()->reloading)
+                                      ? actualScale
+                                      : actualScale / appPrefs.prefs.proxyRes;
+                ImVec2 resetDispSize = ImVec2(resetEffScale * displayWidth, resetEffScale * displayHeight);
+                viewOffset.x = (imageWinSize.x - resetDispSize.x) * 0.5f;
+                viewOffset.y = (imageWinSize.y - resetDispSize.y) * 0.5f;
                 currentlyInteracting = true;
                 firstImage = false;
             }
 
-            // Only allow panning if we're not dragging a corner and not making a selection
-            // And not moving the min/max points and not working the image crop
+            // Panning: no clamping, image can extend beyond window edges
             if ((ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f)) &&
                     !dragging && !isSelecting && !minDrag && !maxDrag && !draggingImageCrop) {
-                scroll.x = ImGui::GetScrollX() - ImGui::GetIO().MouseDelta.x;
-                scroll.y = ImGui::GetScrollY() - ImGui::GetIO().MouseDelta.y;
-                ImGui::SetScrollX(scroll.x);
-                ImGui::SetScrollY(scroll.y);
+                viewOffset.x += ImGui::GetIO().MouseDelta.x;
+                viewOffset.y += ImGui::GetIO().MouseDelta.y;
                 currentlyInteracting = true;
             }
+        }
+
+        // Pixel value inspector — shown as a tooltip when Alt is held and the
+        // cursor is over the image. RGB values are read directly from the floating-point processed texture
+        // (glTexture / glTextureSm) via a lightweight read-only FBO, bypassing
+        // the display framebuffer entirely.  The display framebuffer is GL_RGBA8
+        // (unsigned normalised), which clamps anything outside [0, 1] before
+        if (altHeld && ImGui::IsItemHovered() && validIm()) {
+            ImVec2 mousePos = ImGui::GetIO().MousePos;
+
+            // When a crop is active the GPU renders only the cropped region into
+            // dispTex (dimensions = crop pixel size, not full image size).  The
+            // EXIF rotation is NOT applied in the shader — it is handled solely
+            // by AddImageQuad's UV mapping.  So dispTex is always in original
+            // (pre-rotation) image space, cropped.  We therefore need to:
+            //   1. Use crop dimensions for the rotation inverse-transform so that
+            //      the display-space coords map into the crop's coordinate range.
+            //   2. Clamp to crop dimensions.
+            //   3. Add the crop origin when displaying X/Y so we report the
+            //      full-image pixel position rather than a crop-relative one.
+            bool cropActive = activeImage()->imgParam.cropEnable;
+            int cropOriginX = 0, cropOriginY = 0;
+            int effW = activeImage()->width;   // effective image width  (full or crop)
+            int effH = activeImage()->height;  // effective image height (full or crop)
+
+            if (cropActive) {
+                cropOriginX = (int)(activeImage()->imgParam.imageCropMinX * activeImage()->width);
+                cropOriginY = (int)(activeImage()->imgParam.imageCropMinY * activeImage()->height);
+                effW = std::max(1, (int)((activeImage()->imgParam.imageCropMaxX -
+                                          activeImage()->imgParam.imageCropMinX) * activeImage()->width));
+                effH = std::max(1, (int)((activeImage()->imgParam.imageCropMaxY -
+                                          activeImage()->imgParam.imageCropMinY) * activeImage()->height));
+            }
+
+            // Screen → rotated-image-space → original pixel coordinates
+            // actualScale is always calibrated to the full image, so dividing by
+            // it yields coordinates in original-image pixels regardless of whether
+            // a proxy or the full texture is active.  When crop is active the
+            // result is crop-relative (0-based from the crop top-left corner).
+            float rotX = (mousePos.x - imagePos.x) / actualScale;
+            float rotY = (mousePos.y - imagePos.y) / actualScale;
+
+            int origX = (int)rotX;
+            int origY = (int)rotY;
+            if (activeImage()->imgParam.rotation != 1) {
+                // Use effW/effH (crop or full image) so the inverse maps into
+                // the correct [0, effW-1] × [0, effH-1] range.
+                inverseTransformCoordinates(origX, origY,
+                    activeImage()->imgParam.rotation,
+                    effW, effH);
+            }
+            origX = std::clamp(origX, 0, effW - 1);
+            origY = std::clamp(origY, 0, effH - 1);
+
+            // Full-image pixel coordinates for the X/Y readout.
+            int displayX = origX + cropOriginX;
+            int displayY = origY + cropOriginY;
+
+            // Mirror the texture selection logic used by the draw call
+            bool useFullTex = activeImage()->imageLoaded && !toggleProxy &&
+                              !activeImage()->reloading   && !activeImage()->fullIm;
+            GLuint texHandle = useFullTex
+                ? (GLuint)(uintptr_t)gpu->dispTex()
+                : (GLuint)(uintptr_t)activeImage()->glTextureSm;
+
+            // Map coordinates to texture pixel coordinates.
+            // dispTex / glTextureSm both span only the crop region (effW × effH
+            // at full res, scaled by proxyRes for the proxy).  origX/origY are
+            // already crop-relative, so they index directly into the texture.
+            int texX, texY;
+            if (useFullTex) {
+                texX = origX;
+                texY = origY;
+            } else {
+                // dispW/dispH reflect the proxy-scaled crop (or full image) size.
+                texX = (int)((float)origX / (float)effW * (float)activeImage()->dispW);
+                texY = (int)((float)origY / (float)effH * (float)activeImage()->dispH);
+                texX = std::clamp(texX, 0, (int)activeImage()->dispW - 1);
+                texY = std::clamp(texY, 0, (int)activeImage()->dispH - 1);
+            }
+
+            // One-time FBO creation; reused for every subsequent hover frame
+            static GLuint inspectorFBO = 0;
+            if (!inspectorFBO)
+                glGenFramebuffers(1, &inspectorFBO);
+            float pixel[3] = {0.0f, 0.0f, 0.0f};
+            int pixel8bit[3] = {0, 0, 0};
+            int pixel10bit[3] = {0, 0, 0};
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, inspectorFBO);
+            glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                   GL_TEXTURE_2D, texHandle, 0);
+            glReadBuffer(GL_COLOR_ATTACHMENT0);
+            if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE)
+                glReadPixels(texX, texY, 1, 1, GL_RGB, GL_FLOAT, pixel);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+            glReadBuffer(GL_BACK); // restore default read target
+
+            ImGui::BeginTooltip();
+            ImGui::Text("X: %d  Y: %d", displayX, displayY);
+            ImGui::Separator();
+            switch (appPrefs.prefs.pixelScale) {
+                case 0: // 8-bit
+                    pixel8bit[0] = std::clamp((int)(pixel[0] * 255.0), -255, 255);
+                    pixel8bit[1] = std::clamp((int)(pixel[1] * 255.0), -255, 255);
+                    pixel8bit[2] = std::clamp((int)(pixel[2] * 255.0), -255, 255);
+                    switch (channelView) {
+                        case 0: // RGB
+                            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "R  %i", pixel8bit[0]);
+                            ImGui::TextColored(ImVec4(0.45f, 1.0f, 0.45f, 1.0f), "G  %i", pixel8bit[1]);
+                            ImGui::TextColored(ImVec4(0.45f, 0.65f, 1.0f,  1.0f), "B  %i", pixel8bit[2]);
+                            break;
+                        case 1: // R
+                            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "R  %i", pixel8bit[0]);
+                            break;
+                        case 2: // G
+                            ImGui::TextColored(ImVec4(0.45f, 1.0f, 0.45f, 1.0f), "G  %i", pixel8bit[1]);
+                            break;
+                        case 3: // B
+                            ImGui::TextColored(ImVec4(0.45f, 0.65f, 1.0f,  1.0f), "B  %i", pixel8bit[2]);
+                            break;
+                    }
+                    break;
+                case 1: // 10-bit
+                    pixel10bit[0] = std::clamp((int)(pixel[0] * 1024.0), -1024, 1024);
+                    pixel10bit[1] = std::clamp((int)(pixel[1] * 1024.0), -1024, 1024);
+                    pixel10bit[2] = std::clamp((int)(pixel[2] * 1024.0), -1024, 1024);
+                    switch (channelView) {
+                        case 0: // RGB
+                            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "R  %i", pixel10bit[0]);
+                            ImGui::TextColored(ImVec4(0.45f, 1.0f, 0.45f, 1.0f), "G  %i", pixel10bit[1]);
+                            ImGui::TextColored(ImVec4(0.45f, 0.65f, 1.0f,  1.0f), "B  %i", pixel10bit[2]);
+                            break;
+                        case 1: // R
+                            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "R  %i", pixel10bit[0]);
+                            break;
+                        case 2: // G
+                            ImGui::TextColored(ImVec4(0.45f, 1.0f, 0.45f, 1.0f), "G  %i", pixel10bit[1]);
+                            break;
+                        case 3: // B
+                            ImGui::TextColored(ImVec4(0.45f, 0.65f, 1.0f,  1.0f), "B  %i", pixel10bit[2]);
+                            break;
+                    }
+                    break;
+                case 2: // Float
+                    switch (channelView) {
+                        case 0: // RGB
+                            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "R  %.4f", pixel[0]);
+                            ImGui::TextColored(ImVec4(0.45f, 1.0f, 0.45f, 1.0f), "G  %.4f", pixel[1]);
+                            ImGui::TextColored(ImVec4(0.45f, 0.65f, 1.0f,  1.0f), "B  %.4f", pixel[2]);
+                            break;
+                        case 1: // R
+                            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "R  %.4f", pixel[0]);
+                            break;
+                        case 2: // G
+                            ImGui::TextColored(ImVec4(0.45f, 1.0f, 0.45f, 1.0f), "G  %.4f", pixel[1]);
+                            break;
+                        case 3: // B
+                            ImGui::TextColored(ImVec4(0.45f, 0.65f, 1.0f,  1.0f), "B  %.4f", pixel[2]);
+                            break;
+                    }
+                    break;
+            }
+
+            ImGui::EndTooltip();
         }
 
         if (currentlyInteracting) {
@@ -617,11 +836,147 @@ void mainWindow::imageView() {
 
         // Calculate position relative to the visible window area
         ImVec2 windowPos = ImGui::GetWindowPos();
-        ImVec2 textPos = ImVec2(windowPos.x + 5, windowPos.y + 5); // 10px from left, 30px from top
+        const float uiScale = ImGui::GetFontSize() / 18.0f;
+        ImVec2 textPos = ImVec2(windowPos.x + 5.0f * uiScale, windowPos.y + 5.0f * uiScale);
 
         // Draw the text directly to the draw list so it's always visible
         ImU32 textColor = IM_COL32(255, 0, 0, 255); // Red color
         drawList->AddText(textPos, textColor, "GRADE BYPASS");
+    }
+    if (channelView != 0) {
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+        ImVec2 windowPos = ImGui::GetWindowPos();
+        const float uiScale = ImGui::GetFontSize() / 18.0f;
+        float offset = gradeBypass ? 25.0f * uiScale : 5.0f * uiScale;
+        ImVec2 textPos = ImVec2(windowPos.x + 5.0f * uiScale, windowPos.y + offset);
+
+        // Draw the text directly to the draw list so it's always visible
+        ImU32 textColor = IM_COL32(255, 0, 0, 255); // Red color
+        switch (channelView) {
+            case 1:
+                drawList->AddText(textPos, textColor, "RED CHANNEL");
+                break;
+            case 2:
+                drawList->AddText(textPos, textColor, "GREEN CHANNEL");
+                break;
+            case 3:
+                drawList->AddText(textPos, textColor, "BLUE CHANNEL");
+                break;
+            default:
+                break;
+        }
+
+    }
+    if (appPrefs.prefs.showStats) {
+        static uint64_t statsCachedFrame = UINT64_MAX;
+        static image* lastImage = nullptr;
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec2 windowSize = ImGui::GetWindowSize();
+        ImVec2 windowPos  = ImGui::GetWindowPos();
+        ImU32  textColor  = IM_COL32(255, 255, 255, 200);
+
+        const float uiScale  = ImGui::GetFontSize() / 18.0f;
+        const float fontSize = 13.0f * uiScale;
+        const float padding  = 6.0f  * uiScale;
+        const float minGap   = 14.0f * uiScale;
+        ImFont* font = ImGui::GetFont();
+
+        // Derive line height from the font at the target size
+        float lineH = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, "Ag").y * 1.3f;
+
+        // Static labels — never change, no need to recompute
+        static const char* labels[] = {
+            "FPS:",
+            "Raw Res:",
+            "Display Res:",
+            "Image RAM:",
+
+            "Images in Roll:",
+            "Roll RAM:",
+
+            "Total Rolls:",
+            "Total RAM:",
+            "Total VRAM:"
+        };
+        const int lineCount = 9;
+
+        static std::string vals[9];
+        static float labelW[9] = {};
+        static float valW[9]   = {};
+        static float maxLabelW = 0.0f;
+        static float maxValW   = 0.0f;
+        static float panelW    = 0.0f;
+
+        uint64_t currentFrame = ImGui::GetFrameCount();
+        image* curImage = validIm() ? activeImage() : nullptr;
+        bool needsUpdate = (currentFrame - statsCachedFrame) >= 30
+                        || curImage != lastImage;
+
+        if (needsUpdate && validRoll() && validIm()) {
+            statsCachedFrame = currentFrame;
+
+            uint64_t totalRam = 0;
+            uint64_t totalVram = 0;
+            for (auto& roll : activeRolls) {
+                totalRam += roll.rollRamUsage();
+                totalVram += roll.rollVramUsage();
+            }
+
+
+            // vals[0] = FPS — updated every frame below
+            vals[1] = fmt::format("{}x{}", activeImage()->rawWidth,  activeImage()->rawHeight);
+            vals[2] = fmt::format("{}x{}", activeImage()->width,     activeImage()->height);
+            vals[3] = byteFormat(activeImage()->ramUsage());
+            vals[4] = fmt::format("{}", activeRollSize());
+            vals[5] = byteFormat(activeRoll()->rollRamUsage());
+            vals[6] = fmt::format("{}", activeRolls.size());
+            vals[7] = byteFormat(totalRam);
+            vals[8] = byteFormat(totalVram + gpu->activeBytes());
+
+
+            // Measure everything at the actual render font size
+            maxLabelW = 0.0f;
+            maxValW   = 0.0f;
+            for (int i = 0; i < lineCount; i++) {
+                labelW[i] = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, labels[i]).x;
+                valW[i]   = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, vals[i].c_str()).x;
+                maxLabelW = std::max(maxLabelW, labelW[i]);
+                maxValW   = std::max(maxValW,   valW[i]);
+            }
+            panelW = padding + maxLabelW + minGap + maxValW + padding;
+        }
+
+        // FPS updates every frame
+        if (validIm()) {
+            vals[0]  = fmt::format("{:.1f}", fps);
+            valW[0]  = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, vals[0].c_str()).x;
+            maxValW  = std::max(maxValW, valW[0]);
+            panelW   = padding + maxLabelW + minGap + maxValW + padding;
+        }
+
+        if (validIm() && panelW > 0.0f) {
+            float panelH = lineH * lineCount + padding * 2.0f;
+
+            // Top-right corner in screen coordinates
+            float rightEdge = windowPos.x + windowSize.x;
+            float topEdge   = windowPos.y;
+            ImVec2 rectMin  = ImVec2(rightEdge - panelW, topEdge);
+            ImVec2 rectMax  = ImVec2(rightEdge,           topEdge + panelH);
+
+            drawList->AddRectFilled(rectMin, rectMax, IM_COL32(0, 0, 0, 160), 4.0f);
+
+            float lx  = rectMin.x + padding;      // label left edge
+            float rx  = rectMax.x - padding;      // value right edge (right-justify from here)
+            float ty  = rectMin.y + padding;
+
+            for (int i = 0; i < lineCount; i++) {
+                float y = ty + lineH * (float)i;
+                drawList->AddText(font, fontSize, ImVec2(lx,            y), textColor, labels[i]);
+                drawList->AddText(font, fontSize, ImVec2(rx - valW[i],  y), textColor, vals[i].c_str());
+            }
+        }
     }
     if (ratingSet) {
         if (validIm()) {
@@ -653,6 +1008,7 @@ void mainWindow::imageView() {
 
     }
     ImGui::End();
+    ImGui::PopStyleColor();
 
     // Calculate base color if needed:
     if (calcBaseColor) {

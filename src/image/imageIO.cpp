@@ -7,6 +7,7 @@
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
 #include <OpenImageIO/imageio.h>
+#include <OpenImageIO/filesystem.h>
 #include <cstddef>
 #include <variant>
 #include <filesystem>
@@ -34,6 +35,11 @@ bool image::exportPreProcess(std::string outPath, int exportImgCount) {
     expFullPath = outPath;
     renderReady = false;
     activeExpCount = exportImgCount;
+    // Clear display flags
+    showClip = false;
+    channelView = 0;
+    gradeBypass = false;
+    secEnable = 0xFFFFFFFF;
     if (isRawImage) {
         if (imageLoaded){
             clearBuffers();
@@ -144,7 +150,7 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
     allocateTmpBuf();
     trimForSave();
 
-    int prevRot = imgParam.rotation;
+    imgParam.writeRotation = imgParam.rotation;
 
     // Apply the orientation to the image
     OIIO::ImageBuf srcBuf(inspec, tmpOutData);
@@ -153,14 +159,14 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
     OIIO::ImageBuf reorientedBuf;
     OIIO::ImageBuf greyscaleBuf;
 
-    if (applyCrops && imgParam.rotation != 1) {
+    if (applyCrops && imgParam.writeRotation != 1) {
         // Set the orientation metadata in the source buffer
-        srcBuf.specmod()["Orientation"] = imgParam.rotation;
+        srcBuf.specmod()["Orientation"] = imgParam.writeRotation;
         // Apply reorientation
         if (!OIIO::ImageBufAlgo::reorient(reorientedBuf, srcBuf)) {
             LOG_ERROR("Failed to reorient image: {}", OIIO::geterror());
         } else {
-            imgParam.rotation = 1;
+            imgParam.writeRotation = 1;
         }
         finalBuf = &reorientedBuf;
 
@@ -188,6 +194,50 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
             LOG_ERROR("Unable to add image border: {}", OIIO::geterror(true));
         }
     }
+    OIIO::ImageBuf resizeImg;
+    if (param.resize) {
+        int newWidth, newHeight;
+        if (param.fixedSize) {
+            // Scale image to fixed size
+            if (param.longSide) {
+                // Setting the long side
+                if (finalBuf->spec().width > finalBuf->spec().height) {
+                    // Width is the long side
+                    newWidth = param.fixedSizePx;
+                    newHeight = (int) ( ((float)newWidth / (float)finalBuf->spec().width) * (float)finalBuf->spec().height);
+                } else {
+                    // Height is the long side
+                    newHeight = param.fixedSizePx;
+                    newWidth = (int) ( ((float)newHeight / (float)finalBuf->spec().height) * (float)finalBuf->spec().width);
+                }
+            } else {
+                // Setting the short side
+                if (finalBuf->spec().width > finalBuf->spec().height) {
+                    // Width is the long side, set the height to value
+                    newHeight = param.fixedSizePx;
+                    newWidth = (int) ( ((float)newHeight / (float)finalBuf->spec().height) * (float)finalBuf->spec().width);
+                } else {
+                    // Height is the long side, set the width to value
+                    newWidth = param.fixedSizePx;
+                    newHeight = (int) ( ((float)newWidth / (float)finalBuf->spec().width) * (float)finalBuf->spec().height);
+                }
+            }
+        } else {
+            // Scale image based on percentage
+            newWidth = (int)((float)finalBuf->spec().width * (param.scaleSize * 0.01f));
+            newHeight = (int)((float)finalBuf->spec().height * (param.scaleSize * 0.01f));
+        }
+
+        OIIO::ImageSpec resizeSpec(newWidth, newHeight,
+                                   finalBuf->spec().nchannels,
+                                   finalBuf->spec().format);
+        resizeImg = OIIO::ImageBuf(resizeSpec);
+        if (OIIO::ImageBufAlgo::resize(resizeImg, *finalBuf)) {
+            finalBuf = &resizeImg;
+        } else {
+            LOG_ERROR("Unable to resize image {}: {}", srcFilename, OIIO::geterror(true));
+        }
+    }
 
 
 
@@ -199,6 +249,8 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
     } else if (param.format == 1) {
         // EXR Compression
         finalBuf->specmod()["Compression"] = "zip";
+        updateMetaStr();
+        finalBuf->specmod().attribute("filmvert", jsonMeta);
     } else if (param.format == 3) {
         finalBuf->specmod()["png:compressionLevel"] = param.compression;
     } else if (param.format == 4) {
@@ -224,7 +276,6 @@ bool image::writeImg(const exportParam param, ocioSetting ocioSet) {
     // Write out the metadata
     writeExpMeta(filePath);
 
-    imgParam.rotation = prevRot;
     LOG_INFO("Completed write for {}", srcFilename);
 
     return true;
@@ -251,8 +302,36 @@ bool image::debayerImage(bool fullRes, int quality) {
     rawProcessor->imgdata.params.user_qual = quality;
     rawProcessor->imgdata.params.half_size = !fullRes;
 
-    // Open the raw file
-    int result = rawProcessor->open_file(fullPath.c_str());
+    // Open the raw file from buffer if loaded, otherwise file
+    int result = -1;
+    if (fileLoaded) {
+        // Open from buffer
+        result = rawProcessor->open_buffer(fileBuffer.data(), fileBuffer.size());
+        if (result != LIBRAW_SUCCESS) {
+            // We failed with the buffer, fallback to file
+            rawProcessor->recycle();
+
+            // Set parameters for linear output
+            rawProcessor->imgdata.params.output_bps = 16;       // 16-bit output
+            rawProcessor->imgdata.params.gamm[0] = 1;           // gamma 1.0 for linear output
+            rawProcessor->imgdata.params.gamm[1] = 1;
+            rawProcessor->imgdata.params.no_auto_bright = 1;    // Disable auto-brightening
+            rawProcessor->imgdata.params.use_camera_wb = 1;     // Use camera white balance
+            rawProcessor->imgdata.params.output_color = 6;      // Output color space: ACES
+            rawProcessor->imgdata.params.user_qual = quality;
+            rawProcessor->imgdata.params.half_size = !fullRes;
+
+            result = rawProcessor->open_file(fullPath.c_str());
+            if (result != LIBRAW_SUCCESS) {
+                LOG_WARN("Error opening buffer and file: {}", fullPath);
+                LOG_ERROR("{}", libraw_strerror(result));
+                return false;
+            }
+        }
+    } else {
+        // Open from file
+        result = rawProcessor->open_file(fullPath.c_str());
+    }
     if (result != LIBRAW_SUCCESS) {
         LOG_WARN("Error opening file: {}", fullPath);
         LOG_ERROR("{}", libraw_strerror(result));
@@ -277,7 +356,7 @@ bool image::debayerImage(bool fullRes, int quality) {
     libraw_processed_image_t* processedImage = rawProcessor->dcraw_make_mem_image(&result);
     if (!processedImage || result != LIBRAW_SUCCESS) {
         LOG_ERROR("Error creating image: {}",libraw_strerror(result) );
-        return "Error creating image";
+        return false;
     }
 
     // Fill raw buffer
@@ -287,6 +366,7 @@ bool image::debayerImage(bool fullRes, int quality) {
     if (rawImgData)
         delete[] rawImgData;
     rawImgData = new float[processedImage->width * processedImage->height * 4];
+    rawBufSize = processedImage->width * processedImage->height * 4 * sizeof(float);
 
     // Convert to float (assuming 16-bit output)
     if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP) {
@@ -319,7 +399,6 @@ bool image::debayerImage(bool fullRes, int quality) {
                     rawImgData[index + 0] = pOut[0] * 2.0f;
                     rawImgData[index + 1] = pOut[1] * 2.0f;
                     rawImgData[index + 2] = pOut[2] * 2.0f;
-                    rawImgData[index + 3] = 1.0f;
                 }
             }
         };
@@ -343,6 +422,10 @@ bool image::debayerImage(bool fullRes, int quality) {
         // Clean up
         LibRaw::dcraw_clear_mem(processedImage);
         rawProcessor->recycle();
+
+        // Gamut Compression
+        if (imgParam.gamutComp)
+            ocioProc.refGamutCompress(rawImgData, rawWidth, rawHeight);
         return true;
     }
     LibRaw::dcraw_clear_mem(processedImage);
@@ -357,8 +440,24 @@ bool image::debayerImage(bool fullRes, int quality) {
     and the image has been unloaded for memory savings.
 */
 bool image::oiioReload() {
+
     OIIO::ImageInput::unique_ptr inputImage;
-    inputImage = OIIO::ImageInput::open(fullPath);
+    std::unique_ptr<OIIO::Filesystem::IOMemReader> memReader;
+
+    if (fileLoaded) {
+        memReader = std::make_unique<OIIO::Filesystem::IOMemReader>(
+                fileBuffer.data(),
+                fileBuffer.size()
+            );
+        OIIO::ImageSpec memSpec;
+        inputImage = OIIO::ImageInput::open(fullPath, &memSpec, memReader.get());
+        if (!inputImage) {
+            // We've failed loading the buffer, try from disk
+            inputImage = OIIO::ImageInput::open(fullPath);
+        }
+    } else {
+        inputImage = OIIO::ImageInput::open(fullPath);
+    }
 
     if (!inputImage)
     {
@@ -378,6 +477,7 @@ bool image::oiioReload() {
     }
 
     rawImgData = new float[rawWidth * rawHeight * 4];
+    rawBufSize = rawWidth * rawHeight * 4 * sizeof(float);
     if(!inputImage->read_image(0, 0, 0, nChannels, OIIO::TypeDesc::FLOAT, (void*)rawImgData))
     {
         LOG_ERROR("[oiio] Failed to read image: {}", srcFilename);
@@ -398,6 +498,9 @@ bool image::oiioReload() {
         ocioProc.processImage(rawImgData, width, height, intOCIOSet);
     else
         ocioProc.processImage(rawImgData, rawWidth, rawHeight, intOCIOSet);
+    // Gamut Compression
+    if (imgParam.gamutComp)
+        ocioProc.refGamutCompress(rawImgData, fullIm ? rawWidth : width, fullIm ? rawHeight : height);
     imageLoaded = true;
     needRndr = true;
     return true;
@@ -406,30 +509,21 @@ bool image::oiioReload() {
 
 bool image::dataReload() {
 
-    std::ifstream file(fullPath, std::ios::binary | std::ios::ate);
-    if (!file) {
+    if (!fileLoaded) {
+        loadFileintoBuffer();
+    }
+    if (!fileLoaded || fileBuffer.size() < 24) {
+        LOG_ERROR("Unable to reload file: {}", srcFilename);
         return false;
     }
-    // Get total file size
-    file.seekg(0, std::ios::end);
-    size_t totalSize = file.tellg();
+    // File is loaded
+    size_t totalSize = fileBuffer.size();
     // Calculate data size (excluding header if present)
     size_t dataSize = intRawSet.pakonHeader ? totalSize - 16 : totalSize;
 
     // Seek to start of data (skip header if present)
-    if (intRawSet.pakonHeader)
-        file.seekg(16, std::ios::beg);
-    else
-        file.seekg(0, std::ios::beg);
-
-    // Allocate buffer for data only
-    std::unique_ptr<char[]> buffer(new char[dataSize]);
-
-    // Read the data
-    file.read(buffer.get(), dataSize);
-    file.close();
-
-    char* raw_ptr = buffer.get();
+    int offset = intRawSet.pakonHeader ? 16 : 0;
+    char* raw_ptr = fileBuffer.data() + offset;
 
     float maxValue = static_cast<float>((1 << intRawSet.bitDepth) - 1);
     int bytesPerChannel = (intRawSet.bitDepth > 8) ? (intRawSet.bitDepth > 16 ? 4 : 2) : 1;
@@ -441,6 +535,7 @@ bool image::dataReload() {
     }
 
     rawImgData = new float[rawWidth * rawHeight * 4];
+    rawBufSize = rawWidth * rawHeight * 4 * sizeof(float);
 
     // Load in the image and pre-process to Linear AP1
     unsigned int numThreads = 2;//std::thread::hardware_concurrency();
@@ -507,7 +602,7 @@ bool image::dataReload() {
     // Launch the threads
     for (int i=0; i<numThreads; ++i) {
         int startRow = i * rowsPerThread;
-        int endRow = (i == numThreads - 1) ? height : (i + 1) * rowsPerThread;
+        int endRow = (i == numThreads - 1) ? rawHeight : (i + 1) * rowsPerThread;
         threads[i] = std::thread(processRows, startRow, endRow);
     }
 
@@ -517,12 +612,21 @@ bool image::dataReload() {
     }
 
     padToRGBA();
+    width = rawWidth;
+    height = rawHeight;
     if (appPrefs.prefs.perfMode && !fullIm)
         resizeProxy();
 
     ocioProc.processImage(rawImgData, width, height, intOCIOSet);
+
+    // Gamut Compression
+    if (imgParam.gamutComp)
+        ocioProc.refGamutCompress(rawImgData, width, height);
+
     imageLoaded = true;
     needRndr = true;
+    if (!appPrefs.prefs.holdFilesinRAM)
+        unloadFileBuffer();
     return true;
 }
 
@@ -577,8 +681,12 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
         img.srcFilename = imgP.stem().string();
         img.srcPath = imgP.parent_path().string();
         img.fullPath = imagePath;
+        img.imgMeta.fileName = img.srcFilename + imgP.extension().string();
+        img.imgMeta.filePath = img.srcPath;
 
         try {
+            long fileSize = std::filesystem::file_size(imagePath);
+            checkRawFile(rawSet, fileSize);
             img.width = rawSet.width;
             img.height = rawSet.height;
             img.rawWidth = rawSet.width;
@@ -595,7 +703,7 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
                 // File is exactly right (without header)
                 rawSet.pakonHeader = false;
             }
-            if (std::filesystem::file_size(imgP) == expByteCount + 16) {
+            else if (std::filesystem::file_size(imgP) == expByteCount + 16) {
                 // File has Pakon header
                 rawSet.pakonHeader = true;
             } else {
@@ -615,10 +723,12 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
                 img.intOCIOSet = ocioSet;
                 img.isDataRaw = true;
                 img.isRawImage = false;
+                img.updateSaveState();
                 return img;
             }
 
             img.rawImgData = new float[img.width * img.height * 4];
+            img.rawBufSize = img.width * img.height * 4 * sizeof(float);
             // Load in the image and pre-process to Linear AP1
             unsigned int numThreads = 2;//std::thread::hardware_concurrency();
             numThreads = numThreads == 0 ? 2 : numThreads;
@@ -627,34 +737,23 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
             // Divide the workload into equal parts for each thread
             int rowsPerThread = img.height / numThreads;
 
-            std::ifstream file(imagePath, std::ios::binary | std::ios::ate);
-            if (!file) {
+            img.loadFileintoBuffer();
+            if (!img.fileLoaded || img.fileBuffer.size() < 24) {
                 delete [] img.rawImgData;
                 img.rawImgData = nullptr;
                 throw std::runtime_error("Error: Unable to open input file: " + imagePath);
             }
-
+            img.calculateHash();
+            img.intRawSet = rawSet;
             // Get total file size
-            file.seekg(0, std::ios::end);
-            size_t totalSize = file.tellg();
+            size_t totalSize = img.fileBuffer.size();
 
             // Calculate data size (excluding header if present)
             size_t dataSize = rawSet.pakonHeader ? totalSize - 16 : totalSize;
 
             // Seek to start of data (skip header if present)
-            if (rawSet.pakonHeader)
-                file.seekg(16, std::ios::beg);
-            else
-                file.seekg(0, std::ios::beg);
-
-            // Allocate buffer for data only
-            std::unique_ptr<char[]> buffer(new char[dataSize]);
-
-            // Read the data
-            file.read(buffer.get(), dataSize);
-            file.close();
-
-            char* raw_ptr = buffer.get();
+            int offset = rawSet.pakonHeader ? 16 : 0;
+            char* raw_ptr = img.fileBuffer.data() + offset;
 
             float maxValue = static_cast<float>((1 << rawSet.bitDepth) - 1);
             int bytesPerChannel = (rawSet.bitDepth > 8) ? (rawSet.bitDepth > 16 ? 4 : 2) : 1;
@@ -752,6 +851,7 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
                     img.intOCIOSet.view = img.imgParam.ocioView;
                     img.intOCIOSet.useDisplay = img.imgParam.useDisplay;
                     img.intOCIOSet.inverse = img.imgParam.inverse;
+                    img.intOCIOSet.gamutComp = img.imgParam.gamutComp;
                 } else {
                     LOG_WARN("Unable to locate config used by image, falling back to current selected config!");
                 }
@@ -763,11 +863,20 @@ std::variant<image, std::string> readDataImage(std::string imagePath, rawSetting
                 img.imgParam.ocioView = img.intOCIOSet.view;
                 img.imgParam.useDisplay = img.intOCIOSet.useDisplay;
                 img.imgParam.inverse = img.intOCIOSet.inverse;
+                img.imgParam.gamutComp = appPrefs.prefs.gamutComp;
             }
             ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
+
+            // Gamut Compression
+            if (img.imgParam.gamutComp)
+                ocioProc.refGamutCompress(img.rawImgData, img.width, img.height);
+
             img.imageLoaded = true;
             img.isDataRaw = true;
             img.isRawImage = false;
+            img.updateSaveState();
+            if (!appPrefs.prefs.holdFilesinRAM)
+                img.unloadFileBuffer();
             return img;
 
 
@@ -801,6 +910,8 @@ std::variant<image, std::string> readRawImage(std::string imagePath, bool backgr
     img.srcFilename = imgP.stem().string();
     img.srcPath = imgP.parent_path().string();
     img.fullPath = imagePath;
+    img.imgMeta.fileName = img.srcFilename + imgP.extension().string();
+    img.imgMeta.filePath = img.srcPath;
     std::string fileExtension = imgP.extension().string();
     std::transform(fileExtension.begin(), fileExtension.end(), fileExtension.begin(),
         [](unsigned char c){ return std::tolower(c); });
@@ -829,12 +940,39 @@ std::variant<image, std::string> readRawImage(std::string imagePath, bool backgr
     rawProcessor->imgdata.params.user_qual = appPrefs.prefs.perfMode ? 2 : appPrefs.prefs.debayerMode;
     rawProcessor->imgdata.params.half_size = appPrefs.prefs.perfMode ? 1 : 0;
 
-    // Open the raw file
+    // Open the raw file - check if valid
     int result = rawProcessor->open_file(imagePath.c_str());
     if (result != LIBRAW_SUCCESS) {
         LOG_ERROR("Error opening file: {}", imagePath);
         LOG_ERROR("{}", libraw_strerror(result));
         return "Error opening file";
+    }
+    // We have a valid raw file, load into memory
+    // and calculate hash
+    img.loadFileintoBuffer();
+    if (!img.fileLoaded) {
+        // We've failed to load the file into memory.
+        // Skip hasing and raw processing from buffer.
+    } else {
+        rawProcessor->recycle();
+
+        // Set parameters for linear output
+        rawProcessor->imgdata.params.output_bps = 16;       // 16-bit output
+        rawProcessor->imgdata.params.gamm[0] = 1;         // Set gamma to 1.0 for linear output
+        rawProcessor->imgdata.params.gamm[1] = 1;
+        rawProcessor->imgdata.params.no_auto_bright = 1;    // Disable auto-brightening
+        rawProcessor->imgdata.params.use_camera_wb = 1;     // Use camera white balance
+        rawProcessor->imgdata.params.output_color = 6;      // Output color space: 1 = sRGB
+        rawProcessor->imgdata.params.user_qual = appPrefs.prefs.perfMode ? 2 : appPrefs.prefs.debayerMode;
+        rawProcessor->imgdata.params.half_size = appPrefs.prefs.perfMode ? 1 : 0;
+
+        result = rawProcessor->open_buffer(img.fileBuffer.data(), img.fileBuffer.size());
+        if (result != LIBRAW_SUCCESS) {
+            LOG_ERROR("Error opening file buffer: {}", imagePath);
+            LOG_ERROR("{}", libraw_strerror(result));
+            return "Error opening file buffer";
+        }
+        img.calculateHash();
     }
     if (background) {
         int rwidth = rawProcessor->imgdata.sizes.width;
@@ -855,6 +993,9 @@ std::variant<image, std::string> readRawImage(std::string imagePath, bool backgr
         img.imageLoaded = false;
         img.isDataRaw = false;
         img.isRawImage = true;
+        img.updateSaveState();
+        if (!appPrefs.prefs.holdFilesinRAM)
+            img.unloadFileBuffer();
         return img;
     }
 
@@ -886,6 +1027,7 @@ auto c1 = std::chrono::steady_clock::now();
     img.rawHeight = processedImage->height;
     img.nChannels = processedImage->colors;
     img.rawImgData = new float[img.width * img.height * 4];
+    img.rawBufSize = img.width * img.height * 4 * sizeof(float);
     // Convert to float (assuming 16-bit output)
     if (processedImage->bits == 16 && processedImage->type == LIBRAW_IMAGE_BITMAP) {
         unsigned int numThreads = 2;//std::thread::hardware_concurrency();
@@ -917,7 +1059,6 @@ auto c1 = std::chrono::steady_clock::now();
                     img.rawImgData[index + 0] = pOut[0] * 2.0f;
                     img.rawImgData[index + 1] = pOut[1] * 2.0f;
                     img.rawImgData[index + 2] = pOut[2] * 2.0f;
-                    img.rawImgData[index + 3] = 1.0f;
                 }
             }
         };
@@ -954,6 +1095,7 @@ auto d1 = std::chrono::steady_clock::now();
     img.padToRGBA();
     if (appPrefs.prefs.perfMode)
         img.resizeProxy();
+
     img.setCrop();
 auto e1 = std::chrono::steady_clock::now();
 
@@ -962,12 +1104,19 @@ auto f1 = std::chrono::steady_clock::now();
     // Read metadata
     img.readMetaFromFile();
 
+    // Gamut Compression
+    if (img.imgParam.gamutComp)
+        ocioProc.refGamutCompress(img.rawImgData, img.width, img.height);
+
 
     // Clean up
     LibRaw::dcraw_clear_mem(processedImage);
     rawProcessor->recycle();
     img.isDataRaw = false;
     img.isRawImage = true;
+    img.updateSaveState();
+    if (!appPrefs.prefs.holdFilesinRAM)
+        img.unloadFileBuffer();
 auto end = std::chrono::steady_clock::now();
 
 auto durA = std::chrono::duration_cast<std::chrono::microseconds>(a1 - start);
@@ -1003,8 +1152,36 @@ auto durH = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSetting ocioSet, bool background) {
     image img;
 
+    std::filesystem::path imgP = imagePath;
+    img.srcFilename = imgP.stem().string();
+    img.srcPath = imgP.parent_path().string();
+    img.fullPath = imagePath;
+    img.imgMeta.fileName = img.srcFilename + imgP.extension().string();
+    img.imgMeta.filePath = img.srcPath;
+    if (img.srcFilename == "" || img.srcPath == "") {
+        LOG_ERROR("Unable to parse image: {}, empty paths", imagePath);
+        return "Could not parse image path";
+    }
+
     OIIO::ImageInput::unique_ptr inputImage;
-    inputImage = OIIO::ImageInput::open(imagePath);
+    std::unique_ptr<OIIO::Filesystem::IOMemReader> memReader;
+
+    img.loadFileintoBuffer();
+    if (!img.fileLoaded) {
+        //We've failed to load the image file into memory.
+        // Skip hashing and OIIO loading from buffer
+         inputImage = OIIO::ImageInput::open(imagePath);
+    } else {
+        img.calculateHash();
+        memReader = std::make_unique<OIIO::Filesystem::IOMemReader>(
+                img.fileBuffer.data(),
+                img.fileBuffer.size()
+            );
+        OIIO::ImageSpec memSpec;
+        inputImage = OIIO::ImageInput::open(imagePath, &memSpec, memReader.get());
+    }
+
+
 
     if (!inputImage)
     {
@@ -1013,14 +1190,7 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
         return "Could not open image: " + imagePath;
     }
 
-    std::filesystem::path imgP = imagePath;
-    img.srcFilename = imgP.stem().string();
-    img.srcPath = imgP.parent_path().string();
-    img.fullPath = imagePath;
-    if (img.srcFilename == "" || img.srcPath == "") {
-        LOG_ERROR("Unable to parse image: {}, empty paths", imagePath);
-        return "Could not parse image path";
-    }
+
 
     const OIIO::ImageSpec &inputSpec = inputImage->spec();
     img.width = inputSpec.width;
@@ -1052,12 +1222,16 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
         img.imageLoaded = false;
         img.isDataRaw = false;
         img.isRawImage = false;
+        img.updateSaveState();
+        if (!appPrefs.prefs.holdFilesinRAM)
+            img.unloadFileBuffer();
         return img;
     }
 
     //LOG_INFO("Reading in image with size: {}x{}x{}", img.width, img.height, img.nChannels);
 
     img.rawImgData = new float[img.width * img.height * 4];
+    img.rawBufSize = img.width * img.height * 4 * sizeof(float);
     if(!inputImage->read_image(0, 0, 0, inputSpec.nchannels, OIIO::TypeDesc::FLOAT, (void*)img.rawImgData))
     {
         LOG_ERROR("[oiio] Failed to read image: {}", imagePath);
@@ -1094,6 +1268,7 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
             img.intOCIOSet.view = img.imgParam.ocioView;
             img.intOCIOSet.useDisplay = img.imgParam.useDisplay;
             img.intOCIOSet.inverse = img.imgParam.inverse;
+            img.intOCIOSet.gamutComp = img.imgParam.gamutComp;
         } else {
             LOG_WARN("Unable to locate config used by image, falling back to current selected config!");
         }
@@ -1105,11 +1280,20 @@ std::variant<image, std::string> readImageOIIO(std::string imagePath, ocioSettin
         img.imgParam.ocioView = img.intOCIOSet.view;
         img.imgParam.useDisplay = img.intOCIOSet.useDisplay;
         img.imgParam.inverse = img.intOCIOSet.inverse;
+        img.imgParam.gamutComp = appPrefs.prefs.gamutComp;
     }
     ocioProc.processImage(img.rawImgData, img.width, img.height, img.intOCIOSet);
+
+    // Gamut Compression
+    if (img.imgParam.gamutComp)
+        ocioProc.refGamutCompress(img.rawImgData, img.width, img.height);
+
     img.imageLoaded = true;
     img.isDataRaw = false;
     img.isRawImage = false;
+    img.updateSaveState();
+    if (!appPrefs.prefs.holdFilesinRAM)
+        img.unloadFileBuffer();
 
     return img;
 }

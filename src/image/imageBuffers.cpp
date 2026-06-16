@@ -1,13 +1,17 @@
 #include "image.h"
+#include "imageParams.h"
 #include "logger.h"
 #include "preferences.h"
-
+#include <algorithm>
 
 
 
 void image::allocBlurBuf() {
-    if (!blurImgData)
+    if (!blurImgData) {
         blurImgData = new float[width * height * 4];
+        blurBufSize = width * height * 4 * sizeof(float);
+    }
+
 }
 
 void image::delBlurBuf() {
@@ -16,6 +20,7 @@ void image::delBlurBuf() {
     {
         delete [] blurImgData;
         blurImgData = nullptr;
+        blurBufSize = 0;
     }
 
 }
@@ -25,33 +30,42 @@ void image::allocateTmpBuf() {
     {
         // We already have an alpha channel
         tmpOutData = procImgData;
+        tmpBufSize = 0;
         return;
     }
-    if (rawWidth * rawHeight > width * height)
-        tmpOutData = new float[rawWidth * rawHeight * 4];
-    else
-        tmpOutData = new float[width * height * 4];
+    if (tmpOutData)
+        return;
+    // Allocate the largest buffer size based on all variables
+    size_t allocPixels = std::max(std::max((rawWidth * rawHeight), (width * height)), (rndrW * rndrH));
+    tmpOutData = new float[allocPixels * 4];
+    tmpBufSize = allocPixels * 4 * sizeof(float);
 }
 void image::clearTmpBuf() {
     if (tmpOutData && tmpOutData != procImgData) {
         delete[] tmpOutData;
-        tmpOutData = nullptr;
     }
+    tmpBufSize = 0;
+    tmpOutData = nullptr;
 
 }
 
 void image::allocProcBuf() {
     if (!procImgData) {
-        if (rawWidth * rawHeight > width * height)
+        if (rawWidth * rawHeight > width * height) {
             procImgData = new float[rawWidth * rawHeight * 4];
-        else
+            procBufSize = rawWidth * rawHeight * 4 * sizeof(float);
+        } else {
             procImgData = new float[width * height * 4];
+            procBufSize = width * height * 4 * sizeof(float);
+        }
+
     }
 }
 void image::delProcBuf() {
     if (procImgData) {
         delete [] procImgData;
         procImgData = nullptr;
+        procBufSize = 0;
     }
 }
 
@@ -80,21 +94,25 @@ void image::clearBuffers() {
     if (rawImgData) {
         delete [] rawImgData;
         rawImgData = nullptr;
+        rawBufSize = 0;
     }
+    // Delete temp buffer
+    if (tmpOutData && tmpOutData != procImgData) {
+        delete [] tmpOutData;
+        tmpBufSize = 0;
+    }
+    tmpOutData = nullptr;
     // Delete proc buffer
     if (procImgData) {
         delete [] procImgData;
         procImgData = nullptr;
-    }
-    // Delete temp buffer
-    if (tmpOutData) {
-        delete [] tmpOutData;
-        tmpOutData = nullptr;
+        procBufSize = 0;
     }
     // Delete Blur buff
     if (blurImgData) {
         delete [] blurImgData;
         blurImgData = nullptr;
+        blurBufSize = 0;
     }
     // Delete disp buffer
     if (dispImgData) {
@@ -254,4 +272,25 @@ void image::trimForSave() {
     for (auto& thread : threads) {
         thread.join();
     }
+}
+
+// --- Unload File Buffer --- //
+/*
+    Unload the buffer containing the raw
+    image file data
+*/
+
+void image::unloadFileBuffer() {
+    fileBuffer.clear();
+    fileLoaded = false;
+}
+
+// Return the system RAM usage by the image
+uint64_t image::ramUsage() {
+    return rawBufSize + procBufSize + tmpBufSize + blurBufSize + fileBuffer.size() + sizeof(image);
+}
+
+// Return the GPU RAM usage by the image
+uint64_t image::vramUsage() {
+    return glBufSize + glSmBufSize;
 }

@@ -49,7 +49,7 @@ class OpenColorIOConan(ConanFile):
 
     def requirements(self):
         self.requires("expat/[>=2.6.2 <3]")
-        if self.settings.os == "Windows":
+        if self.settings.os != "Macos":
             self.requires("glew/[>=2.1.0]")
             self.requires("freeglut/[>=3.2.2]")
         if Version(self.version) < "2.2.0":
@@ -142,20 +142,22 @@ class OpenColorIOConan(ConanFile):
         tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0077"] = "NEW"
         tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0091"] = "NEW"
 
-        if self.settings.os == "Windows":
+
+        if self.settings.os != "Macos":
             # glew/glut
             glew_dep = self.dependencies["glew"]
             freeglut_dep = self.dependencies["freeglut"]
 
-            # Convert Windows paths to use forward slashes for CMake
-            glew_root = glew_dep.package_folder.replace("\\", "/")
-            glut_root = freeglut_dep.package_folder.replace("\\", "/")
+            if self.settings.os == "Windows":
+                # Convert Windows paths to use forward slashes for CMake
+                glew_dep = glew_dep.package_folder.replace("\\", "/")
+                freeglut_dep = freeglut_dep.package_folder.replace("\\", "/")
 
-            tc.variables["GLEW_ROOT"] = glew_root
-            tc.variables["GLUT_ROOT"] = glut_root
+                tc.variables["GLEW_ROOT"] = glew_dep
+                tc.variables["GLUT_ROOT"] = freeglut_dep
 
-            # Set specific GLEW variables that OpenColorIO expects
-            tc.variables["GLEW_INCLUDE_DIRS"] = f"{glew_root}/include"
+                # Set specific GLEW variables that OpenColorIO expects
+                tc.variables["GLEW_INCLUDE_DIRS"] = f"{glew_dep}/include"
 
         tc.generate()
 
@@ -165,7 +167,7 @@ class OpenColorIOConan(ConanFile):
     def _patch_sources(self):
         apply_conandata_patches(self)
 
-        for module in ("expat", "lcms2", "pystring", "yaml-cpp", "Imath", "minizip-ng", "freeglut"):
+        for module in ("expat", "lcms2", "pystring", "yaml-cpp", "Imath", "minizip-ng", "freeglut", "GLEW"):
             rm(self, "Find"+module+".cmake", os.path.join(self.source_folder, "share", "cmake", "modules"))
 
     def build(self):

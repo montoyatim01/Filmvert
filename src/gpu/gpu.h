@@ -8,6 +8,7 @@
 #include <OpenColorIO/oglapphelpers/glsl.h>
 
 #include <GL/glew.h>
+#include <array>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -55,8 +56,16 @@ class openglGPU {
         std::string getError();
 
         long long unsigned int histoTex(){return m_histoTex;}
+        long long unsigned int dispTex(){return m_displayTexture;}
+
+        uint64_t activeBytes(){return histoBytes + activeInputBytes + activeDisplayBytes + cleanActiveBytes;}
+        image* dispBufIm(){return m_dispBufIm;}
 
         bool m_rendering = false;
+        const int64_t histoBytes = (HISTWIDTH * HISTHEIGHT * 4 * 4);
+        uint64_t activeInputBytes = 0;
+        uint64_t activeDisplayBytes = 0;
+        uint64_t cleanActiveBytes = 0;
 
     private:
         gpuStat m_status;
@@ -65,6 +74,7 @@ class openglGPU {
         std::mutex m_queueLock;
 
         image* m_prevIm;
+        image* m_dispBufIm;
 
         ocioSetting m_prevOCIO;
 
@@ -102,7 +112,10 @@ class openglGPU {
         OCIO::OpenGLBuilderRcPtr m_ocioBuilder;
 
         GLuint m_framebuffer = 0;
+        GLuint m_smallFBO    = 0;
         GLuint m_inputTexture = 0;
+        GLuint m_displayTexture = 0;
+        GLuint m_cleanOutTex = 0;
         GLuint m_histoTex = 0;
 
         GLuint m_vertexArray = 0;
@@ -126,8 +139,20 @@ class openglGPU {
                 GLint G_temp;
                 GLint G_tint;
                 GLint G_sat;
+                GLint G_matrixR;
+                GLint G_matrixG;
+                GLint G_matrixB;
+                GLint G_sharpen;
+                GLint G_sharpenRadius;
+                GLint G_curveW;   GLint G_curveW_n;
+                GLint G_curveR;   GLint G_curveR_n;
+                GLint G_curveG;   GLint G_curveG_n;
+                GLint G_curveB;   GLint G_curveB_n;
                 GLint bypass;
                 GLint gradeBypass;
+                GLint secEnable;
+                GLint showClip;
+                GLint channelView;
                 // Crop Variables
                 GLint imageCropMin;
                 GLint imageCropMax;
@@ -135,6 +160,7 @@ class openglGPU {
                 GLint cropEnabled;
                 GLint cropVisible;
                 GLint imageSize;
+                GLint proxyPass;
         } m_uniforms;
 };
 

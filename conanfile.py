@@ -1,6 +1,5 @@
 import os
 import platform
-from types import NoneType
 
 from conan import ConanFile
 from conan.tools.cmake import CMakeDeps, CMakeToolchain
@@ -27,6 +26,7 @@ openimageio_options = {
 }
 minizip_options = {"minizip-ng*:with_libcomp": False}
 libraw_options = {"libraw*:build_thread_safe": True}
+curl_options = {"curl*:shared": False}
 
 
 class FilmvertConan(ConanFile):
@@ -38,10 +38,16 @@ class FilmvertConan(ConanFile):
         **openimageio_options,
         **minizip_options,
         **libraw_options,
+        **curl_options,
     }
 
     def requirements(self):
+        self.requires("catch2/3.8.1", test=True)
+        self.requires("openssl/3.6.2")
+        self.requires("libcurl/8.19.0")
+        self.requires("zlib/1.3.1")
         self.requires("libpng/1.6.52")
+        self.requires("imath/3.2.1", override=True)
         self.requires("libjpeg/9f", override=True)
         self.requires("openexr/3.4.4")
         self.requires("jasper/4.0.0")

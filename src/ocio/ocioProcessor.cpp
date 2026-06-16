@@ -76,37 +76,30 @@ bool ocioProcessor::initExtConfig(std::string path) {
 */
 void ocioProcessor::loadNames(ocioConfig& config) {
     // Get all available color spaces
+    config.colorspaces.clear();
     for (int i = 0; i < config.config->getNumColorSpaces(); i++) {
-        std::string colorspace = config.config->getColorSpaceNameByIndex(i);
-        config.colorspaces.resize(config.colorspaces.size() + 1);
-        config.colorspaces[i] = new char[colorspace.length() + 1];
-        std::strcpy(config.colorspaces[i], colorspace.c_str());
+        config.colorspaces.push_back(config.config->getColorSpaceNameByIndex(i));
     }
 
     // Get all available displays
+    config.displays.clear();
+    config.views.clear();
     for (int i = 0; i < config.config->getNumDisplays(); i++) {
         std::string displayName = config.config->getDisplay(i);
-        config.displays.resize(config.displays.size() + 1);
-        config.displays[i] = new char[displayName.length() + 1];
-        std::strcpy(config.displays[i], displayName.c_str());
+        config.displays.push_back(displayName);
 
-        std::vector<char*> curView;
+        std::vector<std::string> curView;
         // Get views for this display
         for (int j = 0; j < config.config->getNumViews(displayName.c_str()); j++) {
-            std::string view = config.config->getView(displayName.c_str(), j);
-            curView.resize(curView.size() + 1);
-            curView[j] = new char[view.length() + 1];
-            std::strcpy(curView[j], view.c_str());
+            curView.push_back(config.config->getView(displayName.c_str(), j));
         }
         config.views.push_back(curView);
     }
 
     // Get all available looks
+    config.looks.clear();
     for (int i = 0; i < config.config->getNumLooks(); i++) {
-        std::string lookName = config.config->getLookNameByIndex(i);
-        config.looks.resize(config.looks.size() + 1);
-        config.looks[i] = new char[lookName.length() + 1];
-        std::strcpy(config.looks[i], lookName.c_str());
+        config.looks.push_back(config.config->getLookNameByIndex(i));
     }
 }
 
@@ -134,13 +127,11 @@ void ocioProcessor::setActiveConfig(int id) {
 /*
     Get list of configs for display
 */
-std::vector<char*> ocioProcessor::getConfigList() {
-    std::vector<char*> list;
-    for (auto &config : m_configs) {
-        list.resize(list.size() + 1);
-        list[list.size() - 1] = new char[config.configName.size() + 1];
-        std::strcpy(list[list.size() - 1], config.configName.c_str());
-    }
+std::vector<std::string> ocioProcessor::getConfigList() {
+    std::vector<std::string> list;
+    list.reserve(m_configs.size());
+    for (auto& config : m_configs)
+        list.push_back(config.configName);
     return list;
 }
 
@@ -250,10 +241,11 @@ void ocioProcessor::processImage(float *img, unsigned int width,
 
 void ocioProcessor::refGamutCompress(float* img, unsigned int width, unsigned int height) {
     try {
-
       OCIO::ConstProcessorRcPtr processor;
       OCIO::LookTransformRcPtr lookTransform = OCIO::LookTransform::Create();
       lookTransform->setLooks("ACES 1.3 Reference Gamut Compression");
+      lookTransform->setSrc("ACEScg");
+      lookTransform->setDst("ACEScg");
       processor = m_configs[selectedConfig].config->getProcessor(lookTransform);
 
       OCIO::ConstCPUProcessorRcPtr cpu =
@@ -286,7 +278,7 @@ void ocioProcessor::refGamutCompress(float* img, unsigned int width, unsigned in
       }
 
     } catch (OCIO::Exception &e) {
-      LOG_ERROR("Error processing OIIO Gamut Compression!");
+      LOG_ERROR("Error processing OIIO Gamut Compression! {}", e.what());
       return;
     }
 }

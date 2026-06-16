@@ -36,6 +36,7 @@ void mainWindow::checkMeta() {
                 image* img = getImage(r, i);
                 if (!img) {
                    LOG_WARN("Cannot update meta on nullptr");
+                   continue;
                 }
 
                 if (img->needMetaWrite) {

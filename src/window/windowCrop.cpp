@@ -1,6 +1,8 @@
 #include "window.h"
 #include <imgui.h>
 #include <string>
+#include <algorithm>
+#include <cmath>
 
 // TODO:
 // -- Implement application for image EXIF rotation (strip meta)
@@ -11,6 +13,9 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
     static int draggedCropHandle = -1; // 0-3 for corners, 4 for entire rectangle
     static ImVec2 dragStartMouse;
     static float dragStartMinX, dragStartMinY, dragStartMaxX, dragStartMaxY;
+    static bool dominantAxisLocked = false; // locked for the duration of a corner drag
+    static bool dominantAxisIsX    = true;  // true = X is the driving axis for lockAspect
+    static float dragLockedNormRatio = 1.0f;
 
     // Only show crop if cropVisible is true
     if (!cropVisible) {
@@ -23,6 +28,45 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
     if (activeImage()->imgParam.rotation == 6 || activeImage()->imgParam.rotation == 8 ||
         activeImage()->imgParam.rotation == 5 || activeImage()->imgParam.rotation == 7) {
         std::swap(displayWidth, displayHeight);
+    }
+
+    // Compute target normalized aspect ratio (normW / normH) for the current image orientation.
+    // imageCropAspect is always long-side / short-side, applied relative to the image's long edge.
+    bool is90Rotated = (activeImage()->imgParam.rotation == 5 || activeImage()->imgParam.rotation == 6 ||
+                        activeImage()->imgParam.rotation == 7 || activeImage()->imgParam.rotation == 8);
+    bool isLandscape = (displayWidth >= displayHeight);
+    float R = activeImage()->imgParam.imageCropAspect;
+    float baseRatio = isLandscape
+        ? (R * (float)displayHeight / (float)displayWidth)
+        : ((float)displayHeight / (R * (float)displayWidth));
+    float targetNormRatio = is90Rotated ? (1.0f / baseRatio) : baseRatio; // normW / normH
+
+    // Handle updateCrop: adjust height to match the aspect ratio based on current box width,
+    // keeping the box centered on its current position.
+    if (updateCrop) {
+        float centerX = (activeImage()->imgParam.imageCropMinX + activeImage()->imgParam.imageCropMaxX) * 0.5f;
+        float centerY = (activeImage()->imgParam.imageCropMinY + activeImage()->imgParam.imageCropMaxY) * 0.5f;
+
+        float normW = activeImage()->imgParam.imageCropMaxX - activeImage()->imgParam.imageCropMinX;
+        float normH = normW / targetNormRatio;
+
+        // Clamp height to [0,1] and back-solve width if needed
+        if (normH > 1.0f) {
+            normH = 1.0f;
+            normW = normH * targetNormRatio;
+        }
+        normW = std::min(normW, 1.0f);
+
+        // Apply, keeping box centered; shift inward if it would exceed bounds
+        float newMinX = ImClamp(centerX - normW * 0.5f, 0.0f, 1.0f - normW);
+        float newMinY = ImClamp(centerY - normH * 0.5f, 0.0f, 1.0f - normH);
+        activeImage()->imgParam.imageCropMinX = newMinX;
+        activeImage()->imgParam.imageCropMaxX = newMinX + normW;
+        activeImage()->imgParam.imageCropMinY = newMinY;
+        activeImage()->imgParam.imageCropMaxY = newMinY + normH;
+
+        updateCrop = false;
+        renderCall = true;
     }
 
     // Calculate crop rectangle corners in normalized coordinates (0-1)
@@ -134,6 +178,12 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
                 dragStartMinY = activeImage()->imgParam.imageCropMinY;
                 dragStartMaxX = activeImage()->imgParam.imageCropMaxX;
                 dragStartMaxY = activeImage()->imgParam.imageCropMaxY;
+                dominantAxisLocked = false;
+                if (activeImage()->imgParam.lockAspect) {
+                    float h = dragStartMaxY - dragStartMinY;
+                    float w = dragStartMaxX - dragStartMinX;
+                    dragLockedNormRatio = (h > 0.0001f) ? w / h : targetNormRatio;
+                }
                 currentlyInteracting = true;
             }
         }
@@ -292,23 +342,80 @@ void mainWindow::windowCrop(ImVec2 &imagePos, bool &dragging, bool &isInteractin
                     break;
             }
 
+            // For aspect-locked dragging, determine the dominant axis once on the first
+            // meaningful movement and hold it for the entire drag to prevent mid-drag jumps.
+            if (activeImage()->imgParam.lockAspect && !dominantAxisLocked) {
+                if (std::fabs(deltaX) > 0.0005f || std::fabs(deltaY) > 0.0005f) {
+                    dominantAxisIsX    = (std::fabs(deltaX) >= std::fabs(deltaY));
+                    dominantAxisLocked = true;
+                }
+            }
+
             // Apply delta to the correct logical corner in original image coordinates
             switch (logicalCorner) {
-                case 0: // Logical top-left in original image
-                    newMinX = dragStartMinX + deltaX;
-                    newMinY = dragStartMinY + deltaY;
+                case 0: // Logical top-left — moves minX, minY; maxX/maxY are anchors
+                    if (activeImage()->imgParam.lockAspect && dominantAxisLocked) {
+                        if (dominantAxisIsX) {
+                            newMinX = dragStartMinX + deltaX;
+                            float cropW = dragStartMaxX - newMinX;
+                            newMinY = dragStartMaxY - cropW / dragLockedNormRatio;
+                        } else {
+                            newMinY = dragStartMinY + deltaY;
+                            float cropH = dragStartMaxY - newMinY;
+                            newMinX = dragStartMaxX - cropH * dragLockedNormRatio;
+                        }
+                    } else {
+                        newMinX = dragStartMinX + deltaX;
+                        newMinY = dragStartMinY + deltaY;
+                    }
                     break;
-                case 1: // Logical top-right in original image
-                    newMaxX = dragStartMaxX + deltaX;
-                    newMinY = dragStartMinY + deltaY;
+                case 1: // Logical top-right — moves maxX, minY; minX/maxY are anchors
+                    if (activeImage()->imgParam.lockAspect && dominantAxisLocked) {
+                        if (dominantAxisIsX) {
+                            newMaxX = dragStartMaxX + deltaX;
+                            float cropW = newMaxX - dragStartMinX;
+                            newMinY = dragStartMaxY - cropW / dragLockedNormRatio;
+                        } else {
+                            newMinY = dragStartMinY + deltaY;
+                            float cropH = dragStartMaxY - newMinY;
+                            newMaxX = dragStartMinX + cropH * dragLockedNormRatio;
+                        }
+                    } else {
+                        newMaxX = dragStartMaxX + deltaX;
+                        newMinY = dragStartMinY + deltaY;
+                    }
                     break;
-                case 2: // Logical bottom-right in original image
-                    newMaxX = dragStartMaxX + deltaX;
-                    newMaxY = dragStartMaxY + deltaY;
+                case 2: // Logical bottom-right — moves maxX, maxY; minX/minY are anchors
+                    if (activeImage()->imgParam.lockAspect && dominantAxisLocked) {
+                        if (dominantAxisIsX) {
+                            newMaxX = dragStartMaxX + deltaX;
+                            float cropW = newMaxX - dragStartMinX;
+                            newMaxY = dragStartMinY + cropW / dragLockedNormRatio;
+                        } else {
+                            newMaxY = dragStartMaxY + deltaY;
+                            float cropH = newMaxY - dragStartMinY;
+                            newMaxX = dragStartMinX + cropH * dragLockedNormRatio;
+                        }
+                    } else {
+                        newMaxX = dragStartMaxX + deltaX;
+                        newMaxY = dragStartMaxY + deltaY;
+                    }
                     break;
-                case 3: // Logical bottom-left in original image
-                    newMinX = dragStartMinX + deltaX;
-                    newMaxY = dragStartMaxY + deltaY;
+                case 3: // Logical bottom-left — moves minX, maxY; maxX/minY are anchors
+                    if (activeImage()->imgParam.lockAspect && dominantAxisLocked) {
+                        if (dominantAxisIsX) {
+                            newMinX = dragStartMinX + deltaX;
+                            float cropW = dragStartMaxX - newMinX;
+                            newMaxY = dragStartMinY + cropW / dragLockedNormRatio;
+                        } else {
+                            newMaxY = dragStartMaxY + deltaY;
+                            float cropH = newMaxY - dragStartMinY;
+                            newMinX = dragStartMaxX - cropH * dragLockedNormRatio;
+                        }
+                    } else {
+                        newMinX = dragStartMinX + deltaX;
+                        newMaxY = dragStartMaxY + deltaY;
+                    }
                     break;
             }
 

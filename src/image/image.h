@@ -7,6 +7,7 @@
 #include <variant>
 #include <thread>
 #include <mutex>
+#include <vector>
 #include <OpenImageIO/imageio.h>
 #include "nlohmann/json.hpp"
 #include "renderParams.h"
@@ -20,11 +21,12 @@
 
 struct image {
     // Buffers
+    std::vector<char> fileBuffer;
     float* rawImgData = nullptr;
     float* procImgData = nullptr;
     float* tmpOutData = nullptr;
     float* blurImgData = nullptr;
-    uint8_t* dispImgData = nullptr;
+    uint8_t* dispImgData = nullptr;  // Deprecated - remove
     //uint8_t* thumbData;
 
     // Metadata
@@ -43,6 +45,14 @@ struct image {
     unsigned int rawWidth = 0;
     unsigned int rawHeight = 0;
 
+    // Buffer Sizes
+    uint64_t rawBufSize = 0;
+    uint64_t blurBufSize = 0;
+    uint64_t procBufSize = 0;
+    uint64_t tmpBufSize = 0;
+    uint64_t glBufSize = 0;
+    uint64_t glSmBufSize = 0;
+
     // Resolution used for display
     // This is modified by the crop settings
     unsigned int dispW = 0;
@@ -53,6 +63,7 @@ struct image {
     unsigned int rndrW = 0;
     unsigned int rndrH = 0;
 
+    bool fileLoaded = false;
     bool isRawImage = false;
     bool isDataRaw = false;
 
@@ -70,6 +81,8 @@ struct image {
 
     // Undo/Redo state
     userState imgState;
+    imageParams prevSaveParam;
+    imageMetadata prevSaveMeta;
 
 
     // Status flags
@@ -92,11 +105,13 @@ struct image {
     // Display/Render flags
     bool renderBypass = true;
     bool gradeBypass = false;
+    bool showClip = false;
+    int channelView = 0;
+    uint32_t secEnable = 0xFFFFFFFF; // Everything on
     bool applyCrops = false;
 
 
     // GL Display
-    long long unsigned int glTexture = 0;
     long long unsigned int glTextureSm = 0;
 
     void* histTex = nullptr;
@@ -120,6 +135,9 @@ struct image {
     void loadBuffers();
     void padToRGBA();
     void trimForSave();
+    void unloadFileBuffer();
+    uint64_t ramUsage();
+    uint64_t vramUsage();
 
 
 
@@ -142,6 +160,8 @@ struct image {
     bool importImageMeta(std::string filename, copyPaste* impOpt = nullptr);
     void metaPaste(copyPaste selectons, imageParams* params, imageMetadata* meta, bool init = false);
     void loadParamJSONObj(imageParams* imgParam, copyPaste *&pasteOpts, nlohmann::json obj);
+    void calculateHash();
+    bool imageUnsaved();
 
     // image.cpp
     void rotLeft();
@@ -149,13 +169,15 @@ struct image {
     void flipV();
     void flipH();
     void setCrop(float buffer = 0.1f);
+    void loadFileintoBuffer();
+    void updateSaveState();
 
 
     // imageProcessing.cpp
     void processBaseColor();
     void blurImage();
-    void processMinMax();
-    void setMinMax();
+    void processMinMax(ocioSetting ocioSet);
+    void setMinMax(ocioSetting ocioSet);
     void calcProxyDim();
     void resizeProxy();
     void processCPU(ocioSetting ocioSet);

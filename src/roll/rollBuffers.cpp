@@ -35,6 +35,7 @@ bool filmRoll::clearBuffers(bool remove) {
 
     if (!appPrefs.prefs.perfMode && !remove)
         return false; // User does not have performance mode enabled
+    LOG_INFO("Unloading roll: {}", rollName);
     for (int i = 0; i < images.size(); i++) {
         images[i].clearBuffers();
     }
@@ -51,7 +52,16 @@ void filmRoll::loadBuffers() {
     rollDumpTimer = std::chrono::steady_clock::now();
     rollDumpCall = false;
     if (rollLoaded) {
-        return;
+        bool anyUnloaded = false;
+        for (const auto& img : images) {
+            if (!img.imageLoaded) {
+                anyUnloaded = true;
+                break;
+            }
+        }
+        if (!anyUnloaded)
+            return;
+        rollLoaded = false;
     }
     imagesLoading = true;
     std::thread([this]() {
@@ -82,6 +92,7 @@ void filmRoll::loadBuffers() {
     re-loaded after save
 */
 void filmRoll::checkBuffers() {
+    imagesLoading = true;
     std::thread([this]() {
         std::vector<std::future<void>> futures;
 
@@ -116,4 +127,30 @@ void filmRoll::closeSelected() {
             ++it;
         }
     }
+}
+
+//--- Roll Ram Usage ---//
+/*
+    Return the total ram used by all
+    images in the current roll
+*/
+
+uint64_t filmRoll::rollRamUsage() {
+    uint64_t ramTotal = 0;
+    for (auto& image : images)
+        ramTotal += image.ramUsage();
+    return ramTotal;
+}
+
+//--- Roll VRam Usage ---//
+/*
+    Return the total vram used by all
+    images in the current roll
+*/
+
+uint64_t filmRoll::rollVramUsage() {
+    uint64_t vramTotal = 0;
+    for (auto& image : images)
+        vramTotal += image.vramUsage();
+    return vramTotal;
 }

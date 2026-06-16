@@ -74,6 +74,16 @@ void filmRoll::clearVisible() {
     }
 }
 
+//--- Clear Display ---//
+/*
+    Clear all display flags in images
+*/
+void filmRoll::clearDisplayFlags() {
+    for (auto &image : images) {
+        image.channelView = 0;
+        image.showClip = false;
+    }
+}
 
 //--- Unsaved Images ---//
 /*

@@ -5,6 +5,7 @@
 #include "imageParams.h"
 #include "logger.h"
 #include "nlohmann/json.hpp"
+#include "openssl/evp.h"
 #include "structs.h"
 #include <cstddef>
 #include <filesystem>
@@ -12,6 +13,7 @@
 #include <iostream>
 #include <ostream>
 #include <csignal>
+#include <string>
 
 // Metadata workflow:
 // Import:
@@ -146,16 +148,16 @@ void image::readMetaFromFile() {
 bool image::writeExpMeta(std::string filename) {
     updateMetaStr();
     exifData["Exif.Image.ImageDescription"] = jsonMeta;
-    exifData["Exif.Image.Orientation"] = imgParam.rotation;
+    exifData["Exif.Image.Orientation"] = imgParam.writeRotation;
     if (hasSCXMP) {
         scxmpData["Xmp.dc.description"] = jsonMeta;
-        scxmpData["Xmp.tiff.Orientation"] = imgParam.rotation;
+        scxmpData["Xmp.tiff.Orientation"] = imgParam.writeRotation;
         scxmpData["Xmp.xmp.Rating"] = imgMeta.rating;
     }
     else {
         intxmpData["Xmp.dc.description"] = jsonMeta;
-        intxmpData["Xmp.tiff.Orientation"] = imgParam.rotation;
-        scxmpData["Xmp.xmp.Rating"] = imgMeta.rating;
+        intxmpData["Xmp.tiff.Orientation"] = imgParam.writeRotation;
+        intxmpData["Xmp.xmp.Rating"] = imgMeta.rating;
     }
 
     try {
@@ -244,8 +246,10 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         fvParams["g_mult"] = nlohmann::json::array();
         fvParams["g_offset"] = nlohmann::json::array();
         fvParams["g_gamma"] = nlohmann::json::array();
+        fvParams["g_matrix"] = nlohmann::json::array();
         fvParams["cropBoxX"] = nlohmann::json::array();
         fvParams["cropBoxY"] = nlohmann::json::array();
+        fvParams["curves"] = nlohmann::json::array();
         for (int i = 0; i < 4; i++) {
             if (i < 2) {
                 fvParams["sampleX"].push_back(imgParam.sampleX[i]);
@@ -265,7 +269,11 @@ std::optional<nlohmann::json> image::getJSONMeta() {
             fvParams["g_gamma"].push_back(imgParam.g_gamma[i]);
             fvParams["cropBoxX"].push_back(imgParam.cropBoxX[i]);
             fvParams["cropBoxY"].push_back(imgParam.cropBoxY[i]);
+            fvParams["curves"].push_back(imgParam.curves[i]);
         }
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
+                fvParams["g_matrix"].push_back(imgParam.g_matrix[i][j]);
         fvParams["blurAmount"] = imgParam.blurAmount;
         fvParams["minX"] = imgParam.minX;
         fvParams["minY"] = imgParam.minY;
@@ -280,6 +288,8 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         fvParams["imageCropMaxY"] = imgParam.imageCropMaxY;
         fvParams["cropEnable"] = imgParam.cropEnable;
         fvParams["arbitraryRotation"] = imgParam.arbitraryRotation;
+        fvParams["lockAspect"] = imgParam.lockAspect;
+        fvParams["imageCropAspect"] = imgParam.imageCropAspect;
 
         fvParams["temp"] = imgParam.temp;
         fvParams["tint"] = imgParam.tint;
@@ -294,6 +304,8 @@ std::optional<nlohmann::json> image::getJSONMeta() {
         fvParams["inverse"] = imgParam.inverse;
 
         metaParams = imgMeta;
+        std::string version = std::to_string(VERMAJOR) + "." + std::to_string(VERMINOR) + "." + std::to_string(VERPATCH);
+        metaParams["fvVersion"] = version;
 
         j["filmvert"] = fvParams;
         j["metadata"] = metaParams;
@@ -369,6 +381,7 @@ void image::writeXMPFile() {
         sidecarFile << xmpPacket;
         sidecarFile.close();
         needMetaWrite = false;
+        updateSaveState();
     } catch (const Exiv2::Error& e) {
         LOG_ERROR("Exiv2 exception writing sidecar: {}", e.what());
     }
@@ -446,8 +459,13 @@ bool image::loadMetaFromStr(const std::string& j, copyPaste* impOpt, bool init) 
         }
     }
     metaPaste(opts, impParam, impMeta, init);
+    imgParam.rgb_to_cmyk();
     if (impParam == nullptr && impMeta == nullptr)
         return false;
+    if (impParam)
+        delete impParam;
+    if (impMeta)
+        delete impMeta;
     return true;
 }
 
@@ -466,31 +484,43 @@ bool image::importImageMeta(std::string filename, copyPaste* impOpt) {
                             std::istreambuf_iterator<char>());
         return loadMetaFromStr(fileContents, impOpt);
     } else {
-        try {
-            Exiv2::enableBMFF();
-            auto image = Exiv2::ImageFactory::open(filename);
-            if (!image) {
-                throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Could not open the image for metadata reading");
+        if (imPath.extension().string() == ".exr" ||
+            imPath.extension().string() == ".EXR") {
+            OIIO::ImageInput::unique_ptr inputImage = OIIO::ImageInput::open(filename);
+            const OIIO::ImageSpec &inputSpec = inputImage->spec();
+            std::string meta = inputSpec.get_string_attribute("filmvert", "");
+            if (!meta.empty()) {
+                return loadMetaFromStr(meta, impOpt);
+            } else {
+                return false;
             }
+        } else {
+            try {
+                Exiv2::enableBMFF();
+                auto image = Exiv2::ImageFactory::open(filename);
+                if (!image) {
+                    throw Exiv2::Error(Exiv2::ErrorCode::kerErrorMessage, "Could not open the image for metadata reading");
+                }
 
-            image->readMetadata();
+                image->readMetadata();
 
-            // Read EXIF Data into Image
-            Exiv2::ExifData exifData = image->exifData();
+                // Read EXIF Data into Image
+                Exiv2::ExifData exifData = image->exifData();
 
-            if (!exifData.empty()) {
-                if (auto fvMetaOpt = getExifValue<std::string>(exifData, "Exif.Image.ImageDescription"); fvMetaOpt.has_value()) {
-                    std::string customMeta = saniJsonString(fvMetaOpt.value());
-                    if (!customMeta.empty()) {
-                        // Run the meta loding function
-                        return loadMetaFromStr(customMeta, impOpt);
+                if (!exifData.empty()) {
+                    if (auto fvMetaOpt = getExifValue<std::string>(exifData, "Exif.Image.ImageDescription"); fvMetaOpt.has_value()) {
+                        std::string customMeta = saniJsonString(fvMetaOpt.value());
+                        if (!customMeta.empty()) {
+                            // Run the meta loding function
+                            return loadMetaFromStr(customMeta, impOpt);
+                        }
                     }
                 }
-            }
 
-        } catch (const Exiv2::Error& e) {
-            LOG_ERROR("Exiv2 image exception: {}", e.what());
-            return false;
+            } catch (const Exiv2::Error& e) {
+                LOG_ERROR("Exiv2 image exception: {}", e.what());
+                return false;
+            }
         }
     }
     return true;
@@ -542,7 +572,9 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
             imgParam.imageCropMinY = impParams.imageCropMinY;
             imgParam.imageCropMaxY = impParams.imageCropMaxY;
             imgParam.arbitraryRotation = impParams.arbitraryRotation;
-            imgParam.cropEnable = true;
+            imgParam.imageCropAspect = impParams.imageCropAspect;
+            imgParam.lockAspect = impParams.lockAspect;
+            imgParam.cropEnable = impParams.cropEnable;
             metaChg = true;
         }
         if (selectons.analysis) {
@@ -597,6 +629,17 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
                 imgParam.g_gamma[j] = impParams.g_gamma[j];
                 metaChg = true;
             }
+        }
+        if (selectons.matrix) {
+            std::memcpy(imgParam.g_matrix, impParams.g_matrix, sizeof(impParams.g_matrix));
+            metaChg = true;
+        }
+        if (selectons.curves) {
+            for (int i = 0; i < 4; i++) {
+                imgParam.curves[i].px = impParams.curves[i].px;
+                imgParam.curves[i].py = impParams.curves[i].py;
+            }
+            metaChg = true;
         }
         renderBypass &= !metaChg;
     }
@@ -668,6 +711,10 @@ void image::metaPaste(copyPaste selectons, imageParams* params, imageMetadata* m
             imgMeta.scanNotes = impMeta.scanNotes;
             metaChg = true;
         }
+        if (selectons.frameNum)
+            imgMeta.frameNumber = impMeta.frameNumber;
+        if (selectons.hash)
+            imgMeta.hash = impMeta.hash;
     }
     if (!init)
         needMetaWrite |= metaChg;
@@ -817,6 +864,20 @@ void image::loadParamJSONObj(imageParams* imgParam, copyPaste *&pasteOpts, nlohm
         auto temp = obj["g_gamma"].get<std::array<float, 4>>();
         std::copy(temp.begin(), temp.end(), imgParam->g_gamma);
     }
+    if (obj.contains("g_matrix")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->matrix = true;
+        auto temp = obj["g_matrix"].get<std::array<float, 9>>();
+        std::memcpy(imgParam->g_matrix, temp.data(), sizeof(imgParam->g_matrix));
+    }
+    if (obj.contains("curves")) {
+        if (pasteOpts->fromLoad)
+            pasteOpts->curves = true;
+        auto temp = obj["curves"].get<std::array<imageCurve, 4>>();
+        for (int i = 0; i < 4; i++) {
+            imgParam->curves[i] = temp[i];
+        }
+    }
 
     if (obj.contains("cropBoxX")) {
         if (pasteOpts->fromLoad)
@@ -865,7 +926,52 @@ void image::loadParamJSONObj(imageParams* imgParam, copyPaste *&pasteOpts, nlohm
     }
     if (obj.contains("cropEnable")) {
         if (pasteOpts->fromLoad)
+            pasteOpts->imageCrop = true;
         imgParam->cropEnable = obj["cropEnable"].get<int>();
     }
 
+}
+
+
+void image::calculateHash() {
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        LOG_ERROR("Failed to create hash context for: {}", srcFilename);
+        return;
+    }
+
+    if (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) != 1) {
+        EVP_MD_CTX_free(ctx);
+        LOG_ERROR("Failed to initialise digest for: {}", srcFilename);
+        return;
+    }
+
+    if (EVP_DigestUpdate(ctx, fileBuffer.data(), fileBuffer.size()) != 1) {
+        EVP_MD_CTX_free(ctx);
+        LOG_ERROR("Failed to update digest for: {}", srcFilename);
+        return;
+    }
+
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hashLen = 0;
+
+    if (EVP_DigestFinal_ex(ctx, hash, &hashLen) != 1) {
+        EVP_MD_CTX_free(ctx);
+        LOG_ERROR("Failed to finalise digest for: {}", srcFilename);
+        return;
+    }
+
+    EVP_MD_CTX_free(ctx);
+
+    std::ostringstream oss;
+    for (unsigned int i = 0; i < hashLen; i++)
+        oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+    imgMeta.hash = oss.str();
+    return;
+}
+
+bool image::imageUnsaved() {
+    if (needMetaWrite)
+        needMetaWrite = prevSaveMeta != imgMeta || prevSaveParam != imgParam;
+    return needMetaWrite;
 }

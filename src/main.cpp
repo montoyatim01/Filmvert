@@ -20,7 +20,7 @@ int main(void)
 
     // Setup Threadpool
     unsigned int numThreads = appPrefs.prefs.maxSimExports;
-    numThreads = numThreads < 1 ? 2 : numThreads;
+    numThreads = numThreads < 1 ? 4 : numThreads > THREAD_LIMIT ? 4 : numThreads;
     LOG_INFO("Starting thread pool with {} threads", numThreads);
     tPool = new ThreadPool(numThreads);
 

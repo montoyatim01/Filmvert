@@ -1,5 +1,7 @@
+#include "preferences.h"
 #include "roll.h"
 #include "window.h"
+#include "utils.h"
 #include <filesystem>
 #include <imgui.h>
 
@@ -83,33 +85,58 @@ void setTintColor(float tintVal) {
     return;
 }
 
-bool DragFloat4WithColors(const char* label, float col[4], float speed) {
+bool DragFloat4WithColors(const char* label, float col[4], float speed, bool cmyk) {
     bool valueChanged = false;
     std::string labelRGBW = label;
     labelRGBW += "RGBW";
     ImGui::PushID(labelRGBW.c_str());
-    float windowWidth = ImGui::GetWindowWidth();
+    const float windowWidth = ImGui::GetContentRegionAvail().x;
+    const float resetW    = ImGui::CalcTextSize("Reset").x
+                          + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float buttonWidth = ImGui::GetFrameHeight();
+    const float totalSliderW = windowWidth - resetW - buttonWidth
+                                 - ImGui::GetStyle().ItemSpacing.x * 5.0f;
+    const float sliderW      = std::floor(totalSliderW / 4.0f);
+    const float lastSliderW  = totalSliderW - sliderW * 3.0f;
 
     // Red Slider
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,67,67,138));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,131,131,138)); //0, 103, 220, 138
-    ImGui::SetNextItemWidth(windowWidth * 0.15);
+    if (cmyk) {
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,112,112,138));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,220,220,138));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,67,67,138));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,131,131,138));
+    }
+
+    ImGui::SetNextItemWidth(sliderW);
     valueChanged |= ImGui::DragFloat("##dragR", &col[0], speed, -10.0f, 10.0f);
     ImGui::PopStyleColor();
     ImGui::PopStyleColor();
 ImGui::SameLine();
     // Green Slider
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,112,67,138));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,220,131,138));
-    ImGui::SetNextItemWidth(windowWidth * 0.15);
+    if (cmyk) {
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,67,112,138));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,131,220,138));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,112,67,138));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,220,131,138));
+    }
+
+    ImGui::SetNextItemWidth(sliderW);
     valueChanged |= ImGui::DragFloat("##dragG", &col[1], speed, -10.0f, 10.0f);
     ImGui::PopStyleColor();
     ImGui::PopStyleColor();
 ImGui::SameLine();
     // Blue Slider
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,67,112,138));
-    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,131,220,138));
-    ImGui::SetNextItemWidth(windowWidth * 0.15);
+    if (cmyk) {
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,112,67,138));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,220,131,138));
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,67,112,138));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,131,220,138));
+    }
+
+    ImGui::SetNextItemWidth(sliderW);
     valueChanged |= ImGui::DragFloat("##dragB", &col[2], speed, -10.0f, 10.0f);
     ImGui::PopStyleColor();
     ImGui::PopStyleColor();
@@ -117,7 +144,72 @@ ImGui::SameLine();
     // White Slider
     ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,112,112,138));
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,220,220,138));
-    ImGui::SetNextItemWidth(windowWidth * 0.15);
+    ImGui::SetNextItemWidth(lastSliderW);
+    valueChanged |= ImGui::DragFloat("##dragW", &col[3], speed, -10.0f, 10.0f);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+
+
+    ImGui::PopID();
+    return valueChanged;
+}
+
+bool DragFloat3WithColors(const char* label, float col[3], float speed) {
+    bool valueChanged = false;
+    std::string labelRGB = label;
+    labelRGB += "RGB";
+    ImGui::PushID(labelRGB.c_str());
+    const float windowWidth = ImGui::GetContentRegionAvail().x;
+    const float resetW    = ImGui::CalcTextSize("Reset").x
+                          + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float buttonWidth = ImGui::GetFrameHeight();
+    const float sliderW = (windowWidth - (resetW + buttonWidth + (ImGui::GetStyle().ItemSpacing.x * 4))) / 3.0f;
+
+    // Red Slider
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,67,67,138));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,131,131,138));
+    ImGui::SetNextItemWidth(sliderW);
+    valueChanged |= ImGui::DragFloat("##dragR", &col[0], speed, -10.0f, 10.0f);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+ImGui::SameLine();
+    // Green Slider
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,112,67,138));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,220,131,138));
+    ImGui::SetNextItemWidth(sliderW);
+    valueChanged |= ImGui::DragFloat("##dragG", &col[1], speed, -10.0f, 10.0f);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+ImGui::SameLine();
+    // Blue Slider
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(67,67,112,138));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(131,131,220,138));
+    ImGui::SetNextItemWidth(sliderW);
+    valueChanged |= ImGui::DragFloat("##dragB", &col[2], speed, -10.0f, 10.0f);
+    ImGui::PopStyleColor();
+    ImGui::PopStyleColor();
+
+
+    ImGui::PopID();
+    return valueChanged;
+}
+
+bool DragFloat1WithColors(const char* label, float col[4], float speed) {
+    bool valueChanged = false;
+    std::string labelRGBW = label;
+    labelRGBW += "RGBW";
+    ImGui::PushID(labelRGBW.c_str());
+    float windowWidth = ImGui::GetContentRegionAvail().x;
+    const float resetW   = ImGui::CalcTextSize("Reset").x
+                         + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float buttonWidth = ImGui::GetFrameHeight();
+    const float sliderW  = -(resetW + (ImGui::GetStyle().ItemSpacing.x * 2) + buttonWidth);
+
+
+    // White Slider
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(112,112,112,138));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(220,220,220,138));
+    ImGui::SetNextItemWidth(sliderW);
     valueChanged |= ImGui::DragFloat("##dragW", &col[3], speed, -10.0f, 10.0f);
     ImGui::PopStyleColor();
     ImGui::PopStyleColor();
@@ -133,16 +225,19 @@ ImGui::SameLine();
     holding shift for more fine-tune
     controls over the values
 */
-bool ColorEdit4WithFineTune(const char* label, float col[4], ImGuiColorEditFlags flags) {
+bool ColorEdit4WithFineTune(const char* label, float col[4], bool cmyk, bool slow, ImGuiColorEditFlags flags) {
     bool value_changed = false;
 
     ImGui::PushID(label);
 
-    // Base speed - when shift is held, use much smaller speed
-    float speed = ImGui::GetIO().KeyShift ? 0.000005f : 0.001f;
+    float speed;
+    if (appPrefs.prefs.altGrades && !slow)
+        speed = ImGui::GetIO().KeyShift ? 0.0010f : 0.040f;
+    else
+        speed = ImGui::GetIO().KeyShift ? 0.000005f : 0.0005f;
 
     // Use DragFloat4 for the color components
-    value_changed = DragFloat4WithColors("##drag", col, speed);
+    value_changed = DragFloat4WithColors("##drag", col, speed, cmyk);
         //ImGui::DragFloat4("##drag", col, speed, -10.0f, 10.0f);
 
     // Add color preview
@@ -158,6 +253,106 @@ bool ColorEdit4WithFineTune(const char* label, float col[4], ImGuiColorEditFlags
     ImGui::PopID();
 
     return value_changed;
+}
+
+bool ColorEdit3WithFineTune(const char* label, float col[3], ImGuiColorEditFlags flags) {
+    bool value_changed = false;
+
+    ImGui::PushID(label);
+
+    // Base speed - when shift is held, use much smaller speed
+    float speed = ImGui::GetIO().KeyShift ? 0.000005f : 0.001f;
+
+    // Use DragFloat4 for the color components
+    value_changed = DragFloat3WithColors("##drag", col, speed);
+        //ImGui::DragFloat4("##drag", col, speed, -10.0f, 10.0f);
+    float a = 1.0f;
+    // Add color preview
+    ImGui::SameLine();
+    if (ImGui::ColorButton("##preview", ImVec4(col[0], col[1], col[2], a), flags)) {
+        ImGui::OpenPopup("color_picker");
+    }
+    if (ImGui::BeginPopup("color_picker")) {
+        value_changed |= ImGui::ColorPicker4("##picker", col, flags);
+        ImGui::EndPopup();
+    }
+
+    ImGui::PopID();
+
+    return value_changed;
+}
+
+bool ColorEdit1WithFineTune(const char* label, float col[4], ImGuiColorEditFlags flags) {
+    bool value_changed = false;
+
+    ImGui::PushID(label);
+
+    // Base speed - when shift is held, use much smaller speed
+    float speed = ImGui::GetIO().KeyShift ? 0.000005f : 0.001f;
+
+    // Use DragFloat4 for the color components
+    value_changed = DragFloat1WithColors("##drag", col, speed);
+        //ImGui::DragFloat4("##drag", col, speed, -10.0f, 10.0f);
+
+    // Add color preview
+    ImGui::SameLine();
+    if (ImGui::ColorButton("##preview", ImVec4(col[0], col[1], col[2], col[3]), flags)) {
+        ImGui::OpenPopup("color_picker");
+    }
+    if (ImGui::BeginPopup("color_picker")) {
+        value_changed |= ImGui::ColorPicker4("##picker", col, flags);
+        ImGui::EndPopup();
+    }
+
+    ImGui::PopID();
+
+    return value_changed;
+}
+
+bool TreeNodeWithLine(const char* label, bool* checked, bool altHeld, float rightPad) {
+    bool open = ImGui::TreeNode(label);
+    ImVec2 itemMin = ImGui::GetItemRectMin();
+    ImVec2 itemMax = ImGui::GetItemRectMax();
+    float lineY    = (itemMin.y + itemMax.y) * 0.5f;
+    float lineX0   = itemMax.x + ImGui::GetStyle().ItemSpacing.x;
+    float winRight = ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x;
+
+    if (checked) {
+        // Shorten the line to leave room for the checkbox on the right.
+        float frameH = ImGui::GetFrameHeight();
+        float lineX1 = winRight - rightPad - frameH - (ImGui::GetStyle().ItemSpacing.x * 4);
+        if (lineX0 < lineX1)
+            ImGui::GetWindowDrawList()->AddLine(
+                ImVec2(lineX0, lineY), ImVec2(lineX1, lineY),
+                ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
+
+        // Draw checkbox flush with the right content edge.
+        std::string chkId = std::string("##tnl_") + label;
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - rightPad - frameH);
+
+        if (!altHeld) {
+            // Momentary mode: held → false, released → spring back to true,
+            bool dummy = *checked;
+            ImGui::Checkbox(chkId.c_str(), &dummy);
+            if (ImGui::IsItemActive())
+                *checked = false;           // force off while held
+            else if (ImGui::IsItemDeactivated())
+                *checked = true;            // spring back the moment mouse lifts
+            // else: no interaction this frame — preserve whatever *checked is
+        } else {
+            // Alt mode: normal latching toggle.
+            ImGui::Checkbox(chkId.c_str(), checked);
+        }
+    } else {
+        // No checkbox — line extends to the full right edge.
+        float lineX1 = winRight;
+        if (lineX0 < lineX1)
+            ImGui::GetWindowDrawList()->AddLine(
+                ImVec2(lineX0, lineY), ImVec2(lineX1, lineY),
+                ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
+    }
+    return open;
 }
 
 bool is_hidden(const std::filesystem::path& p) {
@@ -427,79 +622,7 @@ void mainWindow::testFirstRawFile() {
             fileSize = std::filesystem::file_size(firstPath);
 
         }
-        switch (fileSize) {
-            case 36000000:
-                // 3000x2000 Base 16
-                rawSet.width = 3000;
-                rawSet.height = 2000;
-                rawSet.channels = 3;
-                rawSet.bitDepth = 16;
-                rawSet.littleE = true;
-                break;
-            case 36000016:
-                // 3000x2000 Base 16 w/header
-                rawSet.width = 3000;
-                rawSet.height = 2000;
-                rawSet.channels = 3;
-                rawSet.bitDepth = 16;
-                rawSet.littleE = true;
-                rawSet.pakonHeader = true;
-                break;
-            case 20250000:
-                // 2250x1500 Base 8
-                rawSet.width = 2250;
-                rawSet.height = 1500;
-                rawSet.channels = 3;
-                rawSet.bitDepth = 16;
-                rawSet.littleE = true;
-                break;
-            case 20250016:
-                // 2250x1500 Base 8 w/header
-                rawSet.width = 2250;
-                rawSet.height = 1500;
-                rawSet.channels = 3;
-                rawSet.bitDepth = 16;
-                rawSet.littleE = true;
-                rawSet.pakonHeader = true;
-                break;
-            case 18000000:
-                // 1500x2000 Half-frame Base 16
-                rawSet.width = 1500;
-                rawSet.height = 2000;
-                rawSet.channels = 3;
-                rawSet.bitDepth = 16;
-                rawSet.littleE = true;
-                break;
-            case 18000016:
-                // 1500x2000 Half-frame Base 16 w/header
-                rawSet.width = 1500;
-                rawSet.height = 2000;
-                rawSet.channels = 3;
-                rawSet.bitDepth = 16;
-                rawSet.littleE = true;
-                rawSet.pakonHeader = true;
-                break;
-            case 9000000:
-                // 1500x1000 Base 4
-                rawSet.width = 1500;
-                rawSet.height = 1000;
-                rawSet.channels = 3;
-                rawSet.bitDepth = 16;
-                rawSet.littleE = true;
-                break;
-            case 9000016:
-                // 1500x1000 Base 4 w/header
-                rawSet.width = 1500;
-                rawSet.height = 1000;
-                rawSet.channels = 3;
-                rawSet.bitDepth = 16;
-                rawSet.littleE = true;
-                rawSet.pakonHeader = true;
-                break;
-            default:
-                // We don't know!
-                break;
-        }
+        checkRawFile(rawSet, fileSize);
     }
 }
 
@@ -514,6 +637,18 @@ bool mainWindow::unsavedChanges() {
         unsaved |= activeRolls[r].unsavedImages();
     }
     return unsaved;
+}
+
+//--- Data Format ---//
+/*
+    Format a nice string with units
+    for a given byte value
+*/
+std::string mainWindow::byteFormat(uint64_t v) {
+    if (v >= 1ULL << 30) return fmt::format("{:.2f} GB", v / (double)(1ULL << 30));
+        if (v >= 1ULL << 20) return fmt::format("{:.2f} MB", v / (double)(1ULL << 20));
+        if (v >= 1ULL << 10) return fmt::format("{:.2f} KB", v / (double)(1ULL << 10));
+        return fmt::format("{} B", v);
 }
 
 // Helper function to transform coordinates based on rotation
@@ -593,8 +728,8 @@ void inverseTransformCoordinates(int& x, int& y, int rotation, int width, int he
             break;
 
         case 5: // Transpose (horizontal flip + 90 degrees counterclockwise)
-            x = height - 1 - tempY;
-            y = width - 1 - tempX;
+            x = width  - 1 - tempY;
+            y = height - 1 - tempX;
             break;
 
         case 6: // Left (90 degrees counterclockwise)
@@ -887,6 +1022,10 @@ void mainWindow::selectBackward() {
     flagVisibleImage();
 }
 
+//--- Flag Visible Image ---//
+/*
+    Set's the visible flag in the active image
+*/
 void mainWindow::flagVisibleImage() {
     if (validRoll()) {
         activeRoll()->clearVisible();
@@ -922,5 +1061,15 @@ void mainWindow::loadMappings()
     csBake.push_back("None");
     csBake.push_back("Flip Only");
     csBake.push_back("All");
+
+    colorPickers.push_back("Hue Wheel");
+    colorPickers.push_back("Hue Bar");
+
+    scalingModes.push_back("Linear");
+    scalingModes.push_back("Nearest");
+
+    viewPixelDepth.push_back("8-bit");
+    viewPixelDepth.push_back("10-bit");
+    viewPixelDepth.push_back("Float");
 
 }

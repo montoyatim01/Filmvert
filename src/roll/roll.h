@@ -47,6 +47,7 @@ class filmRoll {
     void selectAll();
     void clearSelection();
     void clearVisible();
+    void clearDisplayFlags();
 
     bool unsavedImages() const;
     bool unsavedIndividual();
@@ -58,6 +59,8 @@ class filmRoll {
     void loadBuffers();
     void checkBuffers();
     void closeSelected();
+    uint64_t rollRamUsage();
+    uint64_t rollVramUsage();
 
     // rollIO.cpp
     void saveAll();
@@ -68,10 +71,12 @@ class filmRoll {
     bool exportRollMetaJSON();
     bool exportRollCSV();
     bool importRollMetaJSON(const std::string& jsonFile);
+    std::optional<std::vector<std::string>> getRollFiles(const std::string& rollFile);
     void applyRollMetaJSON(bool params, copyPaste impOpt);
     bool applySelMetaJSON(std::string inFile, copyPaste impOpt);
     void rollMetaPreEdit(metaBuff* meta);
     void rollMetaPostEdit(metaBuff* meta);
+    std::string searchImage(const std::filesystem::path& searchPath, const std::string& fileStemName);
 
     // rollState.cpp
     void rollUpState();
