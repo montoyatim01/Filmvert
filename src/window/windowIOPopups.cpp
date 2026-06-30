@@ -537,20 +537,20 @@ void mainWindow::batchRenderPopup() {
                     std::vector<const char*> cspPtrs;
                     cspPtrs.reserve(ocioProc.activeConfig()->colorspaces.size());
                     for (auto& s : ocioProc.activeConfig()->colorspaces) cspPtrs.push_back(s.c_str());
-                    ImGui::Combo("###CS", &importOCIO.colorspace, cspPtrs.data(), cspPtrs.size());
+                    ImGui::Combo("###CS", &exportOCIO.colorspace, cspPtrs.data(), cspPtrs.size());
                     exportOCIO.useDisplay = false;
                 } else {
                     ImGui::Text("Display:");
                     std::vector<const char*> dispPtrs;
                     dispPtrs.reserve(ocioProc.activeConfig()->displays.size());
                     for (auto& s : ocioProc.activeConfig()->displays) dispPtrs.push_back(s.c_str());
-                    ImGui::Combo("###DSP", &importOCIO.display, dispPtrs.data(), dispPtrs.size());
+                    ImGui::Combo("###DSP", &exportOCIO.display, dispPtrs.data(), dispPtrs.size());
 
                     ImGui::Text("View:");
                     std::vector<const char*> viewPtrs;
                     viewPtrs.reserve(ocioProc.activeConfig()->views[dispOCIO.display].size());
                     for (auto& s : ocioProc.activeConfig()->views[dispOCIO.display]) viewPtrs.push_back(s.c_str());
-                    ImGui::Combo("##VW", &importOCIO.view, viewPtrs.data(), viewPtrs.size());
+                    ImGui::Combo("##VW", &exportOCIO.view, viewPtrs.data(), viewPtrs.size());
                     exportOCIO.useDisplay = true;
                 }
                 exportOCIO.inverse = false;
