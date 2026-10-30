@@ -2,6 +2,7 @@
 #include "roll.h"
 #include "window.h"
 #include "utils.h"
+#include <algorithm>
 #include <filesystem>
 #include <imgui.h>
 
@@ -758,67 +759,33 @@ ImVec2 transformPointToCroppedDisplay(float origX, float origY, image* img, floa
     ImVec2 result;
 
     if (img->imgParam.cropEnable) {
-        // First check if the point is within the crop region (in original image space)
-        if (origX < img->imgParam.imageCropMinX || origX > img->imgParam.imageCropMaxX ||
-            origY < img->imgParam.imageCropMinY || origY > img->imgParam.imageCropMaxY) {
+        // Mirrors getCroppedRotatedUV in glslKernels.h: the view shows the crop rectangle of the
+        // arbitrarily rotated image, and the EXIF rotation is applied over the crop size.
+        float aspect = (float)img->width / (float)img->height;
+        float rot = -img->imgParam.arbitraryRotation * M_PI / 180.0f;
+        float dx = (origX - 0.5f) * aspect;
+        float dy = origY - 0.5f;
+        float wx = (dx * cos(rot) - dy * sin(rot)) / aspect + 0.5f;
+        float wy = dx * sin(rot) + dy * cos(rot) + 0.5f;
+
+        float cropW = img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX;
+        float cropH = img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY;
+        float u = (wx - img->imgParam.imageCropMinX) / cropW;
+        float v = (wy - img->imgParam.imageCropMinY) / cropH;
+        if (!(u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f)) {
             // Point is outside crop, return off-screen position
             result.x = -1000;
             result.y = -1000;
             return result;
         }
 
-        // Calculate where the point is relative to the crop region (0-1 within crop)
-        float cropWidth = img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX;
-        float cropHeight = img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY;
-
-        float normX = (origX - img->imgParam.imageCropMinX) / cropWidth;
-        float normY = (origY - img->imgParam.imageCropMinY) / cropHeight;
-
-        // Apply arbitrary rotation around center of crop
-        float centerX = 0.5f;
-        float centerY = 0.5f;
-
-        // For flipped EXIF orientations, mirror the rotation
-        float rotationAngle = img->imgParam.arbitraryRotation;
-        bool needsMirroring = (img->imgParam.rotation == 2 ||
-                              img->imgParam.rotation == 4 ||
-                              img->imgParam.rotation == 5 ||
-                              img->imgParam.rotation == 7);
-
-        if (needsMirroring) {
-            rotationAngle = -rotationAngle;
-        }
-
-        float rotRad = rotationAngle * M_PI / 180.0f;
-        float cosR = cos(rotRad);
-        float sinR = sin(rotRad);
-
-        // Translate to origin
-        float tempX = normX - centerX;
-        float tempY = normY - centerY;
-
-        // Rotate
-        float rotatedX = tempX * cosR - tempY * sinR;
-        float rotatedY = tempX * sinR + tempY * cosR;
-
-        // Translate back
-        rotatedX += centerX;
-        rotatedY += centerY;
-
-        // Get the display dimensions accounting for EXIF rotation
-        int displayWidth = img->width;
-        int displayHeight = img->height;
-        if (img->imgParam.rotation == 6 || img->imgParam.rotation == 8 ||
-            img->imgParam.rotation == 5 || img->imgParam.rotation == 7) {
-            std::swap(displayWidth, displayHeight);
-        }
-
-        // Convert to display coordinates using the cropped display dimensions
-        float cropDisplayW = (img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX) * displayWidth;
-        float cropDisplayH = (img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY) * displayHeight;
-
-        result.x = imagePos.x + rotatedX * cropDisplayW * dispScale;
-        result.y = imagePos.y + rotatedY * cropDisplayH * dispScale;
+        int effW = std::max(1, (int)(cropW * img->width));
+        int effH = std::max(1, (int)(cropH * img->height));
+        int pixelX = u * effW;
+        int pixelY = v * effH;
+        transformCoordinates(pixelX, pixelY, img->imgParam.rotation, effW, effH);
+        result.x = imagePos.x + pixelX * dispScale;
+        result.y = imagePos.y + pixelY * dispScale;
     } else {
         // No crop enabled, use standard transformation with EXIF rotation
         int pixelX = origX * img->width;
@@ -869,65 +836,26 @@ ImVec2 transformPointToCroppedDisplay(float origX, float origY, image* img, floa
 // Inverse transform from display coordinates back to original image coordinates
 bool inverseTransformFromCroppedDisplay(ImVec2 displayPos, ImVec2 imagePos, image* img, float dispScale, float& origX, float& origY) {
     if (img->imgParam.cropEnable) {
-        // Get the display dimensions accounting for EXIF rotation
-        int displayWidth = img->width;
-        int displayHeight = img->height;
-        if (img->imgParam.rotation == 6 || img->imgParam.rotation == 8 ||
-            img->imgParam.rotation == 5 || img->imgParam.rotation == 7) {
-            std::swap(displayWidth, displayHeight);
-        }
+        // Inverse of transformPointToCroppedDisplay.
+        float cropW = img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX;
+        float cropH = img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY;
+        int effW = std::max(1, (int)(cropW * img->width));
+        int effH = std::max(1, (int)(cropH * img->height));
+        int pixelX = (displayPos.x - imagePos.x) / dispScale;
+        int pixelY = (displayPos.y - imagePos.y) / dispScale;
+        inverseTransformCoordinates(pixelX, pixelY, img->imgParam.rotation, effW, effH);
+        pixelX = std::clamp(pixelX, 0, effW);
+        pixelY = std::clamp(pixelY, 0, effH);
+        float wx = img->imgParam.imageCropMinX + (float)pixelX / effW * cropW;
+        float wy = img->imgParam.imageCropMinY + (float)pixelY / effH * cropH;
 
-        float cropDisplayW = (img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX) * displayWidth;
-        float cropDisplayH = (img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY) * displayHeight;
-
-        // Convert from display to normalized crop coordinates
-        float normX = (displayPos.x - imagePos.x) / (cropDisplayW * dispScale);
-        float normY = (displayPos.y - imagePos.y) / (cropDisplayH * dispScale);
-
-        // Apply inverse arbitrary rotation
-        float centerX = 0.5f;
-        float centerY = 0.5f;
-
-        // For flipped EXIF orientations, mirror the rotation
-        float rotationAngle = img->imgParam.arbitraryRotation;
-        bool needsMirroring = (img->imgParam.rotation == 2 ||
-                              img->imgParam.rotation == 4 ||
-                              img->imgParam.rotation == 5 ||
-                              img->imgParam.rotation == 7);
-
-        if (needsMirroring) {
-            rotationAngle = -rotationAngle;
-        }
-
-        float rotRad = -rotationAngle * M_PI / 180.0f; // Negative for inverse
-        float cosR = cos(rotRad);
-        float sinR = sin(rotRad);
-
-        // Translate to origin
-        float tempX = normX - centerX;
-        float tempY = normY - centerY;
-
-        // Rotate
-        float unrotatedX = tempX * cosR - tempY * sinR;
-        float unrotatedY = tempX * sinR + tempY * cosR;
-
-        // Translate back
-        unrotatedX += centerX;
-        unrotatedY += centerY;
-
-        // Check bounds
-        if (unrotatedX < 0 || unrotatedX > 1 || unrotatedY < 0 || unrotatedY > 1) {
-            return false; // Outside crop region
-        }
-
-        // Convert back to original image coordinates
-        float cropWidth = img->imgParam.imageCropMaxX - img->imgParam.imageCropMinX;
-        float cropHeight = img->imgParam.imageCropMaxY - img->imgParam.imageCropMinY;
-
-        origX = img->imgParam.imageCropMinX + unrotatedX * cropWidth;
-        origY = img->imgParam.imageCropMinY + unrotatedY * cropHeight;
-
-        return true;
+        float aspect = (float)img->width / (float)img->height;
+        float rot = img->imgParam.arbitraryRotation * M_PI / 180.0f;
+        float dx = (wx - 0.5f) * aspect;
+        float dy = wy - 0.5f;
+        origX = (dx * cos(rot) - dy * sin(rot)) / aspect + 0.5f;
+        origY = dx * sin(rot) + dy * cos(rot) + 0.5f;
+        return origX >= 0.0f && origX <= 1.0f && origY >= 0.0f && origY <= 1.0f;
     } else {
         // No crop, use standard inverse transformation with EXIF rotation
         int transformedX = (displayPos.x - imagePos.x) / dispScale;

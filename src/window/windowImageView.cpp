@@ -306,27 +306,34 @@ void mainWindow::imageView() {
             }
         }
         // Draw min/max positions if available
-        if (minMaxDisp && !cropVisible && !activeImage()->imgParam.cropEnable) {
+        if (minMaxDisp && !cropVisible) {
             if (validIm()){
                 if (activeImage()->imgParam.minX > 0.001 && activeImage()->imgParam.maxY > 0.001) {
-                    // Transform coordinates for minPoint
-                    int minX = activeImage()->imgParam.minX * activeImage()->width;
-                    int minY = activeImage()->imgParam.minY * activeImage()->height;
-                    transformCoordinates(minX, minY, activeImage()->imgParam.rotation,
-                                         activeImage()->width, activeImage()->height);
-
-                    // Transform coordinates for maxPoint
-                    int maxX = activeImage()->imgParam.maxX * activeImage()->width;
-                    int maxY = activeImage()->imgParam.maxY * activeImage()->height;
-                    transformCoordinates(maxX, maxY, activeImage()->imgParam.rotation,
-                                         activeImage()->width, activeImage()->height);
-
                     ImVec2 minPoint;
-                    minPoint.x = imagePos.x + (float)minX * actualScale;
-                    minPoint.y = imagePos.y + (float)minY * actualScale;
                     ImVec2 maxPoint;
-                    maxPoint.x = imagePos.x + (float)maxX * actualScale;
-                    maxPoint.y = imagePos.y + (float)maxY * actualScale;
+                    if (activeImage()->imgParam.cropEnable) {
+                        minPoint = transformPointToCroppedDisplay(activeImage()->imgParam.minX, activeImage()->imgParam.minY,
+                                                                  activeImage(), actualScale, imagePos);
+                        maxPoint = transformPointToCroppedDisplay(activeImage()->imgParam.maxX, activeImage()->imgParam.maxY,
+                                                                  activeImage(), actualScale, imagePos);
+                    } else {
+                        // Transform coordinates for minPoint
+                        int minX = activeImage()->imgParam.minX * activeImage()->width;
+                        int minY = activeImage()->imgParam.minY * activeImage()->height;
+                        transformCoordinates(minX, minY, activeImage()->imgParam.rotation,
+                                             activeImage()->width, activeImage()->height);
+
+                        // Transform coordinates for maxPoint
+                        int maxX = activeImage()->imgParam.maxX * activeImage()->width;
+                        int maxY = activeImage()->imgParam.maxY * activeImage()->height;
+                        transformCoordinates(maxX, maxY, activeImage()->imgParam.rotation,
+                                             activeImage()->width, activeImage()->height);
+
+                        minPoint.x = imagePos.x + (float)minX * actualScale;
+                        minPoint.y = imagePos.y + (float)minY * actualScale;
+                        maxPoint.x = imagePos.x + (float)maxX * actualScale;
+                        maxPoint.y = imagePos.y + (float)maxY * actualScale;
+                    }
                     float pointRadius = 8.0f;
 
                     // Check if mouse is hovering
@@ -403,24 +410,32 @@ void mainWindow::imageView() {
             if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                 // Calculate the new position in screen space
                 ImVec2 mousePos = ImGui::GetIO().MousePos;
-                // Convert to image space (rotated)
-                ImVec2 newPosRotated;
-                newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
-                newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
-                bool swapDims = (activeImage()->imgParam.rotation >= 5 && activeImage()->imgParam.rotation <= 8);
-                int rotatedWidth  = swapDims ? activeImage()->height : activeImage()->width;
-                int rotatedHeight = swapDims ? activeImage()->width  : activeImage()->height;
+                float normX, normY;
+                if (activeImage()->imgParam.cropEnable) {
+                    if (inverseTransformFromCroppedDisplay(mousePos, imagePos, activeImage(), actualScale, normX, normY)) {
+                        activeImage()->imgParam.minX = normX;
+                        activeImage()->imgParam.minY = normY;
+                    }
+                } else {
+                    // Convert to image space (rotated)
+                    ImVec2 newPosRotated;
+                    newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
+                    newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
+                    bool swapDims = (activeImage()->imgParam.rotation >= 5 && activeImage()->imgParam.rotation <= 8);
+                    int rotatedWidth  = swapDims ? activeImage()->height : activeImage()->width;
+                    int rotatedHeight = swapDims ? activeImage()->width  : activeImage()->height;
 
-                newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
-                newPosRotated.y = ImClamp(newPosRotated.y, 0.0f, (float)rotatedHeight);
-                // Convert from rotated to original image coordinates
-                int origX = newPosRotated.x;
-                int origY = newPosRotated.y;
-                inverseTransformCoordinates(origX, origY, activeImage()->imgParam.rotation,
-                                            activeImage()->width, activeImage()->height);
-                // Update the corner position
-                activeImage()->imgParam.minX = (float)origX / activeImage()->width;
-                activeImage()->imgParam.minY = (float)origY / activeImage()->height;
+                    newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
+                    newPosRotated.y = ImClamp(newPosRotated.y, 0.0f, (float)rotatedHeight);
+                    // Convert from rotated to original image coordinates
+                    int origX = newPosRotated.x;
+                    int origY = newPosRotated.y;
+                    inverseTransformCoordinates(origX, origY, activeImage()->imgParam.rotation,
+                                                activeImage()->width, activeImage()->height);
+                    // Update the corner position
+                    activeImage()->imgParam.minX = (float)origX / activeImage()->width;
+                    activeImage()->imgParam.minY = (float)origY / activeImage()->height;
+                }
 
                 activeImage()->minSel = true;
                 // Does this need to be on it's own thread?
@@ -439,24 +454,32 @@ void mainWindow::imageView() {
             if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                 // Calculate the new position in screen space
                 ImVec2 mousePos = ImGui::GetIO().MousePos;
-                // Convert to image space (rotated)
-                ImVec2 newPosRotated;
-                newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
-                newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
-                bool swapDims = (activeImage()->imgParam.rotation >= 5 && activeImage()->imgParam.rotation <= 8);
-                int rotatedWidth  = swapDims ? activeImage()->height : activeImage()->width;
-                int rotatedHeight = swapDims ? activeImage()->width  : activeImage()->height;
+                float normX, normY;
+                if (activeImage()->imgParam.cropEnable) {
+                    if (inverseTransformFromCroppedDisplay(mousePos, imagePos, activeImage(), actualScale, normX, normY)) {
+                        activeImage()->imgParam.maxX = normX;
+                        activeImage()->imgParam.maxY = normY;
+                    }
+                } else {
+                    // Convert to image space (rotated)
+                    ImVec2 newPosRotated;
+                    newPosRotated.x = (mousePos.x - imagePos.x) / actualScale;
+                    newPosRotated.y = (mousePos.y - imagePos.y) / actualScale;
+                    bool swapDims = (activeImage()->imgParam.rotation >= 5 && activeImage()->imgParam.rotation <= 8);
+                    int rotatedWidth  = swapDims ? activeImage()->height : activeImage()->width;
+                    int rotatedHeight = swapDims ? activeImage()->width  : activeImage()->height;
 
-                newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
-                newPosRotated.y = ImClamp(newPosRotated.y, 0.0f, (float)rotatedHeight);
-                // Convert from rotated to original image coordinates
-                int origX = newPosRotated.x;
-                int origY = newPosRotated.y;
-                inverseTransformCoordinates(origX, origY, activeImage()->imgParam.rotation,
-                                            activeImage()->width, activeImage()->height);
-                // Update the corner position
-                activeImage()->imgParam.maxX = (float)origX / activeImage()->width;
-                activeImage()->imgParam.maxY = (float)origY / activeImage()->height;
+                    newPosRotated.x = ImClamp(newPosRotated.x, 0.0f, (float)rotatedWidth);
+                    newPosRotated.y = ImClamp(newPosRotated.y, 0.0f, (float)rotatedHeight);
+                    // Convert from rotated to original image coordinates
+                    int origX = newPosRotated.x;
+                    int origY = newPosRotated.y;
+                    inverseTransformCoordinates(origX, origY, activeImage()->imgParam.rotation,
+                                                activeImage()->width, activeImage()->height);
+                    // Update the corner position
+                    activeImage()->imgParam.maxX = (float)origX / activeImage()->width;
+                    activeImage()->imgParam.maxY = (float)origY / activeImage()->height;
+                }
 
                 activeImage()->minSel = false;
                 // Does this need to be on it's own thread?
